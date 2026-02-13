@@ -242,7 +242,7 @@ export default function ControleVeiculos({
             </div>
             {!veiculo.emUso ? (
               <button
-                className="mt-2 px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="mt-2 px-4 py-1 bg-[#62A1D9] text-white rounded hover:bg-[#24094E] disabled:opacity-50"
                 onClick={() => abrirModal(veiculo)}
                 disabled={veiculo.emUso}
               >
@@ -254,7 +254,7 @@ export default function ControleVeiculos({
                   Em uso
                 </div>
                 <button
-                  className="mt-2 px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                  className="mt-2 px-4 py-1 bg-[#733D38] text-white rounded hover:bg-[#A6806A]"
                   onClick={() => abrirModalFinalizar(veiculo)}
                 >
                   Finalizar
@@ -341,14 +341,14 @@ export default function ControleVeiculos({
             </div>
             <div className="flex justify-end gap-2">
               <button
-                className="px-4 py-1 bg-gray-300 rounded hover:bg-gray-400"
+                className="px-4 py-1 bg-[#A6806A] text-white rounded hover:bg-[#733D38]"
                 onClick={fecharModalFinalizar}
                 disabled={finalizando}
               >
                 Cancelar
               </button>
               <button
-                className="px-4 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1 bg-[#62A1D9] text-white rounded hover:bg-[#24094E] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={finalizarVeiculo}
                 disabled={finalizando}
               >
@@ -448,14 +448,14 @@ export default function ControleVeiculos({
             </div>
             <div className="flex justify-end gap-2">
               <button
-                className="px-4 py-1 bg-gray-300 rounded hover:bg-gray-400"
+                className="px-4 py-1 bg-[#A6806A] text-white rounded hover:bg-[#733D38]"
                 onClick={fecharModal}
                 disabled={salvando}
               >
                 Cancelar
               </button>
               <button
-                className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1 bg-[#62A1D9] text-white rounded hover:bg-[#24094E] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={pilotarVeiculo}
                 disabled={salvando}
               >

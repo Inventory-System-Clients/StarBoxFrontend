@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import api from "../services/api";
-import { Navbar } from "../components/Navbar";
+import Navbar from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { PageHeader, Badge, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";

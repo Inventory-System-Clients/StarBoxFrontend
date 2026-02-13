@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
-import { Navbar } from "../components/Navbar";
+import Navbar from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import {
   PageHeader,
@@ -651,7 +651,7 @@ export function Movimentacoes() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
+    <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

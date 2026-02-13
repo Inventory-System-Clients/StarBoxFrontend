@@ -27,15 +27,15 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary via-background-light to-accent-cream/30 px-4 bg-pattern relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] px-4 relative overflow-hidden">
       {/* Decorative elements */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-tl from-accent-yellow/10 to-transparent rounded-full blur-3xl"></div>
+      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-[#62A1D9]/10 to-transparent rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-tl from-[#A6806A]/10 to-transparent rounded-full blur-3xl"></div>
 
-      <div className="relative card-gradient max-w-md w-full backdrop-blur-sm">
+      <div className="relative bg-white max-w-md w-full rounded-xl shadow-xl backdrop-blur-sm border border-[#62A1D9]">
         {/* Logo/Header Section */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-accent-yellow rounded-full shadow-2xl mb-4 transform hover:rotate-12 transition-transform duration-300">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#62A1D9] to-[#A6806A] rounded-full shadow-2xl mb-4 transform hover:rotate-12 transition-transform duration-300">
             <svg
               className="w-10 h-10 text-white"
               fill="currentColor"
@@ -44,14 +44,16 @@ export function Login() {
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
             </svg>
           </div>
-          <h1 className="text-4xl font-bold mb-2">
-            <span className="text-gradient">Agarra Mais</span>
+          <h1 className="text-4xl font-bold mb-2 text-[#24094E]">
+            <span className="bg-gradient-to-r from-[#62A1D9] via-[#A6806A] to-[#733D38] text-transparent bg-clip-text">
+              StarBox
+            </span>
           </h1>
-          <p className="text-gray-600 font-medium">
-            Sistema de Gestão de Pelúcias 🧸
+          <p className="text-[#733D38] font-medium">
+            Sistema de Gestão de Estoque
           </p>
-          <div className="mt-2 inline-block bg-gradient-to-r from-primary/10 to-accent-yellow/10 px-4 py-1 rounded-full">
-            <p className="text-sm text-gray-700">
+          <div className="mt-2 inline-block bg-gradient-to-r from-[#62A1D9]/10 to-[#A6806A]/10 px-4 py-1 rounded-full">
+            <p className="text-sm text-[#733D38]">
               Controle seu estoque com facilidade
             </p>
           </div>

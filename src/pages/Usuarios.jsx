@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import Navbar from "../components/Navbar";
 import api from "../services/api";
 
 export function Usuarios() {
@@ -50,7 +50,7 @@ export function Usuarios() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background-light">
+      <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
         <Navbar />
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

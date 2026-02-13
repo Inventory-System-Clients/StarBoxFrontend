@@ -2,9 +2,9 @@ import api from "../services/api";
 import React, { useEffect, useState } from "react";
 
 const nivelCor = {
-  danger: "bg-red-100 text-red-800 border-red-300",
-  warning: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  info: "bg-blue-100 text-blue-800 border-blue-300",
+  danger: "bg-[#733D38] text-white border-[#A6806A]",
+  warning: "bg-[#62A1D9] text-white border-[#24094E]",
+  info: "bg-[#A6806A] text-white border-[#733D38]",
 };
 
 export default function AlertasVeiculos() {

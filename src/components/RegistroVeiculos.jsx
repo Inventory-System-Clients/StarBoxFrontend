@@ -8,11 +8,13 @@ export default function RegistroVeiculos({ veiculos = [], loading }) {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Registro de Veículos</h2>
+      <h2 className="text-2xl font-bold mb-4 text-[#24094E]">
+        Registro de Veículos
+      </h2>
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+        <table className="min-w-full bg-white border border-[#62A1D9] rounded-lg text-[#24094E]">
           <thead>
-            <tr className="bg-gray-100">
+            <tr className="bg-[#62A1D9] text-white">
               <th className="px-4 py-2 border">Veículo</th>
               <th className="px-4 py-2 border">Km</th>
               <th className="px-4 py-2 border">Estado</th>

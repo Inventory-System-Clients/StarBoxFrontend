@@ -37,64 +37,31 @@ const RegistrarDinheiro = ({ lojas, maquinas, onSubmit }) => {
   return (
     <form
       onSubmit={handleSubmit}
-      style={{
-        maxWidth: 540,
-        margin: "0 auto",
-        padding: 32,
-        background: "#f7ecd7", // bege claro
-        borderRadius: 18,
-        boxShadow: "0 4px 24px #e2cfa3",
-        position: "relative",
-        border: "2px solid #e2cfa3",
-        overflowY: "auto",
-        maxHeight: "90vh",
-      }}
+      className="max-w-lg mx-auto p-8 bg-white rounded-2xl shadow-2xl relative border-2 border-[#62A1D9] overflow-y-auto max-h-[90vh]"
     >
-      {/* Botão Voltar no topo à esquerda */}
       <button
         type="button"
         onClick={() => window.history.back()}
-        style={{
-          top: 16,
-          left: 16,
-          background: "#e2cfa3",
-          color: "#a67c52",
-          border: "none",
-          borderRadius: 8,
-          padding: "8px 18px",
-          fontWeight: 600,
-          fontSize: 16,
-          boxShadow: "0 2px 8px #e2cfa3",
-          cursor: "pointer",
-        }}
+        className="absolute top-4 left-4 bg-yellow-200 text-yellow-900 border-none rounded-lg px-4 py-2 font-semibold text-lg shadow-md cursor-pointer"
       >
         ← Voltar
       </button>
-      {/* Pelúcia decorativa topo */}
-      <div style={{ position: "absolute", left: -38, top: -38 }}>
+      <div className="absolute left-[-38px] top-[-38px]">
         <img
           src="/public/pelucia-urso.png"
           alt="Pelúcia"
-          style={{ width: 64, height: 64 }}
+          className="w-16 h-16"
         />
       </div>
-      <div style={{ position: "absolute", right: -38, top: -38 }}>
+      <div className="absolute right-[-38px] top-[-38px]">
         <img
           src="/public/pelucia-coelho.png"
           alt="Pelúcia"
-          style={{ width: 64, height: 64 }}
+          className="w-16 h-16"
         />
       </div>
-      <h2
-        style={{
-          fontWeight: 800,
-          fontSize: 26,
-          marginBottom: 18,
-          color: "#a67c52",
-          letterSpacing: 1,
-        }}
-      >
-        <span role="img" aria-label="dinheiro" style={{ marginRight: 8 }}>
+      <h2 className="font-extrabold text-2xl mb-5 text-yellow-900 tracking-wide flex items-center">
+        <span role="img" aria-label="dinheiro" className="mr-2">
           💰
         </span>
         Registrar Dinheiro

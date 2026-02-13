@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import api from "../services/api";
-import { Navbar } from "../components/Navbar";
+import Navbar from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { PageLoader } from "../components/Loading";
 import { Badge } from "../components/UIComponents";
@@ -145,7 +145,7 @@ export function Dashboard() {
             <select
               value={movimentacaoLojaId}
               onChange={(e) => setMovimentacaoLojaId(e.target.value)}
-              className="input-field"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
             >
               <option value="">Selecione a loja</option>
               {(lojas || []).map((loja) => (
@@ -166,7 +166,7 @@ export function Dashboard() {
                   onChange={(e) =>
                     handleProdutoChange(idx, "produtoId", e.target.value)
                   }
-                  className="input-field"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 >
                   <option value="">Produto</option>
                   {(produtos || []).map((prod) => (
@@ -183,14 +183,14 @@ export function Dashboard() {
                     handleProdutoChange(idx, "quantidade", e.target.value)
                   }
                   placeholder="Quantidade"
-                  className="input-field w-24"
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 />
                 <select
                   value={p.tipoMovimentacao || "entrada"}
                   onChange={(e) =>
                     handleProdutoChange(idx, "tipoMovimentacao", e.target.value)
                   }
-                  className="input-field w-28"
+                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 >
                   <option value="saida">Saída</option>
                   <option value="entrada">Entrada</option>
@@ -198,7 +198,7 @@ export function Dashboard() {
                 {produtosMovimentacao.length > 1 && (
                   <button
                     type="button"
-                    className="btn-danger"
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"
                     onClick={() => handleRemoveProduto(idx)}
                   >
                     Remover
@@ -208,7 +208,7 @@ export function Dashboard() {
             ))}
             <button
               type="button"
-              className="btn-secondary"
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg transition"
               onClick={handleAddProduto}
             >
               Adicionar mais um produto
@@ -218,7 +218,7 @@ export function Dashboard() {
             <div className="flex gap-4 justify-end mt-6">
               <button
                 type="button"
-                className="btn-secondary"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition"
                 onClick={() => setMostrarModalMovimentacao(false)}
                 disabled={movimentacaoEnviando}
               >
@@ -226,7 +226,7 @@ export function Dashboard() {
               </button>
               <button
                 type="submit"
-                className="btn-primary"
+                className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold px-4 py-2 rounded-lg flex items-center transition"
                 disabled={movimentacaoEnviando}
               >
                 <svg
@@ -249,7 +249,6 @@ export function Dashboard() {
           {movimentacaoErro && (
             <div className="text-red-600 mt-2">{movimentacaoErro}</div>
           )}
-          {/* Mensagem de sucesso removida, feedback só via alert externo */}
         </div>
       </div>
     );
@@ -1227,23 +1226,26 @@ export function Dashboard() {
   console.log("Fichas no render:", stats.balanco?.totais?.totalFichas);
 
   return (
-    <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
+    <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header com boas-vindas */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2">
-              <span className="text-gradient">Dashboard</span> 🧸
+            <h1 className="text-4xl font-bold mb-2 text-[#24094E]">
+              <span className="bg-gradient-to-r from-[#62A1D9] via-[#A6806A] to-[#733D38] text-transparent bg-clip-text">
+                Dashboard
+              </span>{" "}
+              🧸
             </h1>
-            <p className="text-gray-600">
+            <p className="text-[#733D38]">
               Visão geral do seu sistema de pelúcias
             </p>
           </div>
           <button
             onClick={carregarDados}
-            className="btn-primary flex items-center gap-2"
+            className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
             title="Atualizar dados"
           >
             <svg

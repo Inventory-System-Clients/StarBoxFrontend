@@ -83,14 +83,14 @@ export default function Veiculos() {
   };
 
   // Função auxiliar para formatar a data para o componente filho (se necessário DD/MM/YYYY)
-//   const getDataFormatada = () => {
-//     if (!filtroData) return "";
-//     const [ano, mes, dia] = filtroData.split("-");
-//     return `${dia}/${mes}/${ano}`;
-//   };
+  //   const getDataFormatada = () => {
+  //     if (!filtroData) return "";
+  //     const [ano, mes, dia] = filtroData.split("-");
+  //     return `${dia}/${mes}/${ano}`;
+  //   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-0 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] p-0 md:p-8 text-[#24094E]">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center mb-8 gap-4 bg-white/80 rounded-xl shadow p-4 border border-gray-100 backdrop-blur-sm">

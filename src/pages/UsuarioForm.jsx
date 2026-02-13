@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import Navbar from "../components/Navbar";
 import api from "../services/api";
 
 export function UsuarioForm() {
@@ -137,7 +137,7 @@ export function UsuarioForm() {
     } catch (error) {
       setError(
         error.response?.data?.error ||
-          `Erro ao ${isEdit ? "atualizar" : "criar"} usuário`
+          `Erro ao ${isEdit ? "atualizar" : "criar"} usuário`,
       );
     } finally {
       setSubmitting(false);
@@ -352,8 +352,8 @@ export function UsuarioForm() {
                     ? "Salvando..."
                     : "Criando..."
                   : isEdit
-                  ? "Salvar Alterações"
-                  : "Criar Usuário"}
+                    ? "Salvar Alterações"
+                    : "Criar Usuário"}
               </button>
             </div>
           </form>

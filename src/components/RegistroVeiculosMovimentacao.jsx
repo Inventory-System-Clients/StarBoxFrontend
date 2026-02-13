@@ -46,21 +46,21 @@ export default function RegistroVeiculos({
 
   return (
     <div className="p-0 md:p-2">
-      <h2 className="text-2xl font-bold mb-6 text-blue-900 tracking-tight drop-shadow-sm">
+      <h2 className="text-2xl font-bold mb-6 text-[#24094E] tracking-tight drop-shadow-sm">
         Registro de Movimentação
       </h2>
-      <div className="mb-2 text-sm text-gray-600">
+      <div className="mb-2 text-sm text-[#A6806A]">
         {carregandoMov
           ? "Buscando registros..."
           : `Registros encontrados: ${movimentacoes.length}`}
       </div>
       <div className="mb-6 flex flex-col md:flex-row gap-4 items-stretch md:items-end">
         <div className="flex-1">
-          <label className="block text-sm font-medium mb-1 text-blue-900">
+          <label className="block text-sm font-medium mb-1 text-[#24094E]">
             Filtrar por veículo
           </label>
           <select
-            className="border rounded-lg p-2 w-full focus:ring-2 focus:ring-blue-200"
+            className="border border-[#62A1D9] rounded-lg p-2 w-full focus:ring-2 focus:ring-[#62A1D9]"
             value={filtroVeiculo}
             onChange={(e) => setFiltroVeiculo(e.target.value)}
           >
@@ -73,10 +73,10 @@ export default function RegistroVeiculos({
           </select>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-gray-100 shadow bg-white/90">
-        <table className="min-w-full text-sm text-gray-800">
+      <div className="overflow-x-auto rounded-xl border border-[#62A1D9] shadow bg-white">
+        <table className="min-w-full text-sm text-[#24094E]">
           <thead>
-            <tr className="bg-blue-50 text-blue-900">
+            <tr className="bg-[#62A1D9] text-white">
               <th className="px-4 py-3 border-b font-semibold">Veículo</th>
               <th className="px-4 py-3 border-b font-semibold">Usuário</th>
               <th className="px-4 py-3 border-b font-semibold">Tipo</th>
@@ -97,14 +97,14 @@ export default function RegistroVeiculos({
               <tr>
                 <td
                   colSpan={10}
-                  className="text-center p-6 text-blue-700 font-semibold animate-pulse"
+                  className="text-center p-6 text-[#62A1D9] font-semibold animate-pulse"
                 >
                   Carregando movimentações...
                 </td>
               </tr>
             ) : movimentacoes.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center p-6 text-gray-500">
+                <td colSpan={10} className="text-center p-6 text-[#A6806A]">
                   Nenhum registro encontrado.
                 </td>
               </tr>
@@ -115,13 +115,13 @@ export default function RegistroVeiculos({
                 const precisaLimpar = mov.nivel_limpeza
                   ?.toLowerCase()
                   .includes("precisa");
-                let rowClass = "text-center hover:bg-blue-50 transition";
+                let rowClass = "text-center hover:bg-[#62A1D9]/20 transition";
                 if (isRuim && precisaLimpar) {
-                  rowClass += " bg-red-100 !hover:bg-red-200";
+                  rowClass += " bg-[#733D38]/20 !hover:bg-[#733D38]/30";
                 } else if (isRuim) {
-                  rowClass += " bg-red-100 !hover:bg-red-200";
+                  rowClass += " bg-[#733D38]/20 !hover:bg-[#733D38]/30";
                 } else if (precisaLimpar) {
-                  rowClass += " bg-yellow-100 !hover:bg-yellow-200";
+                  rowClass += " bg-[#A6806A]/20 !hover:bg-[#A6806A]/30";
                 }
                 return (
                   <tr key={mov.id} className={rowClass}>
@@ -133,7 +133,7 @@ export default function RegistroVeiculos({
                     </td>
                     <td className="px-4 py-2 border-b">
                       <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${mov.tipo === "retirada" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"}`}
+                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${mov.tipo === "retirada" ? "bg-[#62A1D9] text-white" : "bg-[#A6806A] text-white"}`}
                       >
                         {mov.tipo === "retirada" ? "Retirada" : "Devolução"}
                       </span>

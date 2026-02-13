@@ -27,10 +27,10 @@ export default function TabelaMovimentacoesEstoqueDeLoja({
   // Função para editar movimentação (apenas abre modal, recarrega estoque deve ser feito após salvar no modal principal)
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-      <table className="min-w-full table-auto">
+    <div className="overflow-x-auto rounded-xl border border-[#62A1D9] bg-white">
+      <table className="min-w-full table-auto text-[#24094E]">
         <thead>
-          <tr className="bg-gray-50">
+          <tr className="bg-[#62A1D9] text-white">
             <th className="px-4 py-2">Data/Hora</th>
             <th className="px-4 py-2">Loja de Destino</th>
             <th className="px-4 py-2">Responsável</th>
@@ -51,7 +51,7 @@ export default function TabelaMovimentacoesEstoqueDeLoja({
                       .includes(filtroResponsavelEstoque.toLowerCase()))) &&
                 (!filtroDataEstoque ||
                   (mov.dataMovimentacao &&
-                    mov.dataMovimentacao.startsWith(filtroDataEstoque)))
+                    mov.dataMovimentacao.startsWith(filtroDataEstoque))),
             )
             .map((mov) => (
               <tr key={mov.id} className="border-b">
@@ -89,7 +89,7 @@ export default function TabelaMovimentacoesEstoqueDeLoja({
                 </td>
                 <td className="px-4 py-2">
                   <button
-                    className="btn-primary px-3 py-1"
+                    className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-semibold px-3 py-1 rounded transition"
                     onClick={() => setEditandoEstoqueLoja(mov)}
                   >
                     Editar
@@ -97,7 +97,7 @@ export default function TabelaMovimentacoesEstoqueDeLoja({
                 </td>
                 <td className="px-4 py-2">
                   <button
-                    className="btn-danger px-3 py-1"
+                    className="bg-[#733D38] hover:bg-[#A6806A] text-white px-3 py-1 rounded transition"
                     onClick={() => handleDelete(mov)}
                   >
                     Deletar
