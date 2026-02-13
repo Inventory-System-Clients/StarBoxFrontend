@@ -32,9 +32,9 @@ export default function Navbar() {
               className="flex items-center space-x-2 sm:space-x-3 group"
             >
               <img
-                src="https://res.cloudinary.com/docrd6tkk/image/upload/v1766765078/LogoAgarraMais_adqqlp.png"
-                alt="Agarra Mais"
-                className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 object-contain transition-transform duration-300 group-hover:scale-110"
+                src="/starbox-logo.png"
+                alt="StarBox Logo"
+                className="w-24 h-16 sm:w-32 sm:h-20 lg:w-40 lg:h-24 object-contain transition-transform duration-300 group-hover:scale-110"
                 onError={(e) => {
                   e.target.style.display = "none";
                 }}
