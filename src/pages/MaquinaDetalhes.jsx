@@ -17,6 +17,7 @@ export function MaquinaDetalhes() {
   const [alertaInconsistencia, setAlertaInconsistencia] = useState(null);
   const [alertaAbastecimento, setAlertaAbastecimento] = useState(null);
   const [produtoUltimaMov, setProdutoUltimaMov] = useState(null);
+  const [concluidaHoje, setConcluidaHoje] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -91,6 +92,24 @@ export function MaquinaDetalhes() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Verifica status de movimentação concluída para hoje
+    const verificarStatus = async () => {
+      try {
+        const hoje = new Date().toISOString().slice(0, 10);
+        const res = await api.get(
+          `/status-diario?maquinaId=${id}&roteiroId=${maquina?.roteiroId}&data=${hoje}`,
+        );
+        setConcluidaHoje(res.data.concluida === true);
+      } catch (e) {
+        setConcluidaHoje(false);
+      }
+    };
+    if (maquina && maquina.roteiroId) {
+      verificarStatus();
+    }
+  }, [maquina]);
 
   if (loading) return <PageLoader />;
 
@@ -248,6 +267,21 @@ export function MaquinaDetalhes() {
             </table>
           )}
         </div>
+
+        {/* Botão de movimentação */}
+        <button
+          className={`btn-primary ${concluidaHoje ? "opacity-50 cursor-not-allowed" : ""}`}
+          disabled={concluidaHoje}
+          title={
+            concluidaHoje
+              ? "Movimentação já registrada hoje"
+              : "Registrar movimentação"
+          }
+        >
+          {concluidaHoje
+            ? "Movimentação concluída hoje"
+            : "Registrar movimentação"}
+        </button>
       </div>
       <Footer />
     </div>

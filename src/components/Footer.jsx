@@ -11,9 +11,8 @@ export function Footer() {
               <img
                 src="/starbox-logo.png"
                 alt="StarBox Logo"
-                className="w-24 h-16 sm:w-32 sm:h-20 lg:w-40 lg:h-24 object-contain"
+                className="bg-blue-900 p-4 w-28 h-20 sm:w-36 sm:h-24 lg:w-44 lg:h-28 object-contain"
               />
-              <span className="text-xl font-bold text-[#62A1D9]">StarBox</span>
             </div>
             <p className="text-[#62A1D9]/80 text-sm leading-relaxed">
               Sistema de gestão de estoque StarBox. Controle eficiente e moderno
@@ -48,9 +47,9 @@ export function Footer() {
               <li>
                 <Link
                   to="/maquinas"
-                  className="text-white hover:text-[#24094E] transition-colors flex items-center gap-2 group"
+                  className="text-[#62A1D9] hover:text-white transition-colors flex items-center gap-2 group"
                 >
-                  <span className="w-1.5 h-1.5 bg-[#24094E] rounded-full group-hover:scale-125 transition-transform"></span>
+                  <span className="w-1.5 h-1.5 bg-[#62A1D9] rounded-full group-hover:scale-125 transition-transform"></span>
                   Máquinas
                 </Link>
               </li>
@@ -80,16 +79,16 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-8 pt-6 border-t border-[#24094E]/20">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-[#24094E]/70 text-sm">
-              © 2026 Agarra Mais. Todos os direitos reservados. 🧸
+        <div className="mt-8 pt-6 border-t  border-[#24094E]/20">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-black">
+            <p className="text-white text-sm">
+              © 2026 SelfMachine. Todos os direitos reservados. 🧸
             </p>
-            <div className="flex items-center gap-4 text-sm text-[#24094E]/70">
+            <div className="flex items-center gap-4 text-sm text-white">
               <span className="bg-white/20 px-2 py-1 rounded">
                 Versão 1.0.0
               </span>
-              <span className="w-1 h-1 bg-[#24094E]/30 rounded-full"></span>
+              <span className="w-1 h-1  bg-[#24094E]/30 rounded-full"></span>
               <span>Made by SelfMachine developers</span>
             </div>
           </div>

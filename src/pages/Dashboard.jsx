@@ -1226,7 +1226,7 @@ export function Dashboard() {
   console.log("Fichas no render:", stats.balanco?.totais?.totalFichas);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
+    <div className="min-h-screen bg-[rgb(242, 242, 242)];">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -20,6 +20,9 @@ import { Movimentacoes } from "./pages/Movimentacoes";
 import { Graficos } from "./pages/Graficos";
 import { Relatorios } from "./pages/Relatorios";
 import { StyleGuide } from "./pages/StyleGuide";
+import { Roteiros } from "./pages/Roteiros";
+import RoteiroExecucao from "./pages/RoteiroExecucao";
+import MovimentacaoMaquina from "./pages/MovimentacaoMaquina";
 import "./App.css";
 
 function App() {
@@ -47,6 +50,7 @@ function App() {
           ;
           <Route path="/registrar" element={<Registrar />} />
           <Route path="/style-guide" element={<StyleGuide />} />
+          <Route path="/roteiros" element={<Roteiros />} />
           <Route
             path="/"
             element={
@@ -190,6 +194,11 @@ function App() {
                 <Relatorios />
               </PrivateRoute>
             }
+          />
+          <Route path="/roteiros/:id/executar" element={<RoteiroExecucao />} />
+          <Route
+            path="/roteiros/:roteiroId/lojas/:lojaId/maquinas/:maquinaId/movimentacao"
+            element={<MovimentacaoMaquina />}
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
