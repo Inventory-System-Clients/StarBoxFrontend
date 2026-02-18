@@ -173,7 +173,7 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
               required
             >
               <SelectTrigger data-testid="select-bill-type">
-                <SelectValue />
+                <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="company">Empresarial</SelectItem>
