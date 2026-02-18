@@ -31,4 +31,56 @@ api.interceptors.response.use(
   }
 );
 
+
+// APIs para integração do financeiro pessoal
+export const billsAPI = {
+  getAll: async (filters = {}) => {
+    const params = new URLSearchParams(filters).toString();
+    const response = await api.get(`/bills?${params}`);
+    return response.data;
+  },
+  create: async (billData) => {
+    const response = await api.post(`/bills`, billData);
+    return response.data;
+  },
+  update: async (id, billData) => {
+    const response = await api.put(`/bills/${id}`, billData);
+    return response.data;
+  },
+  updateStatus: async (id, status) => {
+    const response = await api.patch(`/bills/${id}/status`, { status });
+    return response.data;
+  },
+  delete: async (id) => {
+    const response = await api.delete(`/bills/${id}`);
+    return response.data;
+  }
+};
+
+export const categoriesAPI = {
+  getAll: async () => {
+    const response = await api.get(`/categories`);
+    return response.data;
+  },
+  create: async (name) => {
+    const response = await api.post(`/categories`, { name });
+    return response.data;
+  }
+};
+
+export const reportsAPI = {
+  getDashboard: async () => {
+    const response = await api.get(`/reports/dashboard`);
+    return response.data;
+  },
+  getAlerts: async () => {
+    const response = await api.get(`/reports/alerts`);
+    return response.data;
+  },
+  export: async (format = 'pdf') => {
+    const response = await api.get(`/reports/export?format=${format}`, { responseType: 'blob' });
+    return response.data;
+  }
+};
+
 export default api;

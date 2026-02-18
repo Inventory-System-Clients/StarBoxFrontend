@@ -1,4 +1,13 @@
 import Veiculos from "./pages/Veiculos";
+import FinanceiroRoutes from "./pages/FinanceiroRoutes.jsx";
+          <Route
+            path="/financeiro/*"
+            element={
+              <PrivateRoute>
+                <FinanceiroRoutes />
+              </PrivateRoute>
+            }
+          />
 import Alertas from "./pages/Alertas";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
