@@ -23,19 +23,11 @@ export default function Navbar() {
 
   return (
 
-    <nav className="bg-[#24094E] text-[#62A1D9] shadow-2xl border-b-4 border-[#62A1D9] sticky top-0 z-50">
+    <nav className="text-[#62A1D9] shadow-2xl border-b-4 border-[#62A1D9] sticky top-0 z-50" style={{ background: 'linear-gradient(90deg, #62A1D9 0%, #24094E 35%, #24094E 100%)' }}>
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex items-center justify-between h-30">
           {/* Logo e Nome */}
           <div className="flex items-center relative">
-            {/* Gradiente atrás da logo */}
-            <div
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-[60px] sm:h-[70px] lg:h-[80px] w-[220px] sm:w-[260px] lg:w-[320px] z-0 rounded-r-full pointer-events-none"
-              style={{
-                background: "linear-gradient(90deg, #62A1D9 0%, #24094E 80%)",
-                boxShadow: "0 0 24px 0 #62A1D980"
-              }}
-            ></div>
             <Link
               to="/"
               className="flex items-center space-x-2 sm:space-x-3 group min-w-0 relative z-10"
@@ -44,7 +36,7 @@ export default function Navbar() {
                 src="/starbox-logo.png"
                 alt="StarBox Logo"
                 className="p-4 w-22 h-8 sm:w-30 sm:h-10 lg:w-38 lg:h-12 object-contain transition-transform duration-300 group-hover:scale-105"
-                style={{ maxWidth: "180px", height: "auto" }}
+                style={{ maxWidth: "180px", height: "auto", background: 'transparent' }}
                 onError={(e) => {
                   e.target.style.display = "none";
                 }}
@@ -71,7 +63,7 @@ export default function Navbar() {
                   🧸 Produtos
                 </NavLink>
 
-                <NavLink to="/financeiro" active={isActive("/financeiro")}> 
+                <NavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}> 
                   💸 Financeiro
                 </NavLink>
 
@@ -137,7 +129,7 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
-            <MobileNavLink to="/financeiro" active={isActive("/financeiro")}
+            <MobileNavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}
               onClick={closeMenu}>
               💸 Financeiro
             </MobileNavLink>

@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export function PrivateRoute({ children, adminOnly = false }) {
   const { signed, loading, isAdmin } = useAuth();
+  const currentPath = window.location.pathname;
 
   if (loading) {
     return (

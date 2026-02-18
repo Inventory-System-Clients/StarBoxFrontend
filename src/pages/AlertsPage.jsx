@@ -126,7 +126,7 @@ export default function AlertsPage() {
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500" data-testid="summary-green">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">No Prazo (>3 dias)</p>
+                  <p className="text-sm text-gray-600 mb-1">No Prazo (3 dias)</p>
                   <p className="text-3xl font-bold text-green-600">{greenAlerts.length}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-lg">

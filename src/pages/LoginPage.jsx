@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
@@ -9,6 +9,7 @@ import { Lock, Mail, User as UserIcon } from 'lucide-react';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const { usuario } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,6 +19,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (usuario) {
+      navigate('/financeiro/dashboard');
+    }
+  }, [usuario, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +40,7 @@ export default function LoginPage() {
 
       if (result.success) {
         toast.success(isLogin ? 'Login realizado com sucesso!' : 'Conta criada com sucesso!');
-        navigate('/dashboard');
+        navigate('/financeiro/dashboard');
       } else {
         toast.error(result.error);
       }

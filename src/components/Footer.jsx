@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 
-export function Footer() {
+const Footer = () => {
   return (
-    <footer className="bg-[#24094E] text-[#62A1D9] mt-12 border-t-4 border-[#24094E]">
+    <footer className="text-[#62A1D9] mt-12 border-t-4 border-[#24094E]" style={{ background: 'linear-gradient(90deg, #62A1D9 0%, #24094E 35%, #24094E 100%)' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Branding */}
@@ -11,7 +11,8 @@ export function Footer() {
               <img
                 src="/starbox-logo.png"
                 alt="StarBox Logo"
-                className="bg-blue-900 p-4 w-28 h-20 sm:w-36 sm:h-24 lg:w-44 lg:h-28 object-contain"
+                className="p-4 w-28 h-20 sm:w-36 sm:h-24 lg:w-44 lg:h-28 object-contain"
+                style={{ background: 'transparent' }}
               />
             </div>
             <p className="text-[#62A1D9]/80 text-sm leading-relaxed">
@@ -96,7 +97,9 @@ export function Footer() {
       </div>
     </footer>
   );
-}
+};
+
+export default Footer;
 
 // Ícones extraídos para limpeza do código
 const EmailIcon = () => (

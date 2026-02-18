@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import api from "../services/api";
 import Navbar from "../components/Navbar";
-import { Footer } from "../components/Footer";
+import Footer from "../components/Footer.jsx";
 import { PageLoader } from "../components/Loading";
 import { Badge } from "../components/UIComponents";
 import AlertAdmin from "../components/AlertAdmin";
@@ -2662,13 +2662,12 @@ export function Dashboard() {
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-lg text-gray-900">
-                            {alerta.maquina.codigo}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">
+                            {alerta.produto.emoji || "📦"}
                           </span>
-                          <span className="text-gray-600">-</span>
-                          <span className="text-gray-800 font-medium">
-                            {alerta.maquina.nome}
+                          <span className="font-bold text-lg text-gray-900">
+                            {alerta.produto.nome}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 flex items-center gap-1">
@@ -2683,19 +2682,23 @@ export function Dashboard() {
                               clipRule="evenodd"
                             />
                           </svg>
-                          {alerta.maquina.loja}
+                          {alerta.lojaNome}
                         </p>
+                        {alerta.produto.codigo && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Código: {alerta.produto.codigo}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="flex items-baseline gap-1">
                           <span className="text-3xl font-bold text-gray-900">
-                            {alerta.percentualAtual}
+                            {alerta.quantidade}
                           </span>
-                          <span className="text-lg text-gray-600">%</span>
+                          <span className="text-lg text-gray-600">un</span>
                         </div>
                         <p className="text-xs text-gray-600 mt-1 bg-white/60 px-2 py-1 rounded-full">
-                          {alerta.estoqueAtual}/{alerta.capacidadePadrao}{" "}
-                          unidades
+                          Min: {alerta.estoqueMinimo} · {percentualAtual}%
                         </p>
                       </div>
                     </div>
@@ -3150,6 +3153,7 @@ export function Dashboard() {
                               ? "bg-white hover:border-primary/30"
                               : "bg-gray-50 opacity-60"
                         }`}
+                        title={item.produtoNome}
                       >
                         <div className="flex items-start gap-4">
                           {/* Checkbox para ativar/desativar */}

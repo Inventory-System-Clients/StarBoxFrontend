@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
-import { Footer } from "../components/Footer";
+import Footer from "../components/Footer.jsx";
 import { PageHeader, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
 
@@ -72,7 +72,8 @@ export function MaquinaForm() {
         forcaFraca: response.data.forcaFraca || "",
         forcaPremium: response.data.forcaPremium || "",
         jogadasPremium: response.data.jogadasPremium || "",
-        percentualAlertaEstoque: response.data.percentualAlertaEstoque || 20,
+        percentualAlertaEstoque:
+          response.data.percentualAlertaEstoque || 20,
         localizacao: response.data.localizacao || "",
         ativo: response.data.ativo !== undefined ? response.data.ativo : true,
       });

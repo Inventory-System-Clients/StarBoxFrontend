@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { reportsAPI } from '../services/api';
-import { Button } from '../components/ui/button';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { reportsAPI } from '../services/api.js';
+import { Button } from '../components/ui/button.jsx';
 import { Plus, TrendingUp, TrendingDown, AlertTriangle, Calendar, Download } from 'lucide-react';
-import BillModal from '../components/BillModal';
-import { categoriesAPI } from '../services/api';
+import BillModal from '../components/BillModal.jsx';
+import { categoriesAPI } from '../services/api.js';
 import { toast } from 'sonner';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import Header from '../components/Header.jsx';
+import Footer from '../components/Footer.jsx';
 import { useNavigate } from 'react-router-dom';
 
 export default function DashboardPage() {
@@ -20,10 +20,6 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    if (user?.role !== 'admin') {
-      navigate('/bills/company');
-      return;
-    }
     fetchData();
   }, [user]);
 

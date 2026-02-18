@@ -40,6 +40,14 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route
+            path="/financeiro/*"
+            element={
+              <PrivateRoute>
+                <FinanceiroRoutes />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/veiculos"
             element={
               <PrivateRoute>

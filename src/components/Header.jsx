@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LayoutDashboard, Building2, User, Bell, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
-import Logo from '../assets/logo.png';
+import Logo from '../assets/Star Box.png';
 
 export default function Header() {
   const { user, logout } = useAuth();
