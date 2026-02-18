@@ -60,7 +60,7 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]" data-testid="bill-modal">
+      <DialogContent className="sm:max-w-[500px] bill-modal-content" data-testid="bill-modal">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             {bill ? 'Editar Conta' : 'Cadastrar Conta à Pagar'}
