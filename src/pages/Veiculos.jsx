@@ -96,7 +96,7 @@ export default function Veiculos() {
         <div className="flex flex-wrap justify-between items-center mb-8 gap-4 bg-white/80 rounded-xl shadow p-4 border border-gray-100 backdrop-blur-sm">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/")}
               className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition-all duration-150 flex items-center gap-2"
             >
               <span>←</span> Voltar para o Dashboard
