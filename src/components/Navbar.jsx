@@ -59,9 +59,16 @@ export default function Navbar() {
                   🏪 Lojas
                 </NavLink>
 
+
                 <NavLink to="/produtos" active={isActive("/produtos")}> 
                   🧸 Produtos
                 </NavLink>
+
+                {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO") && (
+                  <NavLink to="/pecas" active={isActive("/pecas")}> 
+                    🛠️ Peças
+                  </NavLink>
+                )}
 
 
                 {usuario?.role === "ADMIN" && (
@@ -132,10 +139,18 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
-            <MobileNavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}
-              onClick={closeMenu}>
-              💸 Financeiro
-            </MobileNavLink>
+            {usuario?.role === "ADMIN" && (
+              <MobileNavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}
+                onClick={closeMenu}>
+                💸 Financeiro
+              </MobileNavLink>
+            )}
+            {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO") && (
+              <MobileNavLink to="/pecas" active={isActive("/pecas")}
+                onClick={closeMenu}>
+                🛠️ Peças
+              </MobileNavLink>
+            )}
             {/* ... Repetir para outros links ... */}
             {usuario?.role === "ADMIN" && (
               <MobileNavLink

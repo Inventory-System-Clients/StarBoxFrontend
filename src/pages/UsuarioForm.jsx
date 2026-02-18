@@ -289,10 +289,13 @@ export function UsuarioForm() {
                 >
                   <option value="FUNCIONARIO">Funcionário</option>
                   <option value="ADMIN">Administrador</option>
+                  <option value="GERENCIADOR">Gerenciador</option>
                 </select>
                 <p className="mt-2 text-sm text-gray-500">
                   {formData.role === "ADMIN"
                     ? "Administradores têm acesso total ao sistema"
+                    : formData.role === "GERENCIADOR"
+                    ? "Gerenciadores têm acesso apenas à aba de Peças, podem cadastrar, excluir e gerenciar peças e carrinhos dos funcionários."
                     : "Funcionários têm acesso limitado às lojas autorizadas"}
                 </p>
               </div>
