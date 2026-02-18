@@ -43,11 +43,6 @@ export function Login() {
               style={{ background: 'transparent' }}
             />
           </div>
-          <h1 className="text-4xl font-bold mb-2 text-[#24094E]">
-            <span className="bg-gradient-to-r from-[#62A1D9] via-[#A6806A] to-[#733D38] text-transparent bg-clip-text">
-              StarBox
-            </span>
-          </h1>
           <p className="text-[#733D38] font-medium">
             Sistema de Gestão de Estoque
           </p>
