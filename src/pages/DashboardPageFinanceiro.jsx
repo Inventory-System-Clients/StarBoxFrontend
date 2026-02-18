@@ -125,7 +125,7 @@ export default function DashboardPage() {
                     Atenção! Você tem {urgentAlerts.length} conta(s) próxima(s) ao vencimento
                   </p>
                   <button
-                    onClick={() => navigate('/alerts')}
+                    onClick={() => navigate('/financeiro/avisos')}
                     className="text-sm text-yellow-700 underline hover:text-yellow-900"
                     data-testid="link-view-alerts"
                   >
