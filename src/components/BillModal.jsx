@@ -146,40 +146,34 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
                 data-testid="input-new-category"
               />
             ) : (
-              <Select
+              <select
+                className="input-field"
                 value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
+                onChange={e => setFormData({ ...formData, category: e.target.value })}
                 required
+                data-testid="select-category"
               >
-                <SelectTrigger data-testid="select-category">
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">Selecione uma categoria</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
             )}
           </div>
 
           <div>
             <Label htmlFor="bill_type">Tipo *</Label>
-            <Select
+            <select
+              className="input-field"
               value={formData.bill_type}
-              onValueChange={(value) => setFormData({ ...formData, bill_type: value })}
+              onChange={e => setFormData({ ...formData, bill_type: e.target.value })}
               required
+              data-testid="select-bill-type"
             >
-              <SelectTrigger data-testid="select-bill-type">
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="company">Empresarial</SelectItem>
-                <SelectItem value="personal">Particular</SelectItem>
-              </SelectContent>
-            </Select>
+              <option value="">Selecione o tipo</option>
+              <option value="company">Empresarial</option>
+              <option value="personal">Particular</option>
+            </select>
           </div>
 
           <div>
