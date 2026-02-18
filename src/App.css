@@ -1,5 +1,5 @@
 /* Força fundo branco no conteúdo do modal de contas a pagar */
-.bill-modal-content, .bill-modal-content * {
+.bill-modal-content {
 	background: #fff !important;
 	background-color: #fff !important;
 }
