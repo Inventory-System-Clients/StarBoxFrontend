@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 const SENHA_ACESSO = "agarramais2025"; // Defina a senha de acesso aqui
 

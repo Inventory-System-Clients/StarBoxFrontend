@@ -11,7 +11,7 @@ import {
 } from "../components/UIComponents";
 import RegistrarDinheiro from "../components/RegistrarDinheiro";
 import { PageLoader, EmptyState } from "../components/Loading";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import AvisosMaquinasFaltam from "../components/AvisosMaquinasFaltam";
 import TabelaMovimentacoesEstoqueDeLoja from "../components/TabelaMovimentacoesEstoqueDeLoja";
 

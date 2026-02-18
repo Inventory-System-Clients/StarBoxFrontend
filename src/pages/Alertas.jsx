@@ -1,5 +1,5 @@
 import AlertAdmin from "../components/AlertAdmin";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
 
 export default function Alertas() {

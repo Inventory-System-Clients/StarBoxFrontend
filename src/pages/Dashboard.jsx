@@ -7,7 +7,7 @@ import { Footer } from "../components/Footer";
 import { PageLoader } from "../components/Loading";
 import { Badge } from "../components/UIComponents";
 import AlertAdmin from "../components/AlertAdmin";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 import Swal from "sweetalert2";
 

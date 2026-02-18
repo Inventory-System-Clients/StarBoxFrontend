@@ -12,7 +12,7 @@ import {
   AlertBox,
 } from "../components/UIComponents";
 import { PageLoader, EmptyState } from "../components/Loading";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export function Produtos() {
   const navigate = useNavigate();

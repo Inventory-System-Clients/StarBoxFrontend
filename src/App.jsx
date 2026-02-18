@@ -10,7 +10,7 @@ import FinanceiroRoutes from "./pages/FinanceiroRoutes.jsx";
           />
 import Alertas from "./pages/Alertas";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { PrivateRoute } from "./components/PrivateRoute";
 import { Login } from "./pages/Login";
 import { Registrar } from "./pages/Registrar";

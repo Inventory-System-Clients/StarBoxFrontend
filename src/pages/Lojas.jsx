@@ -11,7 +11,7 @@ import {
   Badge,
 } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export function Lojas() {
   const { usuario } = useAuth();
