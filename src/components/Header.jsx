@@ -10,16 +10,15 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleExitFinanceiro = () => {
+    navigate('/');
   };
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
-    { path: '/bills/company', label: 'Contas Empresariais', icon: Building2 },
-    { path: '/bills/personal', label: 'Contas Particulares', icon: User },
-    { path: '/alerts', label: 'Avisos', icon: Bell }
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
+    { path: '/financeiro/contas/company', label: 'Contas Empresariais', icon: Building2 },
+    { path: '/financeiro/contas/personal', label: 'Contas Particulares', icon: User },
+    { path: '/financeiro/avisos', label: 'Avisos', icon: Bell }
   ];
 
   return (
@@ -27,7 +26,7 @@ export default function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-8">
-            <Link to="/dashboard" className="flex items-center space-x-2" data-testid="logo-link">
+            <Link to="/financeiro" className="flex items-center space-x-2" data-testid="logo-link">
               <div className="w-10 h-10 flex items-center justify-center">
                 <img src={Logo} alt="Logo" className="w-10 h-10 object-contain" />
               </div>
@@ -67,11 +66,11 @@ export default function Header() {
               <span className="text-xs text-gray-500 capitalize" data-testid="user-role">{user?.role}</span>
             </div>
             <Button
-              onClick={handleLogout}
+              onClick={handleExitFinanceiro}
               variant="ghost"
               size="sm"
               className="text-gray-600 hover:text-purple-600 hover:bg-purple-50"
-              data-testid="logout-button"
+              data-testid="exit-financeiro-button"
             >
               <LogOut size={18} />
             </Button>

@@ -12,7 +12,7 @@ function FinanceiroRoutes() {
       <Route path="dashboard" element={<DashboardPage />} />
       <Route path="contas/:type" element={<BillsPage />} />
       <Route path="avisos" element={<AlertsPage />} />
-      <Route path="*" element={<Navigate to="/financeiro" />} />
+      {/* <Route path="*" element={<Navigate to="/financeiro" />} /> */}
     </Routes>
   );
 }

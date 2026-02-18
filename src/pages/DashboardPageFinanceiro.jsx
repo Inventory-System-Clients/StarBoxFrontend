@@ -80,6 +80,11 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-4xl font-bold text-gray-800 mb-2" data-testid="page-title">Dashboard</h1>
               <p className="text-gray-600">Visão geral das contas a pagar</p>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <Button onClick={() => navigate('/financeiro/contas/personal')} variant="outline" className="border-blue-300 text-blue-600 hover:bg-blue-50">Contas Particulares</Button>
+                <Button onClick={() => navigate('/financeiro/contas/company')} variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50">Contas Empresariais</Button>
+                <Button onClick={() => navigate('/financeiro/avisos')} variant="outline" className="border-yellow-300 text-yellow-600 hover:bg-yellow-50">Avisos</Button>
+              </div>
             </div>
             <div className="flex space-x-3">
               <Button

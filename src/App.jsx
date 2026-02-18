@@ -217,7 +217,7 @@ function App() {
             path="/roteiros/:roteiroId/lojas/:lojaId/maquinas/:maquinaId/movimentacao"
             element={<MovimentacaoMaquina />}
           />
-          <Route path="*" element={<Navigate to="/" />} />
+          {/* <Route path="*" element={<Navigate to="/" />} /> */}
         </Routes>
       </BrowserRouter>
     </AuthProvider>
