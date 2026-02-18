@@ -35,14 +35,13 @@ export function Login() {
       <div className="relative bg-white max-w-md w-full rounded-xl shadow-xl backdrop-blur-sm border border-[#62A1D9]">
         {/* Logo/Header Section */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#62A1D9] to-[#A6806A] rounded-full shadow-2xl mb-4 transform hover:rotate-12 transition-transform duration-300">
-            <svg
-              className="w-10 h-10 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-24 h-24 mb-4">
+            <img
+              src="/starbox-logo.png"
+              alt="StarBox Logo"
+              className="w-20 h-20 object-contain drop-shadow-lg"
+              style={{ background: 'transparent' }}
+            />
           </div>
           <h1 className="text-4xl font-bold mb-2 text-[#24094E]">
             <span className="bg-gradient-to-r from-[#62A1D9] via-[#A6806A] to-[#733D38] text-transparent bg-clip-text">

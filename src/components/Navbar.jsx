@@ -63,9 +63,12 @@ export default function Navbar() {
                   🧸 Produtos
                 </NavLink>
 
-                <NavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}> 
-                  💸 Financeiro
-                </NavLink>
+
+                {usuario?.role === "ADMIN" && (
+                  <NavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}> 
+                    💸 Financeiro
+                  </NavLink>
+                )}
 
                 {usuario?.role === "ADMIN" && (
                   <>
