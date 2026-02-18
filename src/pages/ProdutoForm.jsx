@@ -326,7 +326,7 @@ export function ProdutoForm() {
                   </div>
                 </div>
               </div>
-
+{/* arrumando deploy */}
               {/* Análise de Lucro por Ficha */}
               {formData.preco && (
                 <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
