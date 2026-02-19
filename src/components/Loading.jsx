@@ -1,3 +1,4 @@
+import VideoLoading from '../assets/VideoLoading.mp4';
 export function LoadingSpinner({ size = "md", message = "Carregando..." }) {
   const sizeClasses = {
     sm: "w-8 h-8",
@@ -26,8 +27,22 @@ export function LoadingSpinner({ size = "md", message = "Carregando..." }) {
 
 export function PageLoader() {
   return (
-    <div className="min-h-screen bg-[#62A1D9] flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-lg text-center p-8 border border-[#24094E]">
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden">
+      {/* Vídeo de fundo */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover opacity-60 z-0"
+      >
+        <source src={VideoLoading} type="video/mp4" />
+        Seu navegador não suporta vídeo em background.
+      </video>
+      {/* Overlay azul */}
+      <div className="absolute inset-0 bg-blue-900 opacity-40 z-10" />
+      {/* Conteúdo de loading */}
+      <div className="relative z-20 bg-white/80 rounded-xl shadow-lg text-center p-8 border border-[#24094E]">
         <div className="relative inline-block mb-6">
           <div className="w-20 h-20 spinner border-4 border-[#62A1D9]"></div>
           <div className="absolute inset-0 flex items-center justify-center">
