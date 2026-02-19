@@ -46,7 +46,7 @@ export default function PecasPage() {
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
-                {(usuario?.role === "MANUTENCAO" || usuario?.role === "ADMIN") && (
+                {(usuario?.role === "MANUTENCAO" || usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR") && (
                   <th className="px-4 py-2"></th>
                 )}
               </tr>
@@ -57,7 +57,7 @@ export default function PecasPage() {
                   <td className="px-4 py-2 font-semibold text-gray-800">{peca.nome}</td>
                   <td className="px-4 py-2 text-gray-700">{peca.categoria}</td>
                   <td className="px-4 py-2 text-gray-700">{peca.quantidade}</td>
-                  {(usuario?.role === "MANUTENCAO" || usuario?.role === "ADMIN") && (
+                  {(usuario?.role === "MANUTENCAO" || usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR") && (
                     <td className="px-4 py-2">
                       <button
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold"
@@ -74,7 +74,7 @@ export default function PecasPage() {
         </div>
 
         {/* Carrinho do usuário */}
-        {(usuario?.role === "MANUTENCAO" || usuario?.role === "ADMIN") && (
+        {(usuario?.role === "MANUTENCAO" || usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR") && (
           <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">🛒 Meu Carrinho</h2>
             {carrinho.length === 0 ? (
