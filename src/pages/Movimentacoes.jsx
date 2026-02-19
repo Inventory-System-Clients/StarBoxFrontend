@@ -301,6 +301,7 @@ export function Movimentacoes() {
           },
         ],
       };
+      console.log("Movimentacao enviada:", data);
       await api.post("/movimentacoes", data);
 
       // Logs para depuração do filtro
