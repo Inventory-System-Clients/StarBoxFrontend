@@ -64,7 +64,7 @@ export default function Navbar() {
                   🧸 Produtos
                 </NavLink>
 
-                {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO") && (
+                {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
                   <NavLink to="/pecas" active={isActive("/pecas")}> 
                     🛠️ Peças
                   </NavLink>
@@ -145,7 +145,7 @@ export default function Navbar() {
                 💸 Financeiro
               </MobileNavLink>
             )}
-            {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO") && (
+            {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
               <MobileNavLink to="/pecas" active={isActive("/pecas")}
                 onClick={closeMenu}>
                 🛠️ Peças

@@ -42,8 +42,13 @@ export default function RoteiroExecucao() {
     <div className="min-h-screen bg-gray-100 text-[#24094E]">
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">
+        <h1
+          className={`text-2xl font-bold mb-6 flex items-center gap-2 ${roteiro.status === "finalizado" ? "text-green-600" : ""}`}
+        >
           Execução do Roteiro: {roteiro.nome}
+          {roteiro.status === "finalizado" && (
+            <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold">Finalizado</span>
+          )}
         </h1>
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-2">
@@ -55,12 +60,17 @@ export default function RoteiroExecucao() {
                 <button
                   key={loja.id}
                   onClick={() => setLojaSelecionada(loja)}
-                  className={`bg-white p-4 rounded-lg shadow border-2 font-bold text-lg transition-all ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}`}
+                  className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start 
+                    ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
+                    ${loja.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
                 >
-                  🏪 {loja.nome}{" "}
+                  <span>🏪 {loja.nome}</span>
                   <span className="text-xs text-gray-500 ml-2">
                     {loja.cidade}, {loja.estado}
                   </span>
+                  {loja.status === "finalizado" && (
+                    <span className="mt-1 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">Finalizada</span>
+                  )}
                 </button>
               ))
             ) : (
@@ -81,17 +91,19 @@ export default function RoteiroExecucao() {
                 lojaSelecionada.maquinas.map((maquina) => (
                   <button
                     key={maquina.id}
-                    className="bg-gray-50 p-3 rounded border font-medium w-full text-left hover:border-blue-600 transition-all"
+                    className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
+                      ${maquina.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}`}
                     onClick={() =>
                       navigate(
                         `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
                       )
                     }
                   >
-                    🖲️ {maquina.nome}{" "}
-                    <span className="text-xs text-gray-500 ml-2">
-                      ({maquina.tipo})
-                    </span>
+                    <span>🖲️ {maquina.nome}</span>
+                    <span className="text-xs text-gray-500 ml-2">({maquina.tipo})</span>
+                    {maquina.status === "finalizado" && (
+                      <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">Finalizada</span>
+                    )}
                   </button>
                 ))
               ) : (
