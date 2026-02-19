@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 
 export default function BillModal({ open, onClose, onSuccess, categories, bill = null, defaultType = 'company' }) {
   const [formData, setFormData] = useState({
+    name: bill?.name || '',
     due_date: bill?.due_date || '',
     city: bill?.city || '',
     account: bill?.account || '',
@@ -35,10 +36,14 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
         categoryToUse = newCat.name;
       }
 
+      let amountValue = parseFloat(formData.amount);
+      if (!isFinite(amountValue) || isNaN(amountValue)) {
+        amountValue = 0;
+      }
       const billData = {
         ...formData,
         category: categoryToUse,
-        amount: parseFloat(formData.amount)
+        amount: amountValue
       };
 
       if (bill) {
@@ -70,6 +75,17 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <Label htmlFor="name">Nome *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Ex: Conta de Luz"
+                required
+                data-testid="input-name"
+              />
+            </div>
+            <div>
               <Label htmlFor="due_date">Data de Vencimento *</Label>
               <Input
                 id="due_date"
@@ -80,7 +96,9 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
                 data-testid="input-due-date"
               />
             </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="amount">Valor (R$) *</Label>
               <Input
@@ -95,6 +113,7 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
                 data-testid="input-amount"
               />
             </div>
+            <div></div>
           </div>
 
           <div>

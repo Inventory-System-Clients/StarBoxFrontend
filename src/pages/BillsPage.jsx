@@ -350,7 +350,9 @@ export default function BillsPage() {
                         </td>
                         <td className="px-6 py-4">
                           <span className="font-semibold text-gray-800">
-                            R$ {bill.amount.toFixed(2)}
+                            R$ {(bill.amount !== undefined && bill.amount !== null && !isNaN(Number(bill.amount)) && isFinite(Number(bill.amount)))
+                              ? Number(bill.amount).toFixed(2)
+                              : "--"}
                           </span>
                         </td>
                         <td className="px-6 py-4">

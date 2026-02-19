@@ -183,7 +183,11 @@ export default function AlertsPage() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-500 mb-1">Valor</p>
-                            <p className="font-semibold text-gray-800">R$ {alert.amount.toFixed(2)}</p>
+                            <p className="font-semibold text-gray-800">
+                              R$ {(!isNaN(Number(alert.amount)) && alert.amount !== null && alert.amount !== undefined)
+                                ? Number(alert.amount).toFixed(2)
+                                : "--"}
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500 mb-1">Status</p>
