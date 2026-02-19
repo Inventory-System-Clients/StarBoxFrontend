@@ -150,6 +150,7 @@ export default function MovimentacaoMaquina() {
     e.preventDefault();
     setError("");
     setSuccess("");
+    console.log("[Movimentacao] Enviando:", { maquinaId, roteiroId });
     try {
       await api.post("/movimentacoes", {
         maquinaId: maquinaId,
