@@ -129,14 +129,18 @@ export function Roteiros() {
               key={roteiro.id}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDrop(e, roteiro.id)}
-              className={`bg-white rounded-xl shadow-lg p-6 border-2 transition-all ${
-                draggedLoja && draggedFromRoteiro !== roteiro.id
-                  ? "border-blue-400 border-dashed bg-blue-50"
-                  : "border-transparent"
-              }`}
+              className={`rounded-xl shadow-lg p-6 border-2 transition-all 
+                ${roteiro.status === "finalizado" ? "bg-green-50 border-green-600" : "bg-white border-transparent"}
+                ${draggedLoja && draggedFromRoteiro !== roteiro.id ? "border-blue-400 border-dashed bg-blue-50" : ""}
+              `}
             >
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-extrabold">{roteiro.nome}</h2>
+                <h2 className="text-xl font-extrabold flex items-center gap-2">
+                  {roteiro.nome}
+                  {roteiro.status === "finalizado" && (
+                    <span className="ml-2 px-2 py-1 rounded-full bg-green-200 text-green-800 text-xs font-bold uppercase">Finalizado</span>
+                  )}
+                </h2>
                 <span
                   className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${roteiro.funcionarioId ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-500"}`}
                 >
@@ -218,61 +222,14 @@ export function Roteiros() {
 
               {/* Botões de Ação com lógica dinâmica */}
               <div className="flex gap-2 mt-auto">
-                {(() => {
-                  // Exemplo: cada loja tem status 'concluida' ou não
-                  const lojas = roteiro.lojas || [];
-                  const concluidas = lojas.filter((l) => l.concluida).length;
-                  const total = lojas.length;
-                  if (!roteiro.funcionarioId) {
-                    // Não iniciado
-                    return (
-                      <button
-                        onClick={() =>
-                          navigate(`/roteiros/${roteiro.id}/executar`)
-                        }
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors"
-                      >
-                        Começar Rota
-                      </button>
-                    );
-                  } else if (concluidas === 0) {
-                    // Iniciado, nenhuma loja concluída
-                    return (
-                      <button
-                        onClick={() =>
-                          navigate(`/roteiros/${roteiro.id}/executar`)
-                        }
-                        className="flex-1 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors"
-                      >
-                        Continuar
-                      </button>
-                    );
-                  } else if (concluidas < total) {
-                    // Algumas lojas concluídas
-                    return (
-                      <button
-                        onClick={() =>
-                          navigate(`/roteiros/${roteiro.id}/executar`)
-                        }
-                        className="flex-1 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors"
-                      >
-                        Continuar
-                      </button>
-                    );
-                  } else {
-                    // Todas lojas concluídas
-                    return (
-                      <button
-                        onClick={() =>
-                          navigate(`/roteiros/${roteiro.id}/executar`)
-                        }
-                        className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
-                      >
-                        Finalizar
-                      </button>
-                    );
-                  }
-                })()}
+                {!roteiro.status || roteiro.status === "pendente" ? (
+                  <button
+                    onClick={() => navigate(`/roteiros/${roteiro.id}/executar`)}
+                    className="flex-1 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors"
+                  >
+                    {roteiro.funcionarioId ? "Continuar" : "Começar Rota"}
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}
