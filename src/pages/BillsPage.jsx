@@ -70,6 +70,7 @@ export default function BillsPage() {
         billsAPI.getAll({ bill_type: billType }),
         categoriesAPI.getAll(),
       ]);
+      console.log("Bills retornados da API:", billsData);
       setBills(billsData);
       setCategories(categoriesData);
     } catch (error) {
@@ -350,8 +351,8 @@ export default function BillsPage() {
                         </td>
                         <td className="px-6 py-4">
                           <span className="font-semibold text-gray-800">
-                            R$ {(bill.amount !== undefined && bill.amount !== null && !isNaN(Number(bill.amount)) && isFinite(Number(bill.amount)))
-                              ? Number(bill.amount).toFixed(2)
+                            R$ {(bill.value !== undefined && bill.value !== null && !isNaN(Number(bill.value)) && isFinite(Number(bill.value)))
+                              ? Number(bill.value).toFixed(2)
                               : "--"}
                           </span>
                         </td>
