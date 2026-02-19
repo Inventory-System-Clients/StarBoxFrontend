@@ -18,6 +18,7 @@ export default function RoteiroExecucao() {
         setLoading(true);
         const res = await api.get(`/roteiros/${id}/executar`);
         setRoteiro(res.data);
+        console.log('Roteiro carregado:', res.data);
       } catch (err) {
         setError("Erro ao buscar roteiro.");
       } finally {
