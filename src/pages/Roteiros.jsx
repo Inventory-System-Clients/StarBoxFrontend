@@ -138,14 +138,16 @@ export function Roteiros() {
                 <h2 className="text-xl font-extrabold flex items-center gap-2">
                   {roteiro.nome}
                   {roteiro.status === "finalizado" && (
-                    <span className="ml-2 px-2 py-1 rounded-full bg-green-200 text-green-800 text-xs font-bold uppercase">Finalizado</span>
+                    <span className="ml-2 px-2 py-1 rounded-full bg-green-200 text-green-800 text-xs font-bold uppercase">
+                      Finalizado
+                    </span>
+                  )}
+                  {roteiro.status === "pendente" && (
+                    <span className="ml-2 px-2 py-1 rounded-full bg-yellow-200 text-yellow-800 text-xs font-bold uppercase">
+                      Pendente
+                    </span>
                   )}
                 </h2>
-                <span
-                  className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${roteiro.funcionarioId ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-500"}`}
-                >
-                  {roteiro.funcionarioId ? "Ativo" : "Pendente"}
-                </span>
               </div>
 
               {/* Seção de Funcionário */}
@@ -153,7 +155,8 @@ export function Roteiros() {
                 <label className="text-xs font-bold text-gray-400 block mb-1">
                   RESPONSÁVEL
                 </label>
-                {usuario?.role === "ADMIN" ? (
+                {usuario?.role === "ADMIN" &&
+                roteiro.status !== "finalizado" ? (
                   <select
                     className="w-full p-2 text-sm border rounded bg-gray-50"
                     value={roteiro.funcionarioId || ""}
@@ -187,25 +190,32 @@ export function Roteiros() {
                   <span className="text-xs font-bold text-gray-400">
                     LOJAS NO DIA
                   </span>
-                  {usuario?.role === "ADMIN" && (
-                    <button
-                      onClick={() => {
-                        setRoteiroParaAdicionar(roteiro);
-                        setShowModalAdicionarLoja(true);
-                      }}
-                      className="text-blue-600 text-xs font-bold hover:underline"
-                    >
-                      + Adicionar
-                    </button>
-                  )}
+                  {usuario?.role === "ADMIN" &&
+                    roteiro.status !== "finalizado" && (
+                      <button
+                        onClick={() => {
+                          setRoteiroParaAdicionar(roteiro);
+                          setShowModalAdicionarLoja(true);
+                        }}
+                        className="text-blue-600 text-xs font-bold hover:underline"
+                      >
+                        + Adicionar
+                      </button>
+                    )}
                 </div>
                 <div className="min-h-[120px] bg-gray-50 rounded-lg p-3 border border-gray-100">
                   {roteiro.lojas?.length > 0 ? (
                     roteiro.lojas.map((loja) => (
                       <div
                         key={loja.id}
-                        draggable={usuario?.role === "ADMIN"}
-                        onDragStart={() => onDragStart(loja, roteiro.id)}
+                        draggable={
+                          usuario?.role === "ADMIN" &&
+                          roteiro.status !== "finalizado"
+                        }
+                        onDragStart={() =>
+                          roteiro.status !== "finalizado" &&
+                          onDragStart(loja, roteiro.id)
+                        }
                         className="bg-white p-3 rounded-md border border-gray-200 shadow-sm mb-2 text-sm flex items-center gap-2 cursor-move hover:border-blue-300 transition-colors"
                       >
                         <span className="text-gray-400">☰</span> 🏪 {loja.nome}
@@ -221,7 +231,7 @@ export function Roteiros() {
               </div>
 
               {/* Botões de Ação com lógica dinâmica */}
-                            {console.log('Status do roteiro:', roteiro.status, roteiro)}
+              {console.log("Status do roteiro:", roteiro.status, roteiro)}
               <div className="flex gap-2 mt-auto">
                 {!roteiro.status || roteiro.status === "pendente" ? (
                   <button
