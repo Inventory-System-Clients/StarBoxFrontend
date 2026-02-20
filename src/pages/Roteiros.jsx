@@ -163,12 +163,26 @@ export function Roteiros() {
                     onChange={async (e) => {
                       const id = e.target.value;
                       const f = funcionarios.find((x) => x.id === id);
-                      await api.post(`/roteiros/${roteiro.id}/iniciar`, {
-                        funcionarioId: id,
-                        funcionarioNome: f?.nome || "",
-                      });
-                      carregarDadosIniciais();
+                      if (!id) return;
+                      try {
+                        setSuccess("");
+                        setError("");
+                        setLoading(true);
+                        await api.post(`/roteiros/${roteiro.id}/iniciar`, {
+                          funcionarioId: id,
+                          funcionarioNome: f?.nome || "",
+                        });
+                        setSuccess(
+                          "Funcionário atribuído ao roteiro com sucesso!",
+                        );
+                        carregarDadosIniciais();
+                      } catch (err) {
+                        setError("Erro ao atribuir funcionário ao roteiro.");
+                      } finally {
+                        setLoading(false);
+                      }
                     }}
+                    disabled={loading}
                   >
                     <option value="">Selecione um funcionário</option>
                     {funcionarios.map((f) => (
