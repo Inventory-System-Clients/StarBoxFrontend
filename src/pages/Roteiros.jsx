@@ -157,40 +157,46 @@ export function Roteiros() {
                 </label>
                 {usuario?.role === "ADMIN" &&
                 roteiro.status !== "finalizado" ? (
-                  <select
-                    className="w-full p-2 text-sm border rounded bg-gray-50"
-                    value={roteiro.funcionarioId || ""}
-                    onChange={async (e) => {
-                      const id = e.target.value;
-                      const f = funcionarios.find((x) => x.id === id);
-                      if (!id) return;
-                      try {
-                        setSuccess("");
-                        setError("");
-                        setLoading(true);
-                        await api.post(`/roteiros/${roteiro.id}/iniciar`, {
-                          funcionarioId: id,
-                          funcionarioNome: f?.nome || "",
-                        });
-                        setSuccess(
-                          "Funcionário atribuído ao roteiro com sucesso!",
-                        );
-                        carregarDadosIniciais();
-                      } catch (err) {
-                        setError("Erro ao atribuir funcionário ao roteiro.");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading}
-                  >
-                    <option value="">Selecione um funcionário</option>
-                    {funcionarios.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      className="w-full p-2 text-sm border rounded bg-gray-50"
+                      value={roteiro.funcionarioId || ""}
+                      onChange={async (e) => {
+                        const id = e.target.value;
+                        const f = funcionarios.find((x) => x.id === id);
+                        if (!id) return;
+                        try {
+                          setSuccess("");
+                          setError("");
+                          setLoading(true);
+                          await api.post(`/roteiros/${roteiro.id}/iniciar`, {
+                            funcionarioId: id,
+                            funcionarioNome: f?.nome || "",
+                          });
+                          setSuccess(
+                            "Funcionário atribuído ao roteiro com sucesso!",
+                          );
+                          carregarDadosIniciais();
+                        } catch (err) {
+                          setError("Erro ao atribuir funcionário ao roteiro.");
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <option value="">Selecione um funcionário</option>
+                      {funcionarios.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.nome}
+                        </option>
+                      ))}
+                    </select>
+                    {/* Sempre mostrar o nome salvo no banco */}
+                    <p className="text-sm font-medium mt-1 text-blue-900 font-bold">
+                      {roteiro.funcionarioNome || "Não atribuído"}
+                    </p>
+                  </>
                 ) : (
                   <p className="text-sm font-medium">
                     {roteiro.funcionarioNome || "Não atribuído"}
