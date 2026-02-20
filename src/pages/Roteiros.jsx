@@ -229,6 +229,13 @@ export function Roteiros() {
                   >
                     {roteiro.funcionarioId ? "Continuar" : "Começar Rota"}
                   </button>
+                ) : roteiro.status === "finalizado" ? (
+                  <button
+                    disabled
+                    className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm cursor-default opacity-90"
+                  >
+                    Finalizado
+                  </button>
                 ) : null}
               </div>
             </div>
