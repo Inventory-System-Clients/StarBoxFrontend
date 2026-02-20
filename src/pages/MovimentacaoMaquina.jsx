@@ -89,111 +89,99 @@ export default function MovimentacaoMaquina() {
     }
     calcularBackend();
   }, []);
-          // ...existing code...
+  // ...existing code...
 
-          // Modal de manutenção (fora do useEffect)
-          const manutencaoModal = showManutencao && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
-                <button className="absolute top-2 right-2 text-gray-500 text-xl font-bold" onClick={() => setShowManutencao(false)}>×</button>
-                <h3 className="text-lg font-bold mb-4">Registrar Manutenção</h3>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    setSuccess("");
-                    setLoading(true);
-                    try {
-                      // Carrinho real do funcionário
-                      const carrinhoFuncionario = JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]");
-                      const payload = {
-                        maquinaId: maquinaId,
-                        observacao: manutencaoObs,
-                        tipoOcorrencia: "Manutenção",
-                        produtos: carrinhoFuncionario.map(item => ({
-                          produtoId: item.id,
-                          quantidadeSaiu: 0,
-                          quantidadeAbastecida: item.quantidade,
-                          retiradaProduto: 0,
-                        })),
-                      };
-                      await api.post(`/movimentacoes`, payload);
-                      setSuccess("Manutenção registrada com sucesso!");
-                      setShowManutencao(false);
-                    } catch (err) {
-                      setError("Erro ao registrar manutenção.");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="space-y-4"
-                >
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Observação</label>
-                  <textarea
-                    value={manutencaoObs}
-                    onChange={e => setManutencaoObs(e.target.value)}
-                    className="input-field w-full"
-                    rows="3"
-                    placeholder="Descreva a manutenção realizada..."
-                  />
-                  {/* Lista de peças do carrinho do funcionário (real) */}
-                  <div className="mt-4">
-                    <h4 className="font-bold mb-2">Peças do Carrinho</h4>
-                    {(() => {
-                      const carrinhoFuncionario = JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]");
-                      return carrinhoFuncionario.length > 0 ? (
-                        <ul className="mb-2">
-                          {carrinhoFuncionario.map(item => (
-                            <li key={item.id} className="text-sm text-gray-700">{item.nome} - Qtd: {item.quantidade}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-gray-400 italic">Nenhuma peça no carrinho.</p>
-                      );
-                    })()}
-                  </div>
-                  <div className="flex justify-end mt-4">
-                    <button
-                      type="submit"
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow"
-                      disabled={loading}
-                    >
-                      {loading ? "Salvando..." : "Registrar Manutenção"}
-                    </button>
-                  </div>
-                  {error && <div className="text-red-600 mt-2">{error}</div>}
-                  {success && <div className="text-green-600 mt-2">{success}</div>}
-                </form>
-              </div>
-            </div>
-          );
-        contadorOut: parseInt(formData.contadorOutManual) || null,
-        quantidade_notas_entrada: formData.quantidade_notas_entrada
-          ? parseFloat(formData.quantidade_notas_entrada)
-          : null,
-        valor_entrada_maquininha_pix: formData.valor_entrada_maquininha_pix
-          ? parseFloat(formData.valor_entrada_maquininha_pix)
-          : null,
-        retiradaEstoque: formData.retiradaEstoque,
-        retiradaProduto: parseInt(formData.retiradaProduto) || 0,
-        observacoes: formData.observacao || "",
-        produtos: [
-          {
-            produtoId: formData.produto_id,
-            quantidadeSaiu: 0,
-            quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
-            retiradaProduto: parseInt(formData.retiradaProduto) || 0,
-          },
-        ],
-      });
-      setSuccess("Movimentação registrada com sucesso!");
-      setTimeout(() => {
-        navigate(`/roteiros/${roteiroId}/executar`, { replace: true });
-      }, 1200);
-    } catch (err) {
-      setError("Erro ao registrar movimentação.");
-    }
-  };
+  // Modal de manutenção (fora do useEffect)
+  const manutencaoModal = showManutencao && (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
+        <button
+          className="absolute top-2 right-2 text-gray-500 text-xl font-bold"
+          onClick={() => setShowManutencao(false)}
+        >
+          ×
+        </button>
+        <h3 className="text-lg font-bold mb-4">Registrar Manutenção</h3>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            setSuccess("");
+            setLoading(true);
+            try {
+              // Carrinho real do funcionário
+              const carrinhoFuncionario = JSON.parse(
+                localStorage.getItem("carrinhoFuncionario") || "[]",
+              );
+              const payload = {
+                maquinaId: maquinaId,
+                observacao: manutencaoObs,
+                tipoOcorrencia: "Manutenção",
+                produtos: carrinhoFuncionario.map((item) => ({
+                  produtoId: item.id,
+                  quantidadeSaiu: 0,
+                  quantidadeAbastecida: item.quantidade,
+                  retiradaProduto: 0,
+                })),
+              };
+              await api.post(`/movimentacoes`, payload);
+              setSuccess("Manutenção registrada com sucesso!");
+              setShowManutencao(false);
+            } catch (err) {
+              setError("Erro ao registrar manutenção.");
+            } finally {
+              setLoading(false);
+            }
+          }}
+          className="space-y-4"
+        >
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Observação
+          </label>
+          <textarea
+            value={manutencaoObs}
+            onChange={(e) => setManutencaoObs(e.target.value)}
+            className="input-field w-full"
+            rows="3"
+            placeholder="Descreva a manutenção realizada..."
+          />
+          {/* Lista de peças do carrinho do funcionário (real) */}
+          <div className="mt-4">
+            <h4 className="font-bold mb-2">Peças do Carrinho</h4>
+            {(() => {
+              const carrinhoFuncionario = JSON.parse(
+                localStorage.getItem("carrinhoFuncionario") || "[]",
+              );
+              return carrinhoFuncionario.length > 0 ? (
+                <ul className="mb-2">
+                  {carrinhoFuncionario.map((item) => (
+                    <li key={item.id} className="text-sm text-gray-700">
+                      {item.nome} - Qtd: {item.quantidade}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-400 italic">
+                  Nenhuma peça no carrinho.
+                </p>
+              );
+            })()}
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              type="submit"
+              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow"
+              disabled={loading}
+            >
+              {loading ? "Salvando..." : "Registrar Manutenção"}
+            </button>
+          </div>
+          {error && <div className="text-red-600 mt-2">{error}</div>}
+          {success && <div className="text-green-600 mt-2">{success}</div>}
+        </form>
+      </div>
+    </div>
+  );
 
   if (loading)
     return <div className="p-20 text-center font-bold">Carregando...</div>;
