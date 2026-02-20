@@ -292,6 +292,7 @@ export function Movimentacoes() {
         retiradaEstoque: formData.retiradaEstoque,
         contadorMaquina: null,
         observacoes: observacaoFinal || null,
+        tipoOcorrencia: formData.tipoOcorrencia || "Manutenção",
         produtos: [
           {
             produtoId: formData.produto_id,

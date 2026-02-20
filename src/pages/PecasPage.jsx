@@ -1,47 +1,54 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { pecasAPI } from "../services/api";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 
-export default function PecasPage() {
+function PecasPage() {
   const { usuario } = useAuth();
+  
+  // --- Estados ---
   const [pecas, setPecas] = useState([]);
   const [carrinho, setCarrinho] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ nome: "", categoria: "", quantidade: 0 });
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    fetchPecas();
+  // --- Permissões ---
+  const temPermissaoEscrita = usuario?.role === "admin" || usuario?.role === "gerente";
+  const podeUsarCarrinho = true; // Ajuste conforme necessário
+
+  // --- Carregamento de Dados ---
+  const fetchPecas = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await pecasAPI.listar(); // Certifique-se que pecasAPI.listar existe
+      setPecas(data || []);
+    } catch (err) {
+      console.error("Erro ao buscar peças:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchPecas = async () => {
-    try {
-      const data = await pecasAPI.getAll();
-      setPecas(data);
-    } catch (error) {
-      console.error("Erro ao buscar peças:", error);
-      setPecas([]);
-    }
-  };
+  useEffect(() => {
+    fetchPecas();
+  }, [fetchPecas]);
 
-  // --- Lógica de CRUD ---
-
+  // --- Lógica do Formulário (CRUD) ---
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     try {
+      setLoading(true);
       if (editId) {
-        await pecasAPI.update(editId, form);
+        await pecasAPI.atualizar(editId, form);
       } else {
-        await pecasAPI.create(form);
+        await pecasAPI.criar(form);
       }
-      await fetchPecas(); // Atualiza a lista
       setForm({ nome: "", categoria: "", quantidade: 0 });
       setEditId(null);
-    } catch (error) {
+      await fetchPecas();
+    } catch (err) {
       alert("Erro ao salvar peça.");
     } finally {
       setLoading(false);
@@ -49,41 +56,31 @@ export default function PecasPage() {
   };
 
   const handleEdit = (peca) => {
-    setForm({
-      nome: peca.nome,
-      categoria: peca.categoria,
-      quantidade: peca.quantidade,
-    });
     setEditId(peca.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // UX: sobe para o formulário
+    setForm({ nome: peca.nome, categoria: peca.categoria, quantidade: peca.quantidade });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Deseja realmente excluir esta peça?")) return;
-    setLoading(true);
     try {
-      await pecasAPI.delete(id);
+      await pecasAPI.deletar(id);
       await fetchPecas();
-    } catch (error) {
-      alert("Erro ao excluir.");
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      alert("Erro ao excluir peça.");
     }
   };
 
   // --- Lógica do Carrinho ---
-
   const adicionarAoCarrinho = (peca) => {
     setCarrinho((prev) => {
       const itemExistente = prev.find((item) => item.id === peca.id);
-      
-      // Validação: não adicionar mais que o estoque disponível
-      if (itemExistente && itemExistente.quantidade >= peca.quantidade) {
-        alert("Quantidade máxima em estoque atingida!");
-        return prev;
-      }
-
       if (itemExistente) {
+        // Evita adicionar mais do que o estoque disponível
+        if (itemExistente.quantidade >= peca.quantidade) {
+          alert("Limite de estoque atingido no carrinho.");
+          return prev;
+        }
         return prev.map((item) =>
           item.id === peca.id ? { ...item, quantidade: item.quantidade + 1 } : item
         );
@@ -92,37 +89,30 @@ export default function PecasPage() {
     });
   };
 
-  const removerDoCarrinho = (pecaId) => {
-    setCarrinho((prev) => prev.filter((item) => item.id !== pecaId));
+  const removerDoCarrinho = (id) => {
+    setCarrinho((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const temPermissaoEscrita = usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
-  const podeUsarCarrinho = usuario?.role === "MANUTENCAO" || temPermissaoEscrita;
-
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
       
-      <main className="container mx-auto py-8 px-4 flex-grow">
+      <main className="flex-grow container mx-auto px-4 py-8">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-            🛠️ Gerenciamento de Peças
-          </h1>
-          <p className="text-gray-600">
-            Visualize o estoque e gerencie os itens para manutenção.
-          </p>
+          <h1 className="text-3xl font-bold text-gray-800">Gestão de Peças</h1>
+          <p className="text-gray-600">Controle de estoque e retiradas para manutenção.</p>
         </header>
 
-        {/* Formulário de Admin */}
+        {/* Formulário de Cadastro/Edição */}
         {temPermissaoEscrita && (
-          <section className="mb-8 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h2 className="text-lg font-bold mb-4">
-              {editId ? "✏️ Editar Peça" : "➕ Cadastrar Nova Peça"}
+          <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+            <h2 className="text-lg font-semibold mb-4">
+              {editId ? "Editar Peça" : "Cadastrar Nova Peça"}
             </h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <input
                 className="border rounded-lg px-3 py-2"
-                placeholder="Nome da peça"
+                placeholder="Nome da Peça"
                 value={form.nome}
                 onChange={(e) => setForm({ ...form, nome: e.target.value })}
                 required
@@ -212,28 +202,67 @@ export default function PecasPage() {
           </table>
         </section>
 
-        {/* Carrinho */}
+        {/* Carrinho de Compras */}
         {podeUsarCarrinho && (
-          <section className="bg-white rounded-xl shadow-md border-t-4 border-blue-600 p-6">
+          <section className="bg-white rounded-xl shadow-md border-t-4 border-blue-600 p-6 mb-12">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               🛒 Peças Selecionadas ({carrinho.length})
             </h2>
             {carrinho.length === 0 ? (
               <p className="text-gray-400 italic">Nenhum item selecionado para a manutenção.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {carrinho.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 border rounded-lg bg-blue-50">
-                    <div>
-                      <p className="font-bold text-gray-800">{item.nome}</p>
-                      <p className="text-xs text-gray-500">Qtd: {item.quantidade}</p>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {carrinho.map(item => (
+                    <div key={item.id} className="flex justify-between items-center p-3 border rounded-lg bg-blue-50">
+                      <div>
+                        <p className="font-bold text-gray-800">{item.nome}</p>
+                        <p className="text-xs text-gray-500">Qtd a retirar: {item.quantidade}</p>
+                      </div>
+                      <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 hover:text-red-700 font-bold text-sm">
+                        Remover
+                      </button>
                     </div>
-                    <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 hover:text-red-700 font-bold">
-                      Remover
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                <div className="flex justify-end mt-6">
+                  <button
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow transition-transform active:scale-95"
+                    disabled={loading}
+                    onClick={async () => {
+                      if (!window.confirm("Confirmar retirada das peças?")) return;
+                      try {
+                        setLoading(true);
+                        const payload = {
+                          lojaId: usuario?.lojaId || 1,
+                          produtos: carrinho.map(item => ({
+                            produtoId: item.id,
+                            quantidade: item.quantidade,
+                            tipoMovimentacao: "saida"
+                          })),
+                          observacao: "Retirada via carrinho",
+                        };
+                        
+                        await fetch("/api/movimentacaoEstoqueLoja", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(payload),
+                        });
+
+                        setCarrinho([]);
+                        alert("Retirada registrada com sucesso!");
+                        await fetchPecas();
+                      } catch (err) {
+                        alert("Erro ao registrar retirada.");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    {loading ? "Salvando..." : "Finalizar Retirada"}
+                  </button>
+                </div>
+              </>
             )}
           </section>
         )}
@@ -243,3 +272,5 @@ export default function PecasPage() {
     </div>
   );
 }
+
+export default PecasPage;
