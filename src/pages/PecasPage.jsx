@@ -7,25 +7,19 @@ import Footer from "../components/Footer.jsx";
 function PecasPage() {
   const { usuario } = useAuth();
 
-  // --- Estados ---
+  // --- 1. Estados ---
   const [pecas, setPecas] = useState([]);
   const [carrinho, setCarrinho] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ nome: "", categoria: "", quantidade: 0 });
 
-  // --- Permissões ---
-  const temPermissaoEscrita = [
-    "admin",
-    "ADMIN",
-    "Administrador",
-    "administrador",
-    "gerente",
-    "GERENTE",
-  ].includes(usuario?.role);
-  const podeUsarCarrinho = true; // Ajuste conforme necessário
+  // --- 2. Permissões ---
+  const rolesAutorizadas = ["admin", "ADMIN", "Administrador", "gerente", "GERENTE"];
+  const temPermissaoEscrita = rolesAutorizadas.includes(usuario?.role);
+  const podeUsarCarrinho = true;
 
-  // --- Carregamento de Dados ---
+  // --- 3. Carregamento de Dados ---
   const fetchPecas = useCallback(async () => {
     try {
       setLoading(true);
@@ -38,13 +32,29 @@ function PecasPage() {
     }
   }, []);
 
+  // Carregar peças ao montar o componente
   useEffect(() => {
     fetchPecas();
   }, [fetchPecas]);
 
-  // --- Lógica do Formulário (CRUD) ---
-  const handleSubmit = async (e) => {
+  // Carregar carrinho do LocalStorage uma única vez
+  useEffect(() => {
+    const carrinhoSalvo = localStorage.getItem("carrinhoFuncionario");
+    if (carrinhoSalvo) {
+      try {
+        setCarrinho(JSON.parse(carrinhoSalvo));
+      } catch (e) {
+        console.error("Erro ao processar carrinho salvo");
+      }
+    }
+  }, []);
+
+  // --- 4. Lógica de Persistência (Submit) ---
+  // Usando 'async function' para evitar erros de inicialização (hoisting)
+  async function handleSubmit(e) {
     e.preventDefault();
+    if (!form.nome || !form.categoria) return alert("Preencha todos os campos!");
+
     try {
       setLoading(true);
       if (editId) {
@@ -52,16 +62,19 @@ function PecasPage() {
       } else {
         await pecasAPI.create(form);
       }
+      // Limpeza
       setForm({ nome: "", categoria: "", quantidade: 0 });
       setEditId(null);
       await fetchPecas();
     } catch (err) {
+      console.error(err);
       alert("Erro ao salvar peça.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
+  // --- 5. Funções Auxiliares de Tabela ---
   const handleEdit = (peca) => {
     setEditId(peca.id);
     setForm({
@@ -82,25 +95,24 @@ function PecasPage() {
     }
   };
 
-  // --- Lógica do Carrinho ---
+  // --- 6. Lógica do Carrinho ---
   const adicionarAoCarrinho = (peca) => {
     setCarrinho((prev) => {
       const itemExistente = prev.find((item) => item.id === peca.id);
       let novoCarrinho;
+
       if (itemExistente) {
         if (itemExistente.quantidade >= peca.quantidade) {
-          alert("Limite de estoque atingido no carrinho.");
+          alert("Limite de estoque atingido.");
           return prev;
         }
         novoCarrinho = prev.map((item) =>
-          item.id === peca.id
-            ? { ...item, quantidade: item.quantidade + 1 }
-            : item,
+          item.id === peca.id ? { ...item, quantidade: item.quantidade + 1 } : item
         );
       } else {
         novoCarrinho = [...prev, { ...peca, quantidade: 1 }];
       }
-      // Salva carrinho no localStorage
+
       localStorage.setItem("carrinhoFuncionario", JSON.stringify(novoCarrinho));
       return novoCarrinho;
     });
@@ -114,14 +126,6 @@ function PecasPage() {
     });
   };
 
-  // Ao carregar a página, recupera carrinho do localStorage
-  useEffect(() => {
-    const carrinhoSalvo = localStorage.getItem("carrinhoFuncionario");
-    if (carrinhoSalvo) {
-      setCarrinho(JSON.parse(carrinhoSalvo));
-    }
-  }, []);
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
@@ -129,9 +133,7 @@ function PecasPage() {
       <main className="flex-grow container mx-auto px-4 py-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Gestão de Peças</h1>
-          <p className="text-gray-600">
-            Controle de estoque e retiradas para manutenção.
-          </p>
+          <p className="text-gray-600">Controle de estoque e retiradas para manutenção.</p>
         </header>
 
         {/* Formulário de Cadastro/Edição */}
@@ -140,10 +142,7 @@ function PecasPage() {
             <h2 className="text-lg font-semibold mb-4">
               {editId ? "Editar Peça" : "Cadastrar Nova Peça"}
             </h2>
-            <form
-              onSubmit={handleSubmit}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4"
-            >
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <input
                 className="border rounded-lg px-3 py-2"
                 placeholder="Nome da Peça"
@@ -155,9 +154,7 @@ function PecasPage() {
                 className="border rounded-lg px-3 py-2"
                 placeholder="Categoria (ex: Elétrica)"
                 value={form.categoria}
-                onChange={(e) =>
-                  setForm({ ...form, categoria: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, categoria: e.target.value })}
                 required
               />
               <input
@@ -165,9 +162,7 @@ function PecasPage() {
                 type="number"
                 min="0"
                 value={form.quantidade}
-                onChange={(e) =>
-                  setForm({ ...form, quantidade: Number(e.target.value) })
-                }
+                onChange={(e) => setForm({ ...form, quantidade: Number(e.target.value) })}
                 required
               />
               <div className="flex gap-2">
@@ -176,11 +171,7 @@ function PecasPage() {
                   disabled={loading}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex-1"
                 >
-                  {loading
-                    ? "Processando..."
-                    : editId
-                      ? "Atualizar"
-                      : "Cadastrar"}
+                  {loading ? "Processando..." : editId ? "Atualizar" : "Cadastrar"}
                 </button>
                 {editId && (
                   <button
@@ -204,37 +195,20 @@ function PecasPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700 uppercase">
-                  Nome
-                </th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700 uppercase">
-                  Categoria
-                </th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700 uppercase">
-                  Estoque
-                </th>
-                {podeUsarCarrinho && (
-                  <th className="px-6 py-4 text-right">Ações</th>
-                )}
+                <th className="px-6 py-4 text-left font-semibold text-gray-700 uppercase">Nome</th>
+                <th className="px-6 py-4 text-left font-semibold text-gray-700 uppercase">Categoria</th>
+                <th className="px-6 py-4 text-left font-semibold text-gray-700 uppercase">Estoque</th>
+                {podeUsarCarrinho && <th className="px-6 py-4 text-right">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {pecas.map((peca) => (
-                <tr
-                  key={peca.id}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-6 py-4 font-medium text-gray-900">
-                    {peca.nome}
-                  </td>
+                <tr key={peca.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-gray-900">{peca.nome}</td>
                   <td className="px-6 py-4 text-gray-600">
-                    <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                      {peca.categoria}
-                    </span>
+                    <span className="bg-gray-100 px-2 py-1 rounded text-xs">{peca.categoria}</span>
                   </td>
-                  <td
-                    className={`px-6 py-4 ${peca.quantidade < 5 ? "text-red-500 font-bold" : "text-gray-600"}`}
-                  >
+                  <td className={`px-6 py-4 ${peca.quantidade < 5 ? "text-red-500 font-bold" : "text-gray-600"}`}>
                     {peca.quantidade} un
                   </td>
                   {podeUsarCarrinho && (
@@ -248,16 +222,10 @@ function PecasPage() {
                       </button>
                       {temPermissaoEscrita && (
                         <>
-                          <button
-                            onClick={() => handleEdit(peca)}
-                            className="text-yellow-600 hover:bg-yellow-50 px-3 py-1 rounded border border-yellow-600 text-xs font-bold"
-                          >
+                          <button onClick={() => handleEdit(peca)} className="text-yellow-600 hover:bg-yellow-50 px-3 py-1 rounded border border-yellow-600 text-xs font-bold">
                             Editar
                           </button>
-                          <button
-                            onClick={() => handleDelete(peca.id)}
-                            className="text-red-600 hover:bg-red-50 px-3 py-1 rounded border border-red-600 text-xs font-bold"
-                          >
+                          <button onClick={() => handleDelete(peca.id)} className="text-red-600 hover:bg-red-50 px-3 py-1 rounded border border-red-600 text-xs font-bold">
                             Excluir
                           </button>
                         </>
@@ -277,27 +245,17 @@ function PecasPage() {
               🛒 Peças Selecionadas ({carrinho.length})
             </h2>
             {carrinho.length === 0 ? (
-              <p className="text-gray-400 italic">
-                Nenhum item selecionado para a manutenção.
-              </p>
+              <p className="text-gray-400 italic">Nenhum item selecionado para a manutenção.</p>
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {carrinho.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-center p-3 border rounded-lg bg-blue-50"
-                    >
+                    <div key={item.id} className="flex justify-between items-center p-3 border rounded-lg bg-blue-50">
                       <div>
                         <p className="font-bold text-gray-800">{item.nome}</p>
-                        <p className="text-xs text-gray-500">
-                          Qtd a retirar: {item.quantidade}
-                        </p>
+                        <p className="text-xs text-gray-500">Qtd a retirar: {item.quantidade}</p>
                       </div>
-                      <button
-                        onClick={() => removerDoCarrinho(item.id)}
-                        className="text-red-500 hover:text-red-700 font-bold text-sm"
-                      >
+                      <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 hover:text-red-700 font-bold text-sm">
                         Remover
                       </button>
                     </div>
@@ -308,8 +266,7 @@ function PecasPage() {
                     className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow transition-transform active:scale-95"
                     disabled={loading}
                     onClick={async () => {
-                      if (!window.confirm("Confirmar retirada das peças?"))
-                        return;
+                      if (!window.confirm("Confirmar retirada das peças?")) return;
                       try {
                         setLoading(true);
                         const payload = {
@@ -331,6 +288,7 @@ function PecasPage() {
                         });
 
                         setCarrinho([]);
+                        localStorage.removeItem("carrinhoFuncionario");
                         alert("Retirada registrada com sucesso!");
                         await fetchPecas();
                       } catch (err) {
@@ -348,7 +306,6 @@ function PecasPage() {
           </section>
         )}
       </main>
-
       <Footer />
     </div>
   );
