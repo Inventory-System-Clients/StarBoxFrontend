@@ -165,19 +165,6 @@ export default function MovimentacaoMaquina() {
               ) : (
                 <p className="text-gray-400 italic">Nenhuma peça no carrinho.</p>
               );
-                <button
-                  className="absolute top-2 right-2 text-gray-500 text-xl font-bold"
-                  onClick={() => setShowManutencao(false)}
-                >
-                  ×
-                </button>
-                <h3 className="text-lg font-bold mb-4">Registrar Manutenção</h3>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    setSuccess("");
-                    setLoading(true);
                     try {
                       // Aqui você pode buscar o carrinho do funcionário (exemplo: via API ou contexto)
                       // Para demo, simula carrinho
