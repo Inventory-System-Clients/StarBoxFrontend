@@ -431,6 +431,30 @@ export default function MovimentacaoMaquina() {
               <button type="submit" className="btn-primary">
                 Registrar Movimentação
               </button>
+              <button
+                type="button"
+                className="btn-warning"
+                onClick={async () => {
+                  setError("");
+                  setSuccess("");
+                  setLoading(true);
+                  try {
+                    const payload = {
+                      ...formData,
+                      tipoOcorrencia: "Manutenção",
+                      // Adicione outros campos obrigatórios conforme necessário
+                    };
+                    await api.post(`/movimentacoes`, payload);
+                    setSuccess("Manutenção registrada com sucesso!");
+                  } catch (err) {
+                    setError("Erro ao registrar manutenção.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                Registrar Manutenção
+              </button>
             </div>
             {error && <div className="text-red-600 mt-2">{error}</div>}
             {success && <div className="text-green-600 mt-2">{success}</div>}
