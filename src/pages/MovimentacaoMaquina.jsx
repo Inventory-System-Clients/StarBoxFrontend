@@ -5,6 +5,8 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 
 export default function MovimentacaoMaquina() {
+  const [showManutencao, setShowManutencao] = useState(false);
+  const [manutencaoObs, setManutencaoObs] = useState("");
   const { roteiroId, lojaId, maquinaId } = useParams();
   const navigate = useNavigate();
 
