@@ -156,72 +156,7 @@ export default function MovimentacaoMaquina() {
               );
               return carrinhoFuncionario.length > 0 ? (
                 <ul className="mb-2">
-                  {carrinhoFuncionario.map((item) => (
-                    <li key={item.id} className="text-sm text-gray-700">
-                      {item.nome} - Qtd: {item.quantidade}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-gray-400 italic">
-                  Nenhuma peça no carrinho.
-                </p>
-              );
-            })()}
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              type="submit"
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow"
-              disabled={loading}
-            >
-              {loading ? "Salvando..." : "Registrar Manutenção"}
-            </button>
-          </div>
-          {error && <div className="text-red-600 mt-2">{error}</div>}
-          {success && <div className="text-green-600 mt-2">{success}</div>}
-        </form>
-      </div>
-    </div>
-  );
 
-  if (loading)
-    return <div className="p-20 text-center font-bold">Carregando...</div>;
-
-  return (
-    <div className="min-h-screen bg-gray-100 text-[#24094E]">
-      <Navbar />
-      {manutencaoModal}
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="card-gradient mb-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <span className="text-2xl">📝</span>
-            Registrar Movimentação
-          </h3>
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <strong>Como funciona:</strong> Informe quantos produtos tem AGORA
-              na máquina (o sistema calcula o que saiu). Se abastecer, informe
-              quantos foram adicionados.
-            </p>
-          </div>
-          {/* Botão para abrir modal de manutenção */}
-          <div className="flex justify-end mb-6">
-            <button
-              type="button"
-              style={{
-                backgroundColor: "#e53935",
-                color: "#fff",
-                fontWeight: "bold",
-                padding: "0.5rem 1.5rem",
-                borderRadius: "0.5rem",
                 boxShadow: "0 2px 8px #e5393533",
                 border: "none",
               }}
