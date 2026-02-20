@@ -221,6 +221,7 @@ export function Roteiros() {
               </div>
 
               {/* Botões de Ação com lógica dinâmica */}
+                            {console.log('Status do roteiro:', roteiro.status, roteiro)}
               <div className="flex gap-2 mt-auto">
                 {!roteiro.status || roteiro.status === "pendente" ? (
                   <button
