@@ -433,16 +433,44 @@ export default function MovimentacaoMaquina() {
               </button>
               <button
                 type="button"
-                className="btn-warning"
+                style={{
+                  backgroundColor: "#e53935",
+                  color: "#fff",
+                  fontWeight: "bold",
+                  padding: "0.5rem 1.5rem",
+                  borderRadius: "0.5rem",
+                  boxShadow: "0 2px 8px #e5393533",
+                  border: "none",
+                }}
                 onClick={async () => {
                   setError("");
                   setSuccess("");
                   setLoading(true);
                   try {
+                    // Monta payload mínimo necessário para o backend
                     const payload = {
-                      ...formData,
+                      maquinaId: maquinaId,
+                      produtoId: formData.produto_id,
+                      quantidadeAtualMaquina: formData.quantidadeAtualMaquina,
+                      quantidadeAdicionada: formData.quantidadeAdicionada,
+                      contadorInManual: formData.contadorInManual,
+                      contadorOutManual: formData.contadorOutManual,
+                      contadorInDigital: formData.contadorInDigital,
+                      contadorOutDigital: formData.contadorOutDigital,
+                      observacao: formData.observacao,
+                      retiradaEstoque: formData.retiradaEstoque,
+                      retiradaProduto: formData.retiradaProduto,
                       tipoOcorrencia: "Manutenção",
-                      // Adicione outros campos obrigatórios conforme necessário
+                      produtos: [
+                        {
+                          produtoId: formData.produto_id,
+                          quantidadeSaiu: 0,
+                          quantidadeAbastecida:
+                            parseInt(formData.quantidadeAdicionada) || 0,
+                          retiradaProduto:
+                            parseInt(formData.retiradaProduto) || 0,
+                        },
+                      ],
                     };
                     await api.post(`/movimentacoes`, payload);
                     setSuccess("Manutenção registrada com sucesso!");
