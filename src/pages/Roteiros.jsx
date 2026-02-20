@@ -34,13 +34,19 @@ export function Roteiros() {
   const carregarDadosIniciais = async () => {
     try {
       setLoading(true);
-      const [resRoteiros, resFuncionarios, resLojas] = await Promise.all([
+      let resFuncionarios = { data: [] };
+      // Só busca funcionários se for admin ou gerente
+      const permissaoFuncionario = ["ADMIN", "admin", "GERENTE", "gerente"];
+      const promessas = [
         api.get("/roteiros/com-status"),
-        api.get("/usuarios/funcionarios"),
+        permissaoFuncionario.includes(usuario?.role)
+          ? api.get("/usuarios/funcionarios")
+          : Promise.resolve({ data: [] }),
         api.get("/lojas"),
-      ]);
+      ];
+      const [resRoteiros, resFunc, resLojas] = await Promise.all(promessas);
       setRoteiros(resRoteiros.data || []);
-      setFuncionarios(resFuncionarios.data || []);
+      setFuncionarios(resFunc.data || []);
       setTodasLojas(resLojas.data || []);
     } catch (err) {
       setError("Erro ao carregar dados dos roteiros.");
