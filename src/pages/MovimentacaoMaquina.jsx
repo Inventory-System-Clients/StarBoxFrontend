@@ -156,18 +156,15 @@ export default function MovimentacaoMaquina() {
               );
               return carrinhoFuncionario.length > 0 ? (
                 <ul className="mb-2">
-
-                boxShadow: "0 2px 8px #e5393533",
-                border: "none",
-              }}
-              onClick={() => setShowManutencao(true)}
-            >
-              Registrar Manutenção
-            </button>
-          </div>
-          {showManutencao && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
+                  {carrinhoFuncionario.map((item) => (
+                    <li key={item.id} className="text-sm text-gray-700">
+                      {item.nome} - Qtd: {item.quantidade}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-400 italic">Nenhuma peça no carrinho.</p>
+              );
                 <button
                   className="absolute top-2 right-2 text-gray-500 text-xl font-bold"
                   onClick={() => setShowManutencao(false)}
