@@ -35,7 +35,7 @@ export function Roteiros() {
     try {
       setLoading(true);
       const [resRoteiros, resFuncionarios, resLojas] = await Promise.all([
-        api.get("/roteiros"),
+        api.get("/roteiros/com-status"),
         api.get("/usuarios/funcionarios"),
         api.get("/lojas"),
       ]);
