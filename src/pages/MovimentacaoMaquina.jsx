@@ -88,8 +88,11 @@ export default function MovimentacaoMaquina() {
       }
     }
     calcularBackend();
-  }, [
-          {showManutencao && (
+  }, []);
+          // ...existing code...
+
+          // Modal de manutenção (fora do useEffect)
+          const manutencaoModal = showManutencao && (
             <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
               <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
                 <button className="absolute top-2 right-2 text-gray-500 text-xl font-bold" onClick={() => setShowManutencao(false)}>×</button>
@@ -163,7 +166,7 @@ export default function MovimentacaoMaquina() {
                 </form>
               </div>
             </div>
-          )}
+          );
         contadorOut: parseInt(formData.contadorOutManual) || null,
         quantidade_notas_entrada: formData.quantidade_notas_entrada
           ? parseFloat(formData.quantidade_notas_entrada)
@@ -198,6 +201,7 @@ export default function MovimentacaoMaquina() {
   return (
     <div className="min-h-screen bg-gray-100 text-[#24094E]">
       <Navbar />
+      {manutencaoModal}
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="card-gradient mb-6">
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -236,8 +240,6 @@ export default function MovimentacaoMaquina() {
               Registrar Manutenção
             </button>
           </div>
-
-          {/* Modal/Formulário de manutenção */}
           {showManutencao && (
             <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
               <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
