@@ -23,7 +23,7 @@ function PecasPage() {
   const fetchPecas = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await pecasAPI.listar(); // Certifique-se que pecasAPI.listar existe
+      const data = await pecasAPI.getAll();
       setPecas(data || []);
     } catch (err) {
       console.error("Erro ao buscar peças:", err);
@@ -42,9 +42,9 @@ function PecasPage() {
     try {
       setLoading(true);
       if (editId) {
-        await pecasAPI.atualizar(editId, form);
+        await pecasAPI.update(editId, form);
       } else {
-        await pecasAPI.criar(form);
+        await pecasAPI.create(form);
       }
       setForm({ nome: "", categoria: "", quantidade: 0 });
       setEditId(null);
@@ -69,7 +69,7 @@ function PecasPage() {
   const handleDelete = async (id) => {
     if (!window.confirm("Deseja realmente excluir esta peça?")) return;
     try {
-      await pecasAPI.deletar(id);
+      await pecasAPI.delete(id);
       await fetchPecas();
     } catch (err) {
       alert("Erro ao excluir peça.");
