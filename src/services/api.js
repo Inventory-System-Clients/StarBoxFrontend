@@ -2,8 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL:
-    import.meta.env.VITE_API_URL ||
-    "https://starboxbackend.onrender.com/api",
+    import.meta.env.VITE_API_URL || "https://starboxbackend.onrender.com/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -28,9 +27,8 @@ api.interceptors.response.use(
       window.location.href = "/login";
     }
     return Promise.reject(error);
-  }
+  },
 );
-
 
 // APIs para integração do financeiro pessoal
 
@@ -49,15 +47,16 @@ export const billsAPI = {
     return response.data;
   },
   updateStatus: async (id, status) => {
-    const response = await api.patch(`/financeiro/bills/${id}/status`, { status });
+    const response = await api.patch(`/financeiro/bills/${id}/status`, {
+      status,
+    });
     return response.data;
   },
   delete: async (id) => {
     const response = await api.delete(`/financeiro/bills/${id}`);
     return response.data;
-  }
+  },
 };
-
 
 export const categoriesAPI = {
   getAll: async () => {
@@ -67,9 +66,28 @@ export const categoriesAPI = {
   create: async (name) => {
     const response = await api.post(`/financeiro/categories`, { name });
     return response.data;
-  }
+  },
 };
 
+// APIs para integração de peças
+export const pecasAPI = {
+  getAll: async () => {
+    const response = await api.get("/pecas");
+    return response.data;
+  },
+  create: async (pecaData) => {
+    const response = await api.post("/pecas", pecaData);
+    return response.data;
+  },
+  update: async (id, pecaData) => {
+    const response = await api.put(`/pecas/${id}`, pecaData);
+    return response.data;
+  },
+  delete: async (id) => {
+    const response = await api.delete(`/pecas/${id}`);
+    return response.data;
+  },
+};
 
 export const reportsAPI = {
   getDashboard: async () => {
@@ -80,10 +98,13 @@ export const reportsAPI = {
     const response = await api.get(`/financeiro/reports/alerts`);
     return response.data;
   },
-  export: async (format = 'pdf') => {
-    const response = await api.get(`/financeiro/reports/export?format=${format}`, { responseType: 'blob' });
+  export: async (format = "pdf") => {
+    const response = await api.get(
+      `/financeiro/reports/export?format=${format}`,
+      { responseType: "blob" },
+    );
     return response.data;
-  }
+  },
 };
 
 export default api;
