@@ -70,8 +70,12 @@ router.post("/mover-loja", async (req, res) => {
 });
 
 // Página de execução de roteiro: retorna lojas e máquinas do roteiro
-import { getRoteiroExecucaoComStatus } from "../controllers/roteiroExecucaoController.js";
 
+import { getRoteiroExecucaoComStatus, getTodosRoteirosComStatus } from "../controllers/roteiroExecucaoController.js";
+
+// Novo endpoint: listar todos os roteiros já com status calculado
+router.get("/com-status", getTodosRoteirosComStatus);
+// Página de execução de roteiro: retorna lojas e máquinas do roteiro
 router.get("/:id/executar", getRoteiroExecucaoComStatus);
 
 export default router;

@@ -1,3 +1,63 @@
+// Retorna todos os roteiros já com status calculado para listagem
+import { Roteiro, Loja, Maquina } from "../models/index.js";
+import MovimentacaoStatusDiario from "../models/MovimentacaoStatusDiario.js";
+
+export async function getTodosRoteirosComStatus(req, res) {
+  try {
+    const roteiros = await Roteiro.findAll({
+      include: [
+        {
+          model: Loja,
+          as: "lojas",
+          attributes: ["id", "nome"],
+          include: [
+            {
+              model: Maquina,
+              as: "maquinas",
+              attributes: ["id"],
+            },
+          ],
+        },
+      ],
+    });
+    const dataHoje = new Date().toISOString().slice(0, 10);
+    // Buscar status de todas as máquinas de todos os roteiros para hoje
+    const statusMaquinas = await MovimentacaoStatusDiario.findAll({
+      where: {
+        data: dataHoje,
+        concluida: true,
+      },
+    });
+    const statusPorRoteiro = {};
+    roteiros.forEach((roteiro) => {
+      const maquinasRoteiro = roteiro.lojas.flatMap(loja => loja.maquinas.map(m => m.id));
+      const maquinasFinalizadas = new Set(
+        statusMaquinas.filter(s => s.roteiro_id === roteiro.id).map(s => s.maquina_id)
+      );
+      let roteiroFinalizado = true;
+      roteiro.lojas.forEach(loja => {
+        let lojaFinalizada = true;
+        loja.maquinas.forEach(maquina => {
+          if (!maquinasFinalizadas.has(maquina.id)) lojaFinalizada = false;
+        });
+        if (!lojaFinalizada) roteiroFinalizado = false;
+      });
+      statusPorRoteiro[roteiro.id] = roteiroFinalizado ? "finalizado" : "pendente";
+    });
+    // Montar resposta incluindo status
+    const resposta = roteiros.map(roteiro => ({
+      id: roteiro.id,
+      nome: roteiro.nome,
+      funcionarioId: roteiro.funcionarioId,
+      funcionarioNome: roteiro.funcionarioNome,
+      lojas: roteiro.lojas,
+      status: statusPorRoteiro[roteiro.id] || "pendente",
+    }));
+    res.json(resposta);
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao listar roteiros com status" });
+  }
+}
 import { Op } from "sequelize";
 import { Roteiro, Loja, Maquina } from "../models/index.js";
 import MovimentacaoStatusDiario from "../models/MovimentacaoStatusDiario.js";
