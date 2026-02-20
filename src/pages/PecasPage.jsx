@@ -15,8 +15,14 @@ function PecasPage() {
   const [form, setForm] = useState({ nome: "", categoria: "", quantidade: 0 });
 
   // --- Permissões ---
-  const temPermissaoEscrita =
-    usuario?.role === "admin" || usuario?.role === "gerente";
+  const temPermissaoEscrita = [
+    "admin",
+    "ADMIN",
+    "Administrador",
+    "administrador",
+    "gerente",
+    "GERENTE",
+  ].includes(usuario?.role);
   const podeUsarCarrinho = true; // Ajuste conforme necessário
 
   // --- Carregamento de Dados ---
