@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
+import { useAuth } from "../hooks/useAuth";
 
 export default function MovimentacaoMaquina() {
   const [showManutencao, setShowManutencao] = useState(false);
@@ -144,9 +145,28 @@ export default function MovimentacaoMaquina() {
   // Estados para seleção de peças no modal
   const [selectedPecaId, setSelectedPecaId] = useState("");
   const [selectedQtd, setSelectedQtd] = useState(1);
-  const [carrinhoManutencao, setCarrinhoManutencao] = useState(() => {
-    return JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]");
-  });
+  const [carrinhoManutencao, setCarrinhoManutencao] = useState([]);
+  const { usuario } = useAuth ? useAuth() : {};
+
+  useEffect(() => {
+    async function fetchCarrinhoFuncionario() {
+      if (!usuario?.id) return;
+      try {
+        const res = await api.get(`/usuarios/${usuario.id}/carrinho`);
+        // O backend retorna array de itens, cada item tem peca e quantidade
+        setCarrinhoManutencao(
+          res.data.map((item) => ({
+            id: item.peca.id,
+            nome: item.peca.nome,
+            quantidade: item.quantidade,
+          })),
+        );
+      } catch (err) {
+        setCarrinhoManutencao([]);
+      }
+    }
+    fetchCarrinhoFuncionario();
+  }, [usuario]);
 
   function handleAdicionarPecaModal() {
     if (
@@ -260,12 +280,11 @@ export default function MovimentacaoMaquina() {
                         onChange={(e) => setSelectedPecaId(e.target.value)}
                       >
                         <option value="">Selecione a peça</option>
-                        {produtos &&
-                          produtos.map((peca) => (
-                            <option key={peca.id} value={peca.id}>
-                              {peca.nome}
-                            </option>
-                          ))}
+                        {carrinhoManutencao.map((peca) => (
+                          <option key={peca.id} value={peca.id}>
+                            {peca.nome}
+                          </option>
+                        ))}
                       </select>
                       <input
                         type="number"
