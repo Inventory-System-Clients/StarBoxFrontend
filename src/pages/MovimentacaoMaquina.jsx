@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function MovimentacaoMaquina() {
   const [showManutencao, setShowManutencao] = useState(false);
@@ -146,7 +146,7 @@ export default function MovimentacaoMaquina() {
   const [selectedPecaId, setSelectedPecaId] = useState("");
   const [selectedQtd, setSelectedQtd] = useState(1);
   const [carrinhoManutencao, setCarrinhoManutencao] = useState([]);
-  const { usuario } = useAuth ? useAuth() : {};
+  const { usuario } = useAuth();
 
   useEffect(() => {
     async function fetchCarrinhoFuncionario() {
