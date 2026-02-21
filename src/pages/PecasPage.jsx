@@ -10,6 +10,27 @@ function PecasPage() {
   // --- Estados ---
   const [pecas, setPecas] = useState([]);
   const [carrinho, setCarrinho] = useState([]);
+
+  // Carregar carrinho do backend
+  useEffect(() => {
+    async function fetchCarrinho() {
+      if (!usuario?.id) return;
+      try {
+        const res = await fetch(`/api/usuarios/${usuario.id}/carrinho`);
+        const data = await res.json();
+        setCarrinho(
+          data.map((item) => ({
+            id: item.peca.id,
+            nome: item.peca.nome,
+            quantidade: item.quantidade,
+          })),
+        );
+      } catch {
+        setCarrinho([]);
+      }
+    }
+    fetchCarrinho();
+  }, [usuario]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ nome: "", categoria: "", quantidade: 0 });
@@ -83,44 +104,49 @@ function PecasPage() {
   };
 
   // --- Lógica do Carrinho ---
-  const adicionarAoCarrinho = (peca) => {
-    setCarrinho((prev) => {
-      const itemExistente = prev.find((item) => item.id === peca.id);
-      let novoCarrinho;
-      if (itemExistente) {
-        if (itemExistente.quantidade >= peca.quantidade) {
-          alert("Limite de estoque atingido no carrinho.");
-          return prev;
-        }
-        novoCarrinho = prev.map((item) =>
-          item.id === peca.id
-            ? { ...item, quantidade: item.quantidade + 1 }
-            : item,
-        );
-      } else {
-        novoCarrinho = [...prev, { ...peca, quantidade: 1 }];
-      }
-      // Salva carrinho no localStorage
-      localStorage.setItem("carrinhoFuncionario", JSON.stringify(novoCarrinho));
-      return novoCarrinho;
-    });
-  };
-
-  const removerDoCarrinho = (id) => {
-    setCarrinho((prev) => {
-      const novoCarrinho = prev.filter((item) => item.id !== id);
-      localStorage.setItem("carrinhoFuncionario", JSON.stringify(novoCarrinho));
-      return novoCarrinho;
-    });
-  };
-
-  // Ao carregar a página, recupera carrinho do localStorage
-  useEffect(() => {
-    const carrinhoSalvo = localStorage.getItem("carrinhoFuncionario");
-    if (carrinhoSalvo) {
-      setCarrinho(JSON.parse(carrinhoSalvo));
+  const adicionarAoCarrinho = async (peca) => {
+    try {
+      await fetch(`/api/usuarios/${usuario.id}/carrinho`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pecaId: peca.id, quantidade: 1 }),
+      });
+      // Atualiza carrinho após adicionar
+      const res = await fetch(`/api/usuarios/${usuario.id}/carrinho`);
+      const data = await res.json();
+      setCarrinho(
+        data.map((item) => ({
+          id: item.peca.id,
+          nome: item.peca.nome,
+          quantidade: item.quantidade,
+        })),
+      );
+    } catch {
+      alert("Erro ao adicionar peça ao carrinho.");
     }
-  }, []);
+  };
+
+  const removerDoCarrinho = async (id) => {
+    try {
+      await fetch(`/api/usuarios/${usuario.id}/carrinho/${id}`, {
+        method: "DELETE",
+      });
+      // Atualiza carrinho após remover
+      const res = await fetch(`/api/usuarios/${usuario.id}/carrinho`);
+      const data = await res.json();
+      setCarrinho(
+        data.map((item) => ({
+          id: item.peca.id,
+          nome: item.peca.nome,
+          quantidade: item.quantidade,
+        })),
+      );
+    } catch {
+      alert("Erro ao remover peça do carrinho.");
+    }
+  };
+
+  // Removido uso de localStorage
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
