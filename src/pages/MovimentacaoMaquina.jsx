@@ -62,27 +62,48 @@ export default function MovimentacaoMaquina() {
   // Cálculo automático
   useEffect(() => {
     async function calcularBackend() {
-      const { contadorInDigital: inDigital, contadorOutDigital: outDigital, ignoreInOut } = formData;
+      const {
+        contadorInDigital: inDigital,
+        contadorOutDigital: outDigital,
+        ignoreInOut,
+      } = formData;
       if (inDigital !== "" && outDigital !== "" && maquina && !ignoreInOut) {
         try {
-          const res = await api.get(`/maquinas/${maquinaId}/calcular-quantidade`, {
-            params: { maquinaId, contadorIn: inDigital, contadorOut: outDigital },
-          });
+          const res = await api.get(
+            `/maquinas/${maquinaId}/calcular-quantidade`,
+            {
+              params: {
+                maquinaId,
+                contadorIn: inDigital,
+                contadorOut: outDigital,
+              },
+            },
+          );
           setFormData((prev) => ({
             ...prev,
-            quantidadeAtualMaquina: res.data.quantidadeAtual >= 0 ? res.data.quantidadeAtual : 0,
+            quantidadeAtualMaquina:
+              res.data.quantidadeAtual >= 0 ? res.data.quantidadeAtual : 0,
           }));
         } catch (err) {
           const inVal = parseInt(inDigital) || 0;
           const outVal = parseInt(outDigital) || 0;
           const capacidade = parseInt(maquina.capacidadePadrao) || 0;
           const qtd = capacidade - (outVal - inVal);
-          setFormData((prev) => ({ ...prev, quantidadeAtualMaquina: qtd >= 0 ? qtd : 0 }));
+          setFormData((prev) => ({
+            ...prev,
+            quantidadeAtualMaquina: qtd >= 0 ? qtd : 0,
+          }));
         }
       }
     }
     calcularBackend();
-  }, [formData.contadorInDigital, formData.contadorOutDigital, formData.ignoreInOut, maquina, maquinaId]);
+  }, [
+    formData.contadorInDigital,
+    formData.contadorOutDigital,
+    formData.ignoreInOut,
+    maquina,
+    maquinaId,
+  ]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -96,7 +117,9 @@ export default function MovimentacaoMaquina() {
     setSuccess("");
     setLoading(true);
     try {
-      const carrinhoFuncionario = JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]");
+      const carrinhoFuncionario = JSON.parse(
+        localStorage.getItem("carrinhoFuncionario") || "[]",
+      );
       const payload = {
         maquinaId,
         observacao: manutencaoObs,
@@ -118,6 +141,53 @@ export default function MovimentacaoMaquina() {
     }
   };
 
+  // Estados para seleção de peças no modal
+  const [selectedPecaId, setSelectedPecaId] = useState("");
+  const [selectedQtd, setSelectedQtd] = useState(1);
+  const [carrinhoManutencao, setCarrinhoManutencao] = useState(() => {
+    return JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]");
+  });
+
+  function handleAdicionarPecaModal() {
+    if (
+      !selectedPecaId ||
+      !selectedQtd ||
+      isNaN(selectedQtd) ||
+      selectedQtd <= 0
+    ) {
+      alert("Selecione a peça e a quantidade.");
+      return;
+    }
+    const peca = produtos.find((p) => String(p.id) === String(selectedPecaId));
+    if (!peca) {
+      alert("Peça não encontrada.");
+      return;
+    }
+    let novoCarrinho = [...carrinhoManutencao];
+    const existente = novoCarrinho.find(
+      (item) => String(item.id) === String(peca.id),
+    );
+    if (existente) {
+      existente.quantidade += parseInt(selectedQtd);
+    } else {
+      novoCarrinho.push({
+        id: peca.id,
+        nome: peca.nome,
+        quantidade: parseInt(selectedQtd),
+      });
+    }
+    setCarrinhoManutencao(novoCarrinho);
+    localStorage.setItem("carrinhoFuncionario", JSON.stringify(novoCarrinho));
+    setSelectedPecaId("");
+    setSelectedQtd(1);
+  }
+
+  function handleRemoverPecaModal(id) {
+    const novoCarrinho = carrinhoManutencao.filter((item) => item.id !== id);
+    setCarrinhoManutencao(novoCarrinho);
+    localStorage.setItem("carrinhoFuncionario", JSON.stringify(novoCarrinho));
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
@@ -128,7 +198,7 @@ export default function MovimentacaoMaquina() {
           </h2>
 
           {/* Botão para abrir manutenção */}
-          <button 
+          <button
             onClick={() => setShowManutencao(true)}
             className="mb-6 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold"
           >
@@ -141,7 +211,12 @@ export default function MovimentacaoMaquina() {
               <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-bold">Registrar Manutenção</h3>
-                  <button onClick={() => setShowManutencao(false)} className="text-2xl">&times;</button>
+                  <button
+                    onClick={() => setShowManutencao(false)}
+                    className="text-2xl"
+                  >
+                    &times;
+                  </button>
                 </div>
                 <form onSubmit={handleSaveManutencao} className="space-y-4">
                   <textarea
@@ -152,18 +227,64 @@ export default function MovimentacaoMaquina() {
                     placeholder="Descreva a manutenção..."
                   />
                   <div className="bg-gray-50 p-3 rounded-lg">
-                    <h4 className="font-bold text-sm mb-2">Peças no Carrinho (Retiradas do Estoque):</h4>
-                    {JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]").length > 0 ? (
+                    <h4 className="font-bold text-sm mb-2">
+                      Peças usadas na manutenção:
+                    </h4>
+                    {carrinhoManutencao.length > 0 ? (
                       <ul className="text-xs space-y-1">
-                        {JSON.parse(localStorage.getItem("carrinhoFuncionario") || "[]").map(item => (
-                          <li key={item.id}>• {item.nome} (Qtd: {item.quantidade})</li>
+                        {carrinhoManutencao.map((item) => (
+                          <li key={item.id} className="flex items-center gap-2">
+                            • {item.nome} (Qtd: {item.quantidade})
+                            <button
+                              type="button"
+                              className="text-red-500 text-xs font-bold"
+                              onClick={() => handleRemoverPecaModal(item.id)}
+                            >
+                              Remover
+                            </button>
+                          </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-xs text-gray-400">Carrinho vazio.</p>
+                      <p className="text-xs text-gray-400">
+                        Nenhuma peça selecionada.
+                      </p>
                     )}
                   </div>
-                  <button 
+                  <div className="flex flex-col gap-2 bg-blue-50 p-3 rounded-lg">
+                    <label className="font-bold text-sm">Adicionar Peça:</label>
+                    <div className="flex gap-2">
+                      <select
+                        className="flex-1 border rounded p-2"
+                        value={selectedPecaId}
+                        onChange={(e) => setSelectedPecaId(e.target.value)}
+                      >
+                        <option value="">Selecione a peça</option>
+                        {produtos &&
+                          produtos.map((peca) => (
+                            <option key={peca.id} value={peca.id}>
+                              {peca.nome}
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="1"
+                        value={selectedQtd}
+                        placeholder="Qtd"
+                        className="w-20 border rounded p-2"
+                        onChange={(e) => setSelectedQtd(Number(e.target.value))}
+                      />
+                      <button
+                        type="button"
+                        className="bg-green-600 text-white px-3 rounded font-bold"
+                        onClick={handleAdicionarPecaModal}
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
+                  <button
                     disabled={loading}
                     className="w-full bg-red-600 text-white py-2 rounded-lg font-bold"
                   >
@@ -179,44 +300,93 @@ export default function MovimentacaoMaquina() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="label">📥 Contador IN Digital</label>
-                <input type="number" name="contadorInDigital" value={formData.contadorInDigital} onChange={handleChange} className="w-full border rounded-lg p-2" />
+                <input
+                  type="number"
+                  name="contadorInDigital"
+                  value={formData.contadorInDigital}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg p-2"
+                />
               </div>
               <div>
                 <label className="label">📤 Contador OUT Digital</label>
-                <input type="number" name="contadorOutDigital" value={formData.contadorOutDigital} onChange={handleChange} className="w-full border rounded-lg p-2" />
+                <input
+                  type="number"
+                  name="contadorOutDigital"
+                  value={formData.contadorOutDigital}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg p-2"
+                />
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-                <input type="checkbox" id="ignoreInOut" name="ignoreInOut" checked={formData.ignoreInOut} onChange={handleChange} />
-                <label htmlFor="ignoreInOut" className="text-sm">Não preciso informar IN/OUT</label>
+              <input
+                type="checkbox"
+                id="ignoreInOut"
+                name="ignoreInOut"
+                checked={formData.ignoreInOut}
+                onChange={handleChange}
+              />
+              <label htmlFor="ignoreInOut" className="text-sm">
+                Não preciso informar IN/OUT
+              </label>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-               <div>
-                 <label className="label">📦 Qtd Atual na Máquina</label>
-                 <input type="number" name="quantidadeAtualMaquina" value={formData.quantidadeAtualMaquina} onChange={handleChange} className="w-full border rounded-lg p-2" />
-               </div>
-               <div>
-                 <label className="label">📦 Qtd Adicionada</label>
-                 <input type="number" name="quantidadeAdicionada" value={formData.quantidadeAdicionada} onChange={handleChange} className="w-full border rounded-lg p-2" />
-               </div>
-               <div>
-                 <label className="label">❌ Retirada de Produto</label>
-                 <input type="number" name="retiradaProduto" value={formData.retiradaProduto} onChange={handleChange} className="w-full border rounded-lg p-2" />
-               </div>
+              <div>
+                <label className="label">📦 Qtd Atual na Máquina</label>
+                <input
+                  type="number"
+                  name="quantidadeAtualMaquina"
+                  value={formData.quantidadeAtualMaquina}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg p-2"
+                />
+              </div>
+              <div>
+                <label className="label">📦 Qtd Adicionada</label>
+                <input
+                  type="number"
+                  name="quantidadeAdicionada"
+                  value={formData.quantidadeAdicionada}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg p-2"
+                />
+              </div>
+              <div>
+                <label className="label">❌ Retirada de Produto</label>
+                <input
+                  type="number"
+                  name="retiradaProduto"
+                  value={formData.retiradaProduto}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg p-2"
+                />
+              </div>
             </div>
 
             <div className="flex flex-col gap-4 pt-4 border-t">
-              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg">
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg"
+              >
                 Registrar Movimentação Normal
               </button>
-              <button type="button" onClick={() => navigate(-1)} className="text-gray-500 underline text-sm">Voltar</button>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="text-gray-500 underline text-sm"
+              >
+                Voltar
+              </button>
             </div>
           </form>
 
           {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
-          {success && <p className="text-green-500 mt-4 text-center">{success}</p>}
+          {success && (
+            <p className="text-green-500 mt-4 text-center">{success}</p>
+          )}
         </div>
       </main>
       <Footer />
