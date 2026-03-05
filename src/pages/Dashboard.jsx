@@ -426,6 +426,15 @@ export function Dashboard() {
       balancoData.totais.totalCartaoPix = totalCartaoPixSemanal;
       balancoData.totais.receitaReal = totalDinheiroSemanal + totalCartaoPixSemanal;
 
+      // Buscar lucro diário do backend
+      try {
+        const lucroDiarioRes = await api.get("/dashboard/lucro-diario");
+        balancoData.lucroPorDia = lucroDiarioRes.data;
+      } catch (err) {
+        console.error("Erro ao buscar lucro diário:", err);
+        balancoData.lucroPorDia = {};
+      }
+
       setStats({
         alertas: alertasRes.data?.alertas || [],
         balanco: balancoData,
@@ -1394,6 +1403,39 @@ export function Dashboard() {
                     </span>
                   </div>
                   <p className="text-xs opacity-75 mt-1">💰 Últimos 7 dias</p>
+                  {/* Comparação de lucro com mês anterior */}
+                  {(() => {
+                    // Supondo que stats.balanco.lucroPorDia[YYYY-MM-DD] existe
+                    const hoje = new Date();
+                    const diaAtual = hoje.getDate();
+                    const mesAtual = hoje.getMonth() + 1;
+                    const anoAtual = hoje.getFullYear();
+                    function getLucroPeriodo(stats, ano, mes, dias) {
+                      let total = 0;
+                      for (let d = 1; d <= dias; d++) {
+                        const dataStr = `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        total += Number(stats.balanco?.lucroPorDia?.[dataStr] || 0);
+                      }
+                      return total;
+                    }
+                    const lucroPeriodoAtual = getLucroPeriodo(stats, anoAtual, mesAtual, diaAtual);
+                    const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
+                    const anoMesAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+                    const lucroPeriodoAnterior = getLucroPeriodo(stats, anoMesAnterior, mesAnterior, diaAtual);
+                    const diff = lucroPeriodoAtual - lucroPeriodoAnterior;
+                    const percent = lucroPeriodoAnterior > 0 ? (diff / lucroPeriodoAnterior) * 100 : 0;
+                    return (
+                      <div className="mt-2 text-xs font-semibold">
+                        Lucro até hoje vs mês passado:
+                        <span className={percent >= 0 ? "text-green-700" : "text-red-700"}>
+                          {percent >= 0 ? "▲" : "▼"} {Math.abs(percent).toFixed(1)}%
+                        </span>
+                        <span className="ml-2 text-gray-700">
+                          (R$ {lucroPeriodoAtual.toLocaleString("pt-BR", {minimumFractionDigits: 2})} vs R$ {lucroPeriodoAnterior.toLocaleString("pt-BR", {minimumFractionDigits: 2})})
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               {/* Prêmios Saídos */}

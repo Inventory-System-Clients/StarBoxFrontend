@@ -215,6 +215,14 @@ export function Graficos() {
                 onChange={(e) => setLojaSelecionada(e.target.value)}
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
               >
+        // LOG DETALHADO DOS DADOS RECEBIDOS
+        console.log("--- DADOS RECEBIDOS DO BACKEND ---");
+        console.log("Totais:", dados.totais);
+        console.log("GraficoFinanceiro:", dados.graficoFinanceiro);
+        console.log("RankingProdutos:", dados.rankingProdutos);
+        console.log("ComparacaoLucro:", dados.comparacaoLucro);
+        console.log("Precos dos produtos:", pMap);
+        console.log("-----------------------------------");
                 {lojas.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
@@ -418,11 +426,59 @@ export function Graficos() {
                   Faturamento total no período: <strong className="text-green-600">{formatMoney(faturamentoReal)}</strong>
                 </p>
                 <div className="h-80 w-full">
-                  {(!graficoComCustosExtras || graficoComCustosExtras.length === 0) ? (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      <p>Sem dados para o período selecionado</p>
-                    </div>
-                  ) : (
+                    {(!graficoComCustosExtras || graficoComCustosExtras.length === 0) ? (
+                      <>
+                        <div className="mt-8 mb-4 p-6 rounded-xl shadow-lg bg-linear-to-br from-yellow-400 to-orange-500 text-white flex flex-col items-center justify-center">
+                          <h4 className="text-xl font-bold mb-2 flex items-center gap-2">
+                            <span className="bg-white/30 p-2 rounded-full">📈</span>
+                            Comparativo de Lucro Mensal
+                          </h4>
+                          {(() => {
+                            const hoje = new Date();
+                            const diaAtual = hoje.getDate();
+                            const mesAtual = hoje.getMonth() + 1;
+                            const anoAtual = hoje.getFullYear();
+                            function getLucroPeriodo(dados, ano, mes, dias) {
+                              let total = 0;
+                              for (let d = 1; d <= dias; d++) {
+                                const dataStr = `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                total += Number(dados.lucroPorDia?.[dataStr] || 0);
+                              }
+                              return total;
+                            }
+                            const lucroPeriodoAtual = getLucroPeriodo(dadosDashboard, anoAtual, mesAtual, diaAtual);
+                            const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
+                            const anoMesAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+                            const lucroPeriodoAnterior = getLucroPeriodo(dadosDashboard, anoMesAnterior, mesAnterior, diaAtual);
+                            const diff = lucroPeriodoAtual - lucroPeriodoAnterior;
+                            const percent = lucroPeriodoAnterior > 0 ? (diff / lucroPeriodoAnterior) * 100 : 0;
+                            return (
+                              <div className="flex flex-col items-center justify-center w-full">
+                                <div className="text-3xl font-extrabold mb-2">
+                                  R$ {lucroPeriodoAtual.toLocaleString("pt-BR", {minimumFractionDigits: 2})}
+                                </div>
+                                <div className="text-lg font-semibold mb-1">
+                                  {lucroPeriodoAnterior > 0 ? (
+                                    <span className={percent >= 0 ? "text-green-200" : "text-red-200"}>
+                                      {percent >= 0 ? "▲" : "▼"} {Math.abs(percent).toFixed(1)}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-white/80">(Sem dados do mês passado)</span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-white/80">
+                                  <span>Lucro até hoje vs mês passado</span><br />
+                                  <span>(R$ {lucroPeriodoAtual.toLocaleString("pt-BR", {minimumFractionDigits: 2})} vs R$ {lucroPeriodoAnterior.toLocaleString("pt-BR", {minimumFractionDigits: 2})})</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className="flex items-center justify-center h-full text-gray-400">
+                          <p>Sem dados para o período selecionado</p>
+                        </div>
+                      </>
+                    ) : (
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={graficoComCustosExtras}>
                       <defs>
@@ -591,9 +647,7 @@ export function Graficos() {
                                 style={{
                                   width: `${Math.min(
                                     (prod.quantidade /
-                                      ((dadosDashboard.rankingProdutos?.[0]
-                                        ?.quantidade) || 1)) *
-                                      100,
+                                      ((dadosDashboard.rankingProdutos?.[0]?.quantidade) || 1)) * 100,
                                     100,
                                   )}%`,
                                 }}
@@ -605,6 +659,74 @@ export function Graficos() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              {/* Box comparativo de lucro mensal - separada, maior e estilizada */}
+              <div className="mt-8 mb-4 p-8 rounded-2xl shadow-2xl bg-gradient-to-br from-yellow-400 via-orange-400 to-orange-600 text-white flex flex-col items-center justify-center border-4 border-yellow-500">
+                <h4 className="text-3xl font-extrabold mb-4 flex items-center gap-3 drop-shadow-lg">
+                  <span className="bg-white/30 p-3 rounded-full text-4xl">📈</span>
+                  Comparativo de Lucro Mensal
+                </h4>
+                {(() => {
+                  // Calcular faturamento do mês atual e do mês passado até o mesmo dia
+                  const hoje = new Date();
+                  const diaAtual = hoje.getDate();
+                  const mesAtual = hoje.getMonth() + 1;
+                  const anoAtual = hoje.getFullYear();
+                  function getFaturamentoPeriodo(dados, ano, mes, dias) {
+                    let total = 0;
+                    for (let d = 1; d <= dias; d++) {
+                      const dataStr = `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                      total += Number(dados.faturamentoPorDia?.[dataStr] || 0);
+                    }
+                    return total;
+                  }
+                  // Se não existir faturamentoPorDia, usar faturamentoReal para o mês atual
+                  let faturamentoAtual = 0;
+                  let faturamentoAnterior = 0;
+                  if (dadosDashboard?.faturamentoPorDia) {
+                    faturamentoAtual = getFaturamentoPeriodo(dadosDashboard, anoAtual, mesAtual, diaAtual);
+                    const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
+                    const anoMesAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+                    faturamentoAnterior = getFaturamentoPeriodo(dadosDashboard, anoMesAnterior, mesAnterior, diaAtual);
+                  } else {
+                    faturamentoAtual = faturamentoReal;
+                    faturamentoAnterior = 0;
+                  }
+                  const percent = faturamentoAnterior > 0 ? ((faturamentoAtual - faturamentoAnterior) / faturamentoAnterior) * 100 : 0;
+                  return (
+                    <div className="flex flex-col items-center justify-center w-full">
+                      <div className="text-5xl font-extrabold mb-2 drop-shadow-xl">
+                        {formatMoney(faturamentoAtual)}
+                      </div>
+                      <div className="text-2xl font-bold mb-2">
+                        {faturamentoAnterior > 0 ? (
+                          <span className={percent >= 0 ? "text-green-200" : "text-red-200"}>
+                            {percent >= 0 ? "▲" : "▼"} {Math.abs(percent).toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-white/80">(Sem dados do mês passado)</span>
+                        )}
+                      </div>
+                      <div className="text-lg text-white/80 mb-2">
+                        <span>Faturamento até hoje vs mês passado</span><br />
+                        <span>(
+                          {formatMoney(faturamentoAtual)} vs {formatMoney(faturamentoAnterior)}
+                        )</span>
+                      </div>
+                      {/* Detalhamento dos descontos do lucro */}
+                      <div className="mt-4 p-4 rounded-xl bg-white/20 text-white text-base w-full max-w-md">
+                        <div className="font-bold mb-2">Descontos considerados no lucro:</div>
+                        <ul className="list-disc pl-5">
+                          <li>Produtos saídos: <span className="font-semibold">{formatMoney(custoProdutos)}</span></li>
+                          <li>Custos extras (fixos/variáveis): <span className="font-semibold">{formatMoney(custosExtras)}</span></li>
+                          <li>Outros custos totais: <span className="font-semibold">{formatMoney(custoTotal)}</span></li>
+                        </ul>
+                        <div className="text-sm mt-2 text-white/80">O lucro é calculado descontando todos os custos acima do faturamento.</div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Status de Ocupação (Estoque) */}
