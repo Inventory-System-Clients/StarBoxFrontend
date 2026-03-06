@@ -2,13 +2,39 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { reportsAPI } from '../services/api.js';
 import { Button } from '../components/ui/button.jsx';
-import { Plus, TrendingUp, TrendingDown, AlertTriangle, Calendar, Download } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, AlertTriangle, Calendar, Download, RefreshCw } from 'lucide-react';
 import BillModal from '../components/BillModal.jsx';
 import { categoriesAPI } from '../services/api.js';
 import { toast } from 'sonner';
 import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
 import { useNavigate } from 'react-router-dom';
+
+// Estilos para animação de pulsar
+const pulseStyles = `
+  @keyframes pulse-scale {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.8;
+    }
+  }
+  .animate-pulse-scale {
+    animation: pulse-scale 1.5s ease-in-out infinite;
+  }
+`;
+
+// Função auxiliar para formatar valores em reais
+const formatCurrency = (value) => {
+  if (value === null || value === undefined) return 'R$ 0,00';
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -18,26 +44,57 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [user]);
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
     try {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+
       const [reportData, alertsData, categoriesData] = await Promise.all([
         reportsAPI.getDashboard(),
         reportsAPI.getAlerts(),
         categoriesAPI.getAll()
       ]);
+
+      // Validar campos essenciais
+      if (typeof reportData.bills_due_today === 'undefined') {
+        console.warn('Campo bills_due_today não encontrado na resposta');
+      }
+
       setReport(reportData);
       setAlerts(alertsData);
       setCategories(categoriesData);
+      setLastUpdate(new Date());
+      
+      if (isRefresh) {
+        toast.success('Dashboard atualizado!');
+      }
     } catch (error) {
-      toast.error('Erro ao carregar dados do dashboard');
+      console.error('Erro ao carregar dashboard:', error);
+      
+      if (error.response?.status === 403) {
+        toast.error('Você não tem permissão para acessar esta funcionalidade');
+        navigate('/');
+      } else if (error.response?.status === 401) {
+        toast.error('Sessão expirada. Faça login novamente.');
+        navigate('/login');
+      } else {
+        toast.error('Erro ao carregar dados do dashboard');
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchData(true);
   };
 
   const handleExport = async (format) => {
@@ -72,6 +129,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col app-container">
+      <style>{pulseStyles}</style>
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
@@ -80,6 +138,20 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-4xl font-bold text-gray-800 mb-2" data-testid="page-title">Dashboard</h1>
               <p className="text-gray-600">Visão geral das contas a pagar</p>
+              <div className="flex items-center gap-4 mt-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2 transition-colors"
+                  title="Atualizar dashboard"
+                >
+                  <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+                  {refreshing ? 'Atualizando...' : 'Atualizar'}
+                </button>
+                <span className="text-xs text-gray-400">
+                  Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2 mt-4">
                 <Button onClick={() => navigate('/financeiro/contas/personal')} variant="outline" className="border-blue-300 text-blue-600 hover:bg-blue-50">Contas Particulares</Button>
                 <Button onClick={() => navigate('/financeiro/contas/company')} variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50">Contas Empresariais</Button>
@@ -89,7 +161,7 @@ export default function DashboardPage() {
             <div className="flex space-x-3">
               <Button
                 onClick={() => setShowModal(true)}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg btn-primary"
+                className="bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg btn-primary"
                 data-testid="btn-add-bill"
               >
                 <Plus size={20} className="mr-2" />
@@ -144,7 +216,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">Total Pago</h3>
-              <p className="text-3xl font-bold text-gray-800">R$ {report?.total_paid.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-gray-800">{formatCurrency(report?.total_paid)}</p>
             </div>
 
             <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-total-open">
@@ -154,7 +226,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">Total em Aberto</h3>
-              <p className="text-3xl font-bold text-gray-800">R$ {report?.total_open.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-gray-800">{formatCurrency(report?.total_open)}</p>
             </div>
 
             <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-upcoming">
@@ -170,11 +242,80 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-overdue">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-purple-100 rounded-lg">
-                  <AlertTriangle className="text-purple-600" size={24} />
+                  <AlertTriangle 
+                    className={`text-purple-600 ${report?.overdue_bills > 0 ? 'animate-pulse-scale' : ''}`}
+                    size={24} 
+                  />
                 </div>
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">Atrasadas</h3>
               <p className="text-3xl font-bold text-gray-800">{report?.overdue_bills}</p>
+            </div>
+          </div>
+
+          {/* Cards de Alertas de Contas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Contas a pagar HOJE */}
+            <div 
+              className="bg-linear-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white card-hover" 
+              data-testid="card-due-today"
+              title="Contas com vencimento na data de hoje (status: Em Aberto)"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-white/20 rounded-lg">
+                  <AlertTriangle size={24} />
+                </div>
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">🔴 Urgente</span>
+              </div>
+              <h3 className="text-white text-sm font-medium mb-1 opacity-90">Contas a Pagar HOJE!</h3>
+              <p className="text-4xl font-bold mb-2">
+                {report?.bills_due_today || 0} {report?.bills_due_today === 1 ? 'conta' : 'contas'}
+              </p>
+              <p className="text-sm opacity-80">
+                Total: {formatCurrency(report?.amount_due_today)}
+              </p>
+            </div>
+
+            {/* Contas a pagar em 3 dias */}
+            <div 
+              className="bg-linear-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md p-6 text-white card-hover" 
+              data-testid="card-due-3-days"
+              title="Contas que vencem nos próximos 3 dias (status: Em Aberto)"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-white/20 rounded-lg">
+                  <Calendar size={24} />
+                </div>
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">🟡 Atenção</span>
+              </div>
+              <h3 className="text-white text-sm font-medium mb-1 opacity-90">Contas a Pagar em 3 Dias!</h3>
+              <p className="text-4xl font-bold mb-2">
+                {report?.bills_due_3_days || 0} {report?.bills_due_3_days === 1 ? 'conta' : 'contas'}
+              </p>
+              <p className="text-sm opacity-80">
+                Total: {formatCurrency(report?.amount_due_3_days)}
+              </p>
+            </div>
+
+            {/* Contas em dia */}
+            <div 
+              className="bg-linear-to-br from-green-500 to-green-600 rounded-xl shadow-md p-6 text-white card-hover" 
+              data-testid="card-up-to-date"
+              title="Contas com vencimento futuro (após 3 dias, status: Em Aberto)"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-white/20 rounded-lg">
+                  <TrendingUp size={24} />
+                </div>
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">🟢 OK</span>
+              </div>
+              <h3 className="text-white text-sm font-medium mb-1 opacity-90">Contas em Dia</h3>
+              <p className="text-4xl font-bold mb-2">
+                {report?.bills_up_to_date || 0} {report?.bills_up_to_date === 1 ? 'conta' : 'contas'}
+              </p>
+              <p className="text-sm opacity-80">
+                Total: {formatCurrency(report?.amount_up_to_date)}
+              </p>
             </div>
           </div>
 
@@ -186,7 +327,7 @@ export default function DashboardPage() {
                   report.bills_by_category.map((item, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                       <span className="font-medium text-gray-700">{item.category}</span>
-                      <span className="text-purple-600 font-semibold">R$ {item.total.toFixed(2)}</span>
+                      <span className="text-purple-600 font-semibold">{formatCurrency(item.total)}</span>
                     </div>
                   ))
                 ) : (

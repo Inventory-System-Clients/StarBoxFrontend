@@ -64,16 +64,15 @@ export default function Navbar() {
                   🧸 Produtos
                 </NavLink>
 
-                {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
+                {(usuario?.role === "ADMIN" || usuario?.role === "FUNCIONARIO" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
                   <NavLink to="/pecas" active={isActive("/pecas")}> 
                     🛠️ Peças
                   </NavLink>
                 )}
 
-
                 {usuario?.role === "ADMIN" && (
-                  <NavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}> 
-                    💸 Financeiro
+                  <NavLink to="/gerenciar-carrinhos" active={isActive("/gerenciar-carrinhos")}> 
+                    🛒 Carrinhos
                   </NavLink>
                 )}
 
@@ -139,16 +138,16 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
-            {usuario?.role === "ADMIN" && (
-              <MobileNavLink to="/financeiro/" active={isActive("/financeiro") || isActive("/financeiro/")}
-                onClick={closeMenu}>
-                💸 Financeiro
-              </MobileNavLink>
-            )}
-            {(usuario?.role === "ADMIN" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
+            {(usuario?.role === "ADMIN" || usuario?.role === "FUNCIONARIO" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
               <MobileNavLink to="/pecas" active={isActive("/pecas")}
                 onClick={closeMenu}>
                 🛠️ Peças
+              </MobileNavLink>
+            )}
+            {usuario?.role === "ADMIN" && (
+              <MobileNavLink to="/gerenciar-carrinhos" active={isActive("/gerenciar-carrinhos")}
+                onClick={closeMenu}>
+                🛒 Carrinhos
               </MobileNavLink>
             )}
             {/* ... Repetir para outros links ... */}

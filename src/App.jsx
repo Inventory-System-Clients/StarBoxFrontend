@@ -34,6 +34,7 @@ import Veiculos from "./pages/Veiculos";
 import FinanceiroRoutes from "./pages/FinanceiroRoutes.jsx";
 import Alertas from "./pages/Alertas";
 import SecurityLockPage from "./pages/SecurityLockPage.jsx";
+import GerenciarCarrinhosPage from "./pages/GerenciarCarrinhosPage.jsx";
 import "./App.css";
 
 function AppRoutes() {
@@ -246,6 +247,14 @@ function AppRoutes() {
         element={
           <PrivateRoute allowedRoles={["ADMIN", "GERENCIADOR"]}>
             <PecasForm />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/gerenciar-carrinhos"
+        element={
+          <PrivateRoute adminOnly>
+            <GerenciarCarrinhosPage />
           </PrivateRoute>
         }
       />

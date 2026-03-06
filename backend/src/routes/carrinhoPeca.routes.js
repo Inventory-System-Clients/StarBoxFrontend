@@ -1,18 +1,19 @@
 import express from "express";
 import {
   listarCarrinho,
+  listarMeuCarrinho,
   adicionarAoCarrinho,
+  adicionarAoMeuCarrinho,
   removerDoCarrinho,
+  removerDoMeuCarrinho,
 } from "../controllers/carrinhoPecaController.js";
 import { autenticar } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-// Listar peças do carrinho do usuário
+// Rotas para gerenciar carrinho de qualquer usuário (ADMIN/GERENCIADOR)
 router.get("/:id/carrinho", autenticar, listarCarrinho);
-// Adicionar peça ao carrinho
 router.post("/:id/carrinho", autenticar, adicionarAoCarrinho);
-// Remover peça do carrinho
 router.delete("/:id/carrinho/:pecaId", autenticar, removerDoCarrinho);
 
 export default router;

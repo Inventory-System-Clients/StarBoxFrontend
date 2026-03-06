@@ -4,10 +4,13 @@ import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { Modal, AlertBox } from "../components/UIComponents";
+import ManutencaoModal from "../components/ManutencaoModal";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function RoteiroExecucao() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [roteiro, setRoteiro] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,6 +22,10 @@ export default function RoteiroExecucao() {
     etapa: 1,
     loading: false,
   });
+  
+  // Estados para manutenção
+  const [manutencaoPendente, setManutencaoPendente] = useState(null);
+  const [modalManutencao, setModalManutencao] = useState(false);
 
   useEffect(() => {
     carregarRoteiro();
@@ -36,6 +43,46 @@ export default function RoteiroExecucao() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const verificarManutencoesPendentes = async (lojaId) => {
+    try {
+      const res = await api.get(`/manutencoes`, {
+        params: {
+          lojaId,
+          status: "pendente",
+        },
+      });
+      const manutencoesPendentes = res.data || [];
+      
+      if (manutencoesPendentes.length > 0) {
+        // Pega a primeira manutenção pendente
+        setManutencaoPendente(manutencoesPendentes[0]);
+        setModalManutencao(true);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Erro ao verificar manutenções:", err);
+      return false;
+    }
+  };
+
+  const handleSelecionarLoja = async (loja) => {
+    setLojaSelecionada(loja);
+    
+    // Verificar se há manutenções pendentes nesta loja
+    if (loja && loja.id) {
+      await verificarManutencoesPendentes(loja.id);
+    }
+  };
+
+  const handleManutencaoConcluida = async () => {
+    setSuccess("Manutenção processada com sucesso!");
+    setModalManutencao(false);
+    setManutencaoPendente(null);
+    // Recarregar roteiro para atualizar status
+    await carregarRoteiro();
   };
 
   const executarFinalizacaoRoteiro = async () => {
@@ -126,7 +173,7 @@ export default function RoteiroExecucao() {
               roteiro.lojas.map((loja) => (
                 <button
                   key={loja.id}
-                  onClick={() => setLojaSelecionada(loja)}
+                  onClick={() => handleSelecionarLoja(loja)}
                   className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start 
                     ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
                     ${loja.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
@@ -250,6 +297,15 @@ export default function RoteiroExecucao() {
             </div>
           </div>
         </Modal>
+
+        <ManutencaoModal
+          isOpen={modalManutencao}
+          onClose={() => setModalManutencao(false)}
+          manutencao={manutencaoPendente}
+          lojaId={lojaSelecionada?.id}
+          usuarioId={usuario?.id}
+          onManutencaoConcluida={handleManutencaoConcluida}
+        />
       </main>
       <Footer />
     </div>

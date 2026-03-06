@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+                  import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
@@ -34,9 +34,13 @@ export function MaquinaForm() {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loadingTiposMaquina, setLoadingTiposMaquina] = useState(false);
+  const [tiposMaquinaExistentes, setTiposMaquinaExistentes] = useState([]);
+  const [mostrarSugestoesTipo, setMostrarSugestoesTipo] = useState(false);
 
   useEffect(() => {
     carregarLojas();
+    carregarTiposMaquina();
     if (isEdit) {
       carregarMaquina();
     } else {
@@ -54,6 +58,29 @@ export function MaquinaForm() {
         "Erro ao carregar lojas: " +
           (error.response?.data?.error || error.message),
       );
+    }
+  };
+
+  const carregarTiposMaquina = async () => {
+    try {
+      setLoadingTiposMaquina(true);
+      const response = await api.get("/maquinas/tipos");
+      const lista = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.tipos)
+          ? response.data.tipos
+          : [];
+
+      const tiposUnicos = Array.from(
+        new Set(lista.map((item) => String(item || "").trim()).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }));
+
+      setTiposMaquinaExistentes(tiposUnicos);
+    } catch (error) {
+      console.error("Erro ao carregar tipos de máquina:", error);
+      setTiposMaquinaExistentes([]);
+    } finally {
+      setLoadingTiposMaquina(false);
     }
   };
 
@@ -94,6 +121,20 @@ export function MaquinaForm() {
       ...formData,
       [name]: type === "checkbox" ? checked : value,
     });
+  };
+
+  const tiposSugeridos = tiposMaquinaExistentes.filter((tipo) => {
+    const termo = String(formData.tipo || "")
+      .trim()
+      .toLocaleLowerCase("pt-BR");
+
+    if (!termo) return true;
+    return tipo.toLocaleLowerCase("pt-BR").includes(termo);
+  });
+
+  const selecionarTipoSugerido = (tipo) => {
+    setFormData((prev) => ({ ...prev, tipo }));
+    setMostrarSugestoesTipo(false);
   };
 
   const handleSubmit = async (e) => {
@@ -291,16 +332,47 @@ export function MaquinaForm() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Tipo de Máquina
                   </label>
-                  <input
-                    type="text"
-                    name="tipo"
-                    value={formData.tipo}
-                    onChange={handleChange}
-                    className="input-field"
-                    placeholder="Ex: Garra, Empurrador, etc."
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      name="tipo"
+                      value={formData.tipo}
+                      onChange={handleChange}
+                      onFocus={() => setMostrarSugestoesTipo(true)}
+                      onBlur={() => {
+                        setTimeout(() => setMostrarSugestoesTipo(false), 120);
+                      }}
+                      className="input-field"
+                      placeholder="Digite para buscar ou criar"
+                      autoComplete="off"
+                    />
+
+                    {mostrarSugestoesTipo && (
+                      <div className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                        {tiposSugeridos.length > 0 ? (
+                          tiposSugeridos.map((tipo) => (
+                            <button
+                              type="button"
+                              key={tipo}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => selecionarTipoSugerido(tipo)}
+                              className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              {tipo}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            Nenhum tipo encontrado
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Tipo ou modelo da máquina
+                    {loadingTiposMaquina
+                      ? "Carregando tipos existentes..."
+                      : "Digite para buscar rapidamente. Se não existir, informe um novo tipo e salve a máquina."}
                   </p>
                 </div>
 

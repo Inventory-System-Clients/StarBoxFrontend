@@ -11,11 +11,6 @@ export default function MovimentacaoMaquina() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
 
-  // Estado para peças do carrinho
-  const [pecasCarrinho, setPecasCarrinho] = useState([]);
-  const [carregandoCarrinho, setCarregandoCarrinho] = useState(false);
-  const [pecasSelecionadas, setPecasSelecionadas] = useState([]);
-
   // Estados para formulário
   const [formData, setFormData] = useState({
     produto_id: "",
@@ -48,20 +43,6 @@ export default function MovimentacaoMaquina() {
         ]);
         setMaquina(maqRes.data);
         setProdutos(prodRes.data);
-        // Buscar peças do carrinho do usuário
-        if (usuario && usuario.id) {
-          setCarregandoCarrinho(true);
-          try {
-            const resCarrinho = await api.get(
-              `/usuarios/${usuario.id}/carrinho`,
-            );
-            setPecasCarrinho(resCarrinho.data || []);
-          } catch (err) {
-            setPecasCarrinho([]);
-          } finally {
-            setCarregandoCarrinho(false);
-          }
-        }
       } catch (err) {
         setError("Erro ao carregar dados da máquina ou produtos.");
       } finally {
@@ -175,26 +156,14 @@ export default function MovimentacaoMaquina() {
     setError("");
     setSuccess("");
     try {
-      // Se o usuário selecionou peças do carrinho, enviar apenas as selecionadas
-      let produtosParaEnviar = [];
-      if (pecasSelecionadas.length > 0) {
-        produtosParaEnviar = pecasSelecionadas.map((peca) => ({
-          produtoId: peca.pecaId,
-          nome: peca.nome,
+      const produtosParaEnviar = [
+        {
+          produtoId: formData.produto_id,
           quantidadeSaiu: 0,
-          quantidadeAbastecida: peca.quantidade,
-          retiradaProduto: 0,
-        }));
-      } else {
-        produtosParaEnviar = [
-          {
-            produtoId: formData.produto_id,
-            quantidadeSaiu: 0,
-            quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
-            retiradaProduto: parseInt(formData.retiradaProduto) || 0,
-          },
-        ];
-      }
+          quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
+          retiradaProduto: parseInt(formData.retiradaProduto) || 0,
+        },
+      ];
       await api.post("/movimentacoes", {
         maquinaId: maquinaId,
         roteiroId: roteiroId,
@@ -214,35 +183,14 @@ export default function MovimentacaoMaquina() {
         observacoes: formData.observacao || "",
         produtos: produtosParaEnviar,
       });
-      // Remover peças do carrinho do usuário após movimentação
-      if (pecasSelecionadas.length > 0 && usuario && usuario.id) {
-        for (const peca of pecasSelecionadas) {
-          await api.delete(`/usuarios/${usuario.id}/carrinho/${peca.pecaId}`);
-        }
-        setPecasCarrinho((prev) =>
-          prev.filter(
-            (p) =>
-              !pecasSelecionadas.some(
-                (sel) => sel.pecaId === (p.pecaId || p.id),
-              ),
-          ),
-        );
-      }
       setSuccess("Movimentação registrada com sucesso!");
       setTimeout(() => {
         navigate(`/roteiros/${roteiroId}/executar`, { replace: true });
       }, 1200);
     } catch (err) {
-      if (err?.response?.status === 409) {
-        setError(
-          err?.response?.data?.error ||
-            "Esta máquina tem manutenção pendente. Vá na aba Manutenções, resolva primeiro e depois lance a movimentação.",
-        );
-      } else {
-        setError(
-          err?.response?.data?.error || "Erro ao registrar movimentação.",
-        );
-      }
+      setError(
+        err?.response?.data?.error || "Erro ao registrar movimentação.",
+      );
     }
   };
 
@@ -259,94 +207,6 @@ export default function MovimentacaoMaquina() {
             Registrar Movimentação
           </h3>
 
-          {/* Exibir peças do carrinho com seleção */}
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-bold text-yellow-800">
-                Peças no seu carrinho:
-              </span>
-              {carregandoCarrinho && (
-                <span className="text-xs text-gray-500">Carregando...</span>
-              )}
-            </div>
-            {pecasCarrinho.length === 0 ? (
-              <span className="text-xs text-gray-500">
-                Nenhuma peça no carrinho.
-              </span>
-            ) : (
-              <ul className="text-sm text-yellow-900 mb-2">
-                {pecasCarrinho.map((peca) => (
-                  <li
-                    key={peca.id || peca.pecaId}
-                    className="flex items-center gap-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={pecasSelecionadas.some(
-                        (p) => p.pecaId === (peca.pecaId || peca.id),
-                      )}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setPecasSelecionadas((prev) => [
-                            ...prev,
-                            {
-                              pecaId: peca.pecaId || peca.id,
-                              nome: peca.nome,
-                              quantidade: peca.quantidade,
-                            },
-                          ]);
-                        } else {
-                          setPecasSelecionadas((prev) =>
-                            prev.filter(
-                              (p) => p.pecaId !== (peca.pecaId || peca.id),
-                            ),
-                          );
-                        }
-                      }}
-                    />
-                    {peca.nome && peca.nome.trim() !== ""
-                      ? peca.nome
-                      : "Peça desconhecida"}{" "}
-                    - Qtd: {peca.quantidade}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button
-              type="button"
-              className="btn-secondary text-xs mt-2"
-              disabled={pecasSelecionadas.length === 0}
-              onClick={async () => {
-                if (pecasSelecionadas.length > 0 && usuario && usuario.id) {
-                  // Remove peças do carrinho do usuário
-                  for (const peca of pecasSelecionadas) {
-                    await api.delete(
-                      `/usuarios/${usuario.id}/carrinho/${peca.pecaId}`,
-                    );
-                  }
-                  setPecasCarrinho((prev) =>
-                    prev.filter(
-                      (p) =>
-                        !pecasSelecionadas.some(
-                          (sel) => sel.pecaId === (p.pecaId || p.id),
-                        ),
-                    ),
-                  );
-                  setSuccess("Peça usada na movimentação");
-                  // Preencher o produto e quantidade adicionada com a primeira peça selecionada
-                  const peca = pecasSelecionadas[0];
-                  setFormData((prev) => ({
-                    ...prev,
-                    produto_id: peca.pecaId || "",
-                    quantidadeAdicionada: peca.quantidade || "",
-                  }));
-                  setPecasSelecionadas([]);
-                }
-              }}
-            >
-              Usar peças selecionadas
-            </button>
-          </div>
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800 flex items-center gap-2">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

@@ -563,6 +563,41 @@ function Manutencoes() {
                 <div>
                   <strong>Máquina:</strong> {detalhe.maquina?.nome || "-"}
                 </div>
+
+                {/* Explicações dos funcionários */}
+                {(detalhe.explicacao_nao_fazer || detalhe.explicacao_sem_peca) && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="font-bold text-gray-800 mb-3">📝 Explicações dos Funcionários</h4>
+                    
+                    {detalhe.explicacao_nao_fazer && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-semibold text-orange-800 mb-1">
+                          Por que não foi feita:
+                        </p>
+                        <p className="text-sm text-gray-700">{detalhe.explicacao_nao_fazer}</p>
+                        {detalhe.verificadoPor && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            - {detalhe.verificadoPor.nome} ({formatarDataHora(detalhe.verificadoEm)})
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {detalhe.explicacao_sem_peca && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-yellow-800 mb-1">
+                          Por que não usou peças:
+                        </p>
+                        <p className="text-sm text-gray-700">{detalhe.explicacao_sem_peca}</p>
+                        {detalhe.concluidoPor && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            - {detalhe.concluidoPor.nome} ({formatarDataHora(detalhe.concluidoEm)})
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 mt-6">

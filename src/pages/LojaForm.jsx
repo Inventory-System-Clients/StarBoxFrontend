@@ -7,6 +7,22 @@ import { PageHeader, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
 
 export function LojaForm() {
+  const criarGastoFixoVazio = () => ({ nome: "", valor: "" });
+
+  const parseValorMonetario = (valor) => {
+    const texto = String(valor ?? "").trim();
+    if (!texto) return 0;
+
+    const limpo = texto.replace(/[^\d.,-]/g, "");
+    const normalizado =
+      limpo.includes(",") && limpo.includes(".")
+        ? limpo.replace(/\./g, "").replace(",", ".")
+        : limpo.replace(",", ".");
+
+    const numero = Number(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+  };
+
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
@@ -26,6 +42,9 @@ export function LojaForm() {
   const [loadingData, setLoadingData] = useState(isEdit);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loadingGastosFixos, setLoadingGastosFixos] = useState(false);
+
+  const [gastosFixos, setGastosFixos] = useState([criarGastoFixoVazio()]);
 
   // Estados para gerenciar estoque do depósito
   const [produtos, setProdutos] = useState([]);
@@ -47,6 +66,13 @@ export function LojaForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, produtos]);
+
+  useEffect(() => {
+    if (isEdit) {
+      carregarGastosFixos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, id]);
 
   const carregarProdutos = async () => {
     try {
@@ -78,11 +104,91 @@ export function LojaForm() {
     } catch (error) {
       setError(
         "Erro ao carregar loja: " +
-          (error.response?.data?.error || error.message)
+          (error.response?.data?.error || error.message),
       );
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const carregarGastosFixos = async () => {
+    try {
+      setLoadingGastosFixos(true);
+      const response = await api.get(`/gastos-fixos-loja/${id}`);
+      const listaRecebida = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.gastos)
+          ? response.data.gastos
+          : [];
+
+      const gastosNormalizados = listaRecebida
+        .map((item) => ({
+          nome: String(item?.nome || ""),
+          valor:
+            item?.valor !== null && item?.valor !== undefined
+              ? String(item.valor)
+              : "",
+        }))
+        .filter((item) => item.nome.trim() || item.valor.trim());
+
+      setGastosFixos(
+        gastosNormalizados.length
+          ? gastosNormalizados
+          : [criarGastoFixoVazio()],
+      );
+    } catch (error) {
+      console.error("Erro ao carregar gastos fixos:", error);
+      setGastosFixos([criarGastoFixoVazio()]);
+    } finally {
+      setLoadingGastosFixos(false);
+    }
+  };
+
+  const adicionarGastoFixo = () => {
+    setGastosFixos((prev) => [...prev, criarGastoFixoVazio()]);
+  };
+
+  const removerGastoFixo = (index) => {
+    setGastosFixos((prev) => {
+      if (prev.length === 1) return [criarGastoFixoVazio()];
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const alterarGastoFixo = (index, campo, valor) => {
+    setGastosFixos((prev) =>
+      prev.map((gasto, idx) =>
+        idx === index
+          ? {
+              ...gasto,
+              [campo]:
+                campo === "valor" ? valor.replace(/[^0-9.,]/g, "") : valor,
+            }
+          : gasto,
+      ),
+    );
+  };
+
+  const salvarGastosFixosDaLoja = async (lojaId) => {
+    const gastosComDados = gastosFixos.filter(
+      (item) => item.nome.trim() || item.valor.trim(),
+    );
+
+    const gastoInvalido = gastosComDados.find((item) => !item.nome.trim());
+    if (gastoInvalido) {
+      throw new Error(
+        "Preencha o nome de todos os gastos fixos antes de salvar",
+      );
+    }
+
+    const payload = {
+      gastos: gastosComDados.map((item) => ({
+        nome: item.nome.trim(),
+        valor: parseValorMonetario(item.valor),
+      })),
+    };
+
+    await api.post(`/gastos-fixos-loja/${lojaId}`, payload);
   };
 
   const handleChange = (e) => {
@@ -118,17 +224,31 @@ export function LojaForm() {
         ativo: formData.ativo,
       };
 
+      let lojaIdSalva = id;
+
       if (isEdit) {
         await api.put(`/lojas/${id}`, data);
-        setSuccess("Loja atualizada com sucesso!");
+        lojaIdSalva = id;
       } else {
-        await api.post("/lojas", data);
-        setSuccess("Loja criada com sucesso!");
+        const respostaCriacao = await api.post("/lojas", data);
+        lojaIdSalva = respostaCriacao.data?.id;
       }
+
+      if (lojaIdSalva) {
+        await salvarGastosFixosDaLoja(lojaIdSalva);
+      }
+
+      setSuccess(
+        isEdit
+          ? "Loja e gastos fixos atualizados com sucesso!"
+          : "Loja e gastos fixos criados com sucesso!",
+      );
 
       setTimeout(() => navigate("/lojas"), 1500);
     } catch (error) {
-      setError(error.response?.data?.error || "Erro ao salvar loja");
+      setError(
+        error.response?.data?.error || error.message || "Erro ao salvar loja",
+      );
     } finally {
       setLoading(false);
     }
@@ -141,7 +261,7 @@ export function LojaForm() {
         return prev.map((item) =>
           item.produtoId === produtoId
             ? { ...item, quantidade: parseInt(quantidade) || 0 }
-            : item
+            : item,
         );
       } else {
         return [
@@ -163,7 +283,7 @@ export function LojaForm() {
         return prev.map((item) =>
           item.produtoId === produtoId
             ? { ...item, estoqueMinimo: parseInt(estoqueMinimo) || 0 }
-            : item
+            : item,
         );
       } else {
         return [
@@ -188,14 +308,14 @@ export function LojaForm() {
         const produtoExiste = produtos.some((p) => p.id === item.produtoId);
         if (!produtoExiste) {
           console.warn(
-            `⚠️ Produto ${item.produtoId} não existe mais, ignorando...`
+            `⚠️ Produto ${item.produtoId} não existe mais, ignorando...`,
           );
         }
         return produtoExiste;
       });
 
       console.log(
-        `📊 Salvando ${produtosValidos.length} produtos válidos (incluindo quantidades zeradas)`
+        `📊 Salvando ${produtosValidos.length} produtos válidos (incluindo quantidades zeradas)`,
       );
 
       // Sempre usar POST que faz findOrCreate automaticamente
@@ -210,7 +330,7 @@ export function LojaForm() {
         } catch (itemError) {
           console.error(
             `❌ Erro ao salvar produto ${item.produtoId}:`,
-            itemError.response?.data || itemError.message
+            itemError.response?.data || itemError.message,
           );
           // Continuar com os próximos itens mesmo se um falhar
         }
@@ -221,7 +341,7 @@ export function LojaForm() {
     } catch (error) {
       setError(
         "Erro ao salvar estoque: " +
-          (error.response?.data?.error || error.message)
+          (error.response?.data?.error || error.message),
       );
     } finally {
       setSalvandoEstoque(false);
@@ -262,6 +382,88 @@ export function LojaForm() {
 
         <div className="card-gradient">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Gastos Fixos */}
+            <div>
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 text-primary"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 4a1 1 0 10-2 0v3H6a1 1 0 100 2h3v3a1 1 0 102 0v-3h3a1 1 0 100-2h-3V6z" />
+                  </svg>
+                  Gastos Fixos
+                </h3>
+                <button
+                  type="button"
+                  onClick={adicionarGastoFixo}
+                  className="btn-secondary"
+                >
+                  + Adicionar gasto
+                </button>
+              </div>
+
+              {loadingGastosFixos && isEdit && (
+                <div className="text-sm text-gray-600 mb-3">
+                  Carregando gastos fixos...
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {gastosFixos.map((gasto, index) => (
+                  <div
+                    key={`gasto-fixo-${index}`}
+                    className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      <div className="md:col-span-7">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Nome do gasto
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Ex: Aluguel"
+                          value={gasto.nome}
+                          onChange={(e) =>
+                            alterarGastoFixo(index, "nome", e.target.value)
+                          }
+                        />
+                      </div>
+
+                      <div className="md:col-span-3">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Valor
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9.,]*"
+                          className="input-field"
+                          placeholder="0,00"
+                          value={gasto.valor}
+                          onChange={(e) =>
+                            alterarGastoFixo(index, "valor", e.target.value)
+                          }
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => removerGastoFixo(index)}
+                          className="w-full px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Informações Básicas */}
             <div>
               <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -512,7 +714,7 @@ export function LojaForm() {
                                 onChange={(e) =>
                                   atualizarQuantidadeEstoque(
                                     produto.id,
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 className="input-field text-center w-24"
@@ -530,7 +732,7 @@ export function LojaForm() {
                                 onChange={(e) =>
                                   atualizarEstoqueMinimoEstoque(
                                     produto.id,
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 className="input-field text-center w-24"
