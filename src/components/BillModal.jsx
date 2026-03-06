@@ -34,6 +34,7 @@ export default function BillModal({
     amount: bill?.amount || "",
     payment_method: bill?.payment_method || "boleto",
     payment_details: bill?.payment_details || "",
+    boleto_em_maos: bill?.boleto_em_maos || false,
   });
   const [newCategory, setNewCategory] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -280,6 +281,24 @@ export default function BillModal({
                 required={formData.payment_method === "email"}
                 data-testid="input-payment-email"
               />
+            </div>
+          )}
+
+          {formData.payment_method === "boleto" && (
+            <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+              <input
+                type="checkbox"
+                id="boleto_em_maos"
+                checked={formData.boleto_em_maos}
+                onChange={(e) =>
+                  setFormData({ ...formData, boleto_em_maos: e.target.checked })
+                }
+                className="w-4 h-4 rounded cursor-pointer"
+                data-testid="checkbox-boleto-em-maos"
+              />
+              <Label htmlFor="boleto_em_maos" className="cursor-pointer mb-0">
+                Boleto em mãos / Recebido
+              </Label>
             </div>
           )}
 
