@@ -22,6 +22,8 @@ import roteiroStatusRoutes from "./roteiroStatus.routes.js";
 const router = express.Router();
 
 router.use("/auth", authRoutes);
+// Carrinho deve vir ANTES de usuarioRoutes para não herdar o middleware autorizar(["ADMIN"])
+router.use("/usuarios", carrinhoPecaRoutes); // /usuarios/:id/carrinho
 router.use("/usuarios", usuarioRoutes);
 router.use("/lojas", lojaRoutes);
 router.use("/maquinas", maquinaRoutes);
@@ -31,7 +33,6 @@ router.use("/relatorios", relatorioRoutes);
 router.use("/totais", totaisRoutes);
 
 router.use("/pecas", pecasRoutes);
-router.use("/usuarios", carrinhoPecaRoutes); // /usuarios/:id/carrinho
 router.use("/admin", adminRoutes);
 router.use("/estoque-lojas", estoqueLojaRoutes);
 router.use("/movimentacao-estoque-loja", movimentacaoEstoqueLojaRoutes);

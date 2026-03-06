@@ -5,6 +5,10 @@ import {
   atualizarPeca,
   excluirPeca,
 } from "../controllers/pecaController.js";
+import {
+  adicionarPecaAoCarrinho,
+  removerPecaDoCarrinho,
+} from "../controllers/carrinhoPecaController.js";
 import { autenticar, autorizar } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -17,5 +21,9 @@ router.post("/", autenticar, autorizar(["ADMIN", "GERENCIADOR"]), criarPeca);
 router.put("/:id", autenticar, autorizar(["ADMIN", "GERENCIADOR"]), atualizarPeca);
 // Excluir peça (ADMIN, GERENCIADOR)
 router.delete("/:id", autenticar, autorizar(["ADMIN", "GERENCIADOR"]), excluirPeca);
+
+// Rotas de carrinho de peças
+router.post("/:pecaId/carrinho", autenticar, adicionarPecaAoCarrinho);
+router.delete("/:pecaId/carrinho", autenticar, removerPecaDoCarrinho);
 
 export default router;

@@ -148,6 +148,13 @@ Produto.hasMany(EstoqueLoja, {
 });
 EstoqueLoja.belongsTo(Loja, { foreignKey: "lojaId", as: "loja" });
 EstoqueLoja.belongsTo(Produto, { foreignKey: "produtoId", as: "produto" });
+
+// CarrinhoPeca -> Peca e Usuario
+CarrinhoPeca.belongsTo(Peca, { foreignKey: "pecaId" });
+CarrinhoPeca.belongsTo(Usuario, { foreignKey: "usuarioId" });
+Peca.hasMany(CarrinhoPeca, { foreignKey: "pecaId" });
+Usuario.hasMany(CarrinhoPeca, { foreignKey: "usuarioId" });
+
 export {
   CarrinhoPeca,
   Usuario,
