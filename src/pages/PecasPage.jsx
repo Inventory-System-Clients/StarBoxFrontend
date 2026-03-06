@@ -54,7 +54,8 @@ export default function PecasPage() {
     }
 
     try {
-      await api.post(`/pecas/${peca.id}/carrinho`, {
+      await api.post(`/usuarios/${usuario.id}/carrinho`, {
+        pecaId: peca.id,
         quantidade: 1,
       });
 
@@ -99,8 +100,8 @@ export default function PecasPage() {
       return;
     }
 
-    const url = `/pecas/${pecaId}/carrinho`;
-    console.log("[removerDoCarrinho] DELETE", { url, pecaId, item });
+    const url = `/usuarios/${usuario.id}/carrinho/${pecaId}`;
+    console.log("[removerDoCarrinho] DELETE", { url, usuarioId: usuario.id, pecaId, item });
     try {
       await api.delete(url);
       // Atualiza lista de peças e carrinho após devolução
