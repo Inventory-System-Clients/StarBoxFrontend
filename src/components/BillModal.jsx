@@ -82,16 +82,16 @@ export default function BillModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className="sm:max-w-[500px] bill-modal-content"
+        className="sm:max-w-[500px] bill-modal-content max-h-[90vh] overflow-y-auto"
         data-testid="bill-modal"
       >
-        <DialogHeader>
+        <DialogHeader className="sticky top-0 bg-white z-10 pb-2 border-b">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             {bill ? "Editar Conta" : "Cadastrar Conta à Pagar"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4 pb-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Nome *</Label>
@@ -316,7 +316,7 @@ export default function BillModal({
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-3 pt-4 sticky bottom-0 bg-white border-t mt-4">
             <Button
               type="button"
               variant="outline"
