@@ -18,6 +18,7 @@ import TabelaMovimentacoesEstoqueDeLoja from "../components/TabelaMovimentacoesE
 export function Movimentacoes() {
   const [modalRegistrarDinheiro, setModalRegistrarDinheiro] = useState(false);
   const { usuario } = useAuth();
+  const isFuncionarioNormal = usuario?.role === "FUNCIONARIO";
 
   // --- ESTADOS ---
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -77,12 +78,24 @@ export function Movimentacoes() {
   // Estados auxiliares
   const [estoqueAnterior, setEstoqueAnterior] = useState(0);
   const [alertaDivergencia, setAlertaDivergencia] = useState(null);
+  const [resumoContadores, setResumoContadores] = useState(null);
 
   // --- EFEITOS ---
   useEffect(() => {
     carregarDados();
     carregarMovimentacoesEstoqueLoja();
   }, []);
+
+  useEffect(() => {
+    if (!showForm || !isFuncionarioNormal) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      contadorIn: "",
+      contadorOut: "",
+      ignoreInOut: true,
+    }));
+  }, [showForm, isFuncionarioNormal]);
 
   // Atualizar estoque anterior quando seleciona máquina
   useEffect(() => {
@@ -97,73 +110,90 @@ export function Movimentacoes() {
   // Verificar divergência entre contador OUT e total pre informado
   useEffect(() => {
     const verificarDivergencia = async () => {
-      // Só verificar se temos máquina selecionada, contador OUT e total pre preenchidos
-      if (
-        !formData.maquina_id ||
-        !formData.contadorOut ||
-        !formData.quantidadeAtualMaquina
-      ) {
+      if (isFuncionarioNormal || !formData.maquina_id) {
         setAlertaDivergencia(null);
-        return;
-      }
-
-      const contadorOutAtual = parseInt(formData.contadorOut);
-      const totalPreInformado = parseInt(formData.quantidadeAtualMaquina);
-
-      // Validar se são números válidos
-      if (isNaN(contadorOutAtual) || isNaN(totalPreInformado)) {
-        setAlertaDivergencia(null);
+        setResumoContadores(null);
         return;
       }
 
       try {
-        // Buscar última movimentação da máquina
-        const response = await api.get(
-          `/movimentacoes?maquinaId=${formData.maquina_id}&limite=1`,
-        );
-        const movimentacoes = response.data;
-
-        if (movimentacoes && movimentacoes.length > 0) {
-          const ultimaMov = movimentacoes[0];
-          const contadorOutAnterior = ultimaMov.contadorOut || 0;
-          const totalPosAnterior = ultimaMov.totalPos || 0;
-
-          // Calcular quantos produtos saíram baseado no contador OUT
-          const saidaCalculada = contadorOutAtual - contadorOutAnterior;
-
-          // Calcular qual deveria ser o total pre esperado
-          const totalPreEsperado = totalPosAnterior - saidaCalculada;
-
-          // Se houver divergência, mostrar alerta
-          const diferenca = Math.abs(totalPreInformado - totalPreEsperado);
-          if (diferenca > 0) {
-            setAlertaDivergencia({
-              totalPreInformado,
-              totalPreEsperado,
-              diferenca,
-              saidaCalculada,
-              totalPosAnterior,
-              contadorOutAnterior,
-              contadorOutAtual,
-            });
-          } else {
-            setAlertaDivergencia(null);
+        const params = { maquinaId: formData.maquina_id };
+        if (!formData.ignoreInOut) {
+          if (formData.contadorIn !== "") params.contadorIn = formData.contadorIn;
+          if (formData.contadorOut !== "") {
+            params.contadorOut = formData.contadorOut;
           }
+        }
+
+        const response = await api.get(
+          `/maquinas/${formData.maquina_id}/calcular-quantidade`,
+          { params },
+        );
+
+        setResumoContadores(response.data);
+
+        if (
+          formData.ignoreInOut ||
+          formData.contadorOut === "" ||
+          formData.quantidadeAtualMaquina === ""
+        ) {
+          setAlertaDivergencia(null);
+          return;
+        }
+
+        const contadorOutAtual = parseInt(formData.contadorOut, 10);
+        const totalPreInformado = parseInt(formData.quantidadeAtualMaquina, 10);
+
+        if (Number.isNaN(contadorOutAtual) || Number.isNaN(totalPreInformado)) {
+          setAlertaDivergencia(null);
+          return;
+        }
+
+        const contadorOutSugerido = parseInt(
+          response.data?.contadorOutSugerido ?? 0,
+          10,
+        );
+
+        if (contadorOutAtual < contadorOutSugerido) {
+          setAlertaDivergencia({
+            tipo: "out_abaixo_sugerido",
+            contadorOutAtual,
+            contadorOutSugerido,
+          });
+          return;
+        }
+
+        const totalPreEsperado = parseInt(
+          response.data?.totalPreEsperado ?? response.data?.quantidadeAtual ?? 0,
+          10,
+        );
+        const diferenca = Math.abs(totalPreInformado - totalPreEsperado);
+
+        if (diferenca > 0) {
+          setAlertaDivergencia({
+            tipo: "quantidade_divergente",
+            totalPreInformado,
+            totalPreEsperado,
+            diferenca,
+          });
         } else {
-          // Não há movimentação anterior, não há como comparar
           setAlertaDivergencia(null);
         }
       } catch (error) {
         console.error("Erro ao verificar divergência:", error);
+        setResumoContadores(null);
         setAlertaDivergencia(null);
       }
     };
 
     verificarDivergencia();
   }, [
+    isFuncionarioNormal,
     formData.maquina_id,
+    formData.contadorIn,
     formData.contadorOut,
     formData.quantidadeAtualMaquina,
+    formData.ignoreInOut,
   ]);
 
   // --- FUNÇÕES DE CARREGAMENTO ---
@@ -178,12 +208,15 @@ export function Movimentacoes() {
       ]);
 
       console.log("🔍 Movimentações carregadas:", movRes.data);
-      console.log("🔍 Movimentações com justificativa:", 
-        movRes.data?.filter(m => m.justificativa_ordem).map(m => ({
-          id: m.id,
-          justificativa: m.justificativa_ordem,
-          data: m.createdAt
-        }))
+      console.log(
+        "🔍 Movimentações com justificativa:",
+        movRes.data
+          ?.filter((m) => m.justificativa_ordem)
+          .map((m) => ({
+            id: m.id,
+            justificativa: m.justificativa_ordem,
+            data: m.createdAt,
+          })),
       );
 
       setMovimentacoes(movRes.data || []);
@@ -282,6 +315,8 @@ export function Movimentacoes() {
           : notaRetirada;
       }
 
+      const deveIgnorarContadores = isFuncionarioNormal || formData.ignoreInOut;
+
       // Transformar para o formato do backend
       const data = {
         maquinaId: formData.maquina_id,
@@ -290,14 +325,23 @@ export function Movimentacoes() {
         abastecidas: quantidadeAdicionada,
         totalPos: totalPos,
         fichas: fichas,
-        contadorIn: parseInt(formData.contadorIn) || null,
-        contadorOut: parseInt(formData.contadorOut) || null,
+        contadorIn: deveIgnorarContadores
+          ? null
+          : formData.contadorIn === ""
+            ? null
+            : parseInt(formData.contadorIn),
+        contadorOut: deveIgnorarContadores
+          ? null
+          : formData.contadorOut === ""
+            ? null
+            : parseInt(formData.contadorOut),
         quantidade_notas_entrada: formData.quantidade_notas_entrada
           ? parseFloat(formData.quantidade_notas_entrada)
           : null,
         valor_entrada_maquininha_pix: formData.valor_entrada_maquininha_pix
           ? parseFloat(formData.valor_entrada_maquininha_pix)
           : null,
+        ignoreInOut: Boolean(formData.ignoreInOut),
         retiradaEstoque: formData.retiradaEstoque,
         contadorMaquina: null,
         observacoes: observacaoFinal || null,
@@ -358,6 +402,9 @@ export function Movimentacoes() {
         valor_entrada_maquininha_pix: "",
         observacao: "",
         retiradaEstoque: false,
+        retiradaProduto: 0,
+        retiradaProdutoDevolverEstoque: false,
+        ignoreInOut: isFuncionarioNormal,
       });
       setEstoqueAnterior(0);
       setFiltroLojaForm("");
@@ -480,11 +527,15 @@ export function Movimentacoes() {
   const totalSaidas = saidas.reduce((sum, m) => sum + (m.sairam || 0), 0);
 
   const movimentacoesFiltradas = filtroLojaListagem
-    ? movimentacoes.filter((mov) => {
-        const maquina = maquinas.find((m) => m.id === mov.maquinaId);
-        return maquina?.lojaId === filtroLojaListagem;
-      }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    : movimentacoes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    ? movimentacoes
+        .filter((mov) => {
+          const maquina = maquinas.find((m) => m.id === mov.maquinaId);
+          return maquina?.lojaId === filtroLojaListagem;
+        })
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    : movimentacoes.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+      );
 
   const stats = [
     {
@@ -634,7 +685,10 @@ export function Movimentacoes() {
       key: "justificativa",
       label: "Quebra de Ordem",
       render: (mov) => {
-        console.log(`🔍 Renderizando justificativa para mov ${mov.id}:`, mov.justificativa_ordem);
+        console.log(
+          `🔍 Renderizando justificativa para mov ${mov.id}:`,
+          mov.justificativa_ordem,
+        );
         return mov.justificativa_ordem ? (
           <div className="max-w-xs">
             <div className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs">
@@ -645,7 +699,7 @@ export function Movimentacoes() {
         ) : (
           <span className="text-gray-400 text-xs">-</span>
         );
-      }
+      },
     },
     {
       key: "observacao",
@@ -830,62 +884,93 @@ export function Movimentacoes() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Contadores da Máquina */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    📥 Contador IN (Entrada)
-                  </label>
-                  <input
-                    type="number"
-                    name="contadorIn"
-                    value={formData.contadorIn}
-                    onChange={handleChange}
-                    className="input-field"
-                    placeholder="0"
-                    min="0"
-                    required={!formData.ignoreInOut}
-                    disabled={formData.ignoreInOut}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Número do contador IN da máquina
-                  </p>
-                </div>
+              {!isFuncionarioNormal ? (
+                <>
+                  {/* Contadores da Máquina */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📥 Contador IN (Entrada)
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorIn"
+                        value={formData.contadorIn}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                        required={!formData.ignoreInOut}
+                        disabled={formData.ignoreInOut}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número do contador IN da máquina
+                      </p>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    📤 Contador OUT (Saída)
-                  </label>
-                  <input
-                    type="number"
-                    name="contadorOut"
-                    value={formData.contadorOut}
-                    onChange={handleChange}
-                    className="input-field"
-                    placeholder="0"
-                    min="0"
-                    required={!formData.ignoreInOut}
-                    disabled={formData.ignoreInOut}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Número do contador OUT da máquina
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📤 Contador OUT (Saída)
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorOut"
+                        value={formData.contadorOut}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                        required={!formData.ignoreInOut}
+                        disabled={formData.ignoreInOut}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número do contador OUT da máquina
+                      </p>
+                    </div>
+                  </div>
+                  {/* Checkbox para ignorar IN/OUT */}
+                  <div className="flex items-center mt-2 mb-4">
+                    <input
+                      type="checkbox"
+                      id="ignoreInOut"
+                      name="ignoreInOut"
+                      checked={formData.ignoreInOut || false}
+                      onChange={handleChange}
+                      className="mr-2"
+                    />
+                    <label
+                      htmlFor="ignoreInOut"
+                      className="text-sm text-gray-700"
+                    >
+                      Não preciso informar IN/OUT nesta movimentação
+                    </label>
+                  </div>
+
+                  {resumoContadores && (
+                    <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <p className="text-sm font-semibold text-indigo-900">
+                        Sugestões automáticas de contagem
+                      </p>
+                      <p className="text-xs text-indigo-700 mt-1">
+                        OUT sugerido acumulado: {resumoContadores.contadorOutSugerido || 0}
+                      </p>
+                      <p className="text-xs text-indigo-700">
+                        Era para ter na máquina: {resumoContadores.totalPreEsperado ?? 0}
+                      </p>
+                      <p className="text-xs text-indigo-700">
+                        Sugestão de abastecimento: {resumoContadores.sugestaoAbastecimento ?? 0}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    Para o perfil de funcionário, os campos IN/OUT não precisam
+                    ser digitados nesta movimentação.
                   </p>
                 </div>
-              </div>
-              {/* Checkbox para ignorar IN/OUT */}
-              <div className="flex items-center mt-2 mb-4">
-                <input
-                  type="checkbox"
-                  id="ignoreInOut"
-                  name="ignoreInOut"
-                  checked={formData.ignoreInOut || false}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                <label htmlFor="ignoreInOut" className="text-sm text-gray-700">
-                  Não preciso informar IN/OUT nesta movimentação
-                </label>
-              </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -922,9 +1007,18 @@ export function Movimentacoes() {
                           <p className="text-xs font-bold text-yellow-800 mb-1">
                             Atenção: Possível erro de contagem!
                           </p>
-                          <p className="text-xs text-yellow-700">
-                            Reconte por favor
-                          </p>
+                          {alertaDivergencia.tipo === "out_abaixo_sugerido" ? (
+                            <p className="text-xs text-yellow-700">
+                              OUT digitado ({alertaDivergencia.contadorOutAtual})
+                              está abaixo do OUT sugerido acumulado (
+                              {alertaDivergencia.contadorOutSugerido}).
+                            </p>
+                          ) : (
+                            <p className="text-xs text-yellow-700">
+                              Era para ter {alertaDivergencia.totalPreEsperado} na
+                              máquina, mas foi informado {alertaDivergencia.totalPreInformado}.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1247,9 +1341,13 @@ export function Movimentacoes() {
             </h3>
 
             {(() => {
-              console.log("🔍 Movimentações filtradas para exibição:", movimentacoesFiltradas);
-              console.log("🔍 Movimentações com justificativa na lista filtrada:", 
-                movimentacoesFiltradas.filter(m => m.justificativa_ordem)
+              console.log(
+                "🔍 Movimentações filtradas para exibição:",
+                movimentacoesFiltradas,
+              );
+              console.log(
+                "🔍 Movimentações com justificativa na lista filtrada:",
+                movimentacoesFiltradas.filter((m) => m.justificativa_ordem),
               );
               return null;
             })()}

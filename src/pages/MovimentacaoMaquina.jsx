@@ -10,6 +10,8 @@ export default function MovimentacaoMaquina() {
   const { roteiroId, lojaId, maquinaId } = useParams();
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const isFuncionarioNormal = usuario?.role === "FUNCIONARIO";
+  const isFuncionarioTodasLojas = usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
 
   // Estados para formulário
   const [formData, setFormData] = useState({
@@ -32,6 +34,8 @@ export default function MovimentacaoMaquina() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [resumoCalculo, setResumoCalculo] = useState(null);
+  const [alertaDivergencia, setAlertaDivergencia] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -52,94 +56,167 @@ export default function MovimentacaoMaquina() {
     fetchData();
   }, [maquinaId, usuario]);
 
-  // Cálculo automático da quantidade atual da máquina usando backend (prioriza digital)
   useEffect(() => {
-    async function calcularBackend() {
-      const inDigital = formData.contadorInDigital;
-      const outDigital = formData.contadorOutDigital;
-      if (
-        inDigital !== "" &&
-        outDigital !== "" &&
-        maquina &&
-        !formData.ignoreInOut
-      ) {
-        try {
-          const res = await api.get(
-            `/maquinas/${maquinaId}/calcular-quantidade`,
-            {
-              params: {
-                maquinaId,
-                contadorIn: inDigital,
-                contadorOut: outDigital,
-              },
-            },
-          );
-          setFormData((prev) => ({
-            ...prev,
-            quantidadeAtualMaquina:
-              res.data.quantidadeAtual >= 0 ? res.data.quantidadeAtual : 0,
-          }));
-        } catch (err) {
-          // fallback para cálculo local se erro
-          const inVal = parseInt(inDigital) || 0;
-          const outVal = parseInt(outDigital) || 0;
-          const capacidade = parseInt(maquina.capacidadePadrao) || 0;
-          const quantidadeAtual = capacidade - (outVal - inVal);
-          setFormData((prev) => ({
-            ...prev,
-            quantidadeAtualMaquina: quantidadeAtual >= 0 ? quantidadeAtual : 0,
-          }));
+    if (!isFuncionarioNormal) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      contadorInManual: "",
+      contadorOutManual: "",
+      contadorInDigital: "",
+      contadorOutDigital: "",
+      ignoreInOut: true,
+    }));
+  }, [isFuncionarioNormal]);
+
+  // Cálculo automático usando histórico de movimentações e contadores projetados
+  useEffect(() => {
+    async function atualizarCalculos() {
+      if (!maquina || !maquinaId) {
+        setResumoCalculo(null);
+        setSugestaoAbastecimento(null);
+        return;
+      }
+
+      const contadorInReferencia =
+        formData.contadorInManual !== ""
+          ? formData.contadorInManual
+          : formData.contadorInDigital;
+      const contadorOutReferencia =
+        formData.contadorOutManual !== ""
+          ? formData.contadorOutManual
+          : formData.contadorOutDigital;
+
+      const params = { maquinaId };
+      if (!isFuncionarioNormal && !formData.ignoreInOut) {
+        if (contadorInReferencia !== "")
+          params.contadorIn = contadorInReferencia;
+        if (contadorOutReferencia !== "") {
+          params.contadorOut = contadorOutReferencia;
         }
       }
-    }
-    calcularBackend();
-  }, [
-    formData.contadorInDigital,
-    formData.contadorOutDigital,
-    maquina,
-    formData.ignoreInOut,
-    maquinaId,
-  ]);
 
-  // Sugestão de abastecimento usando backend (prioriza digital)
-  const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
-  useEffect(() => {
-    async function calcularSugestao() {
-      const inDigital = formData.contadorInDigital;
-      const outDigital = formData.contadorOutDigital;
-      if (
-        inDigital !== "" &&
-        outDigital !== "" &&
-        maquina &&
-        !formData.ignoreInOut
-      ) {
-        try {
-          const res = await api.get(
-            `/maquinas/${maquinaId}/calcular-quantidade`,
-            {
-              params: {
-                maquinaId,
-                contadorIn: inDigital,
-                contadorOut: outDigital,
-              },
-            },
-          );
-          setSugestaoAbastecimento(res.data.sugestaoAbastecimento);
-        } catch (err) {
-          setSugestaoAbastecimento(null);
+      try {
+        const res = await api.get(
+          `/maquinas/${maquinaId}/calcular-quantidade`,
+          {
+            params,
+          },
+        );
+
+        const quantidadeCalculada =
+          res.data.quantidadeAtual >= 0 ? res.data.quantidadeAtual : 0;
+
+        setResumoCalculo(res.data);
+        setSugestaoAbastecimento(res.data.sugestaoAbastecimento ?? null);
+
+        const temContadoresDigitados =
+          !isFuncionarioNormal &&
+          !formData.ignoreInOut &&
+          contadorInReferencia !== "" &&
+          contadorOutReferencia !== "";
+
+        if (temContadoresDigitados) {
+          setFormData((prev) => ({
+            ...prev,
+            quantidadeAtualMaquina: quantidadeCalculada,
+          }));
         }
-      } else {
+      } catch (err) {
+        setResumoCalculo(null);
         setSugestaoAbastecimento(null);
       }
     }
-    calcularSugestao();
+
+    atualizarCalculos();
   }, [
+    maquina,
+    maquinaId,
+    isFuncionarioNormal,
+    formData.contadorInManual,
+    formData.contadorOutManual,
     formData.contadorInDigital,
     formData.contadorOutDigital,
-    maquina,
     formData.ignoreInOut,
-    maquinaId,
   ]);
+
+  // Sugestão de abastecimento usando backend
+  const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
+  useEffect(() => {
+    const contadorOutReferencia =
+      formData.contadorOutManual !== ""
+        ? formData.contadorOutManual
+        : formData.contadorOutDigital;
+
+    const contadorOutDigitado = parseInt(contadorOutReferencia, 10);
+    const totalPreInformado = parseInt(formData.quantidadeAtualMaquina, 10);
+
+    if (isFuncionarioNormal || !resumoCalculo) {
+      setAlertaDivergencia(null);
+      return;
+    }
+
+    if (
+      !formData.ignoreInOut &&
+      contadorOutReferencia !== "" &&
+      !Number.isNaN(contadorOutDigitado) &&
+      contadorOutDigitado < (resumoCalculo.contadorOutSugerido || 0)
+    ) {
+      setAlertaDivergencia({
+        tipo: "out_abaixo_sugerido",
+        contadorOutDigitado,
+        contadorOutSugerido: resumoCalculo.contadorOutSugerido || 0,
+      });
+      return;
+    }
+
+    if (
+      !formData.ignoreInOut &&
+      contadorOutReferencia !== "" &&
+      formData.quantidadeAtualMaquina !== "" &&
+      !Number.isNaN(totalPreInformado)
+    ) {
+      const totalPreEsperado = parseInt(
+        resumoCalculo.totalPreEsperado ?? resumoCalculo.quantidadeAtual ?? 0,
+        10,
+      );
+      const diferenca = Math.abs(totalPreInformado - totalPreEsperado);
+
+      if (diferenca > 0) {
+        setAlertaDivergencia({
+          tipo: "quantidade_divergente",
+          totalPreInformado,
+          totalPreEsperado,
+          diferenca,
+        });
+        return;
+      }
+    }
+
+    setAlertaDivergencia(null);
+  }, [
+    isFuncionarioNormal,
+    resumoCalculo,
+    formData.contadorOutManual,
+    formData.contadorOutDigital,
+    formData.quantidadeAtualMaquina,
+    formData.ignoreInOut,
+  ]);
+
+  useEffect(() => {
+    async function calcularSugestao() {
+      if (isFuncionarioNormal) return;
+
+      if (!resumoCalculo) {
+        setSugestaoAbastecimento(null);
+        return;
+      }
+
+      setSugestaoAbastecimento(resumoCalculo.sugestaoAbastecimento ?? null);
+    }
+
+    calcularSugestao();
+  }, [isFuncionarioNormal, resumoCalculo]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -156,6 +233,8 @@ export default function MovimentacaoMaquina() {
     setError("");
     setSuccess("");
     try {
+      const deveIgnorarContadores = isFuncionarioNormal || formData.ignoreInOut;
+
       const produtosParaEnviar = [
         {
           produtoId: formData.produto_id,
@@ -170,14 +249,23 @@ export default function MovimentacaoMaquina() {
         totalPre: parseInt(formData.quantidadeAtualMaquina) || 0,
         abastecidas: parseInt(formData.quantidadeAdicionada) || 0,
         fichas: parseInt(formData.fichas) || 0,
-        contadorIn: parseInt(formData.contadorInManual) || null,
-        contadorOut: parseInt(formData.contadorOutManual) || null,
+        contadorIn: deveIgnorarContadores
+          ? null
+          : formData.contadorInManual === ""
+            ? null
+            : parseInt(formData.contadorInManual),
+        contadorOut: deveIgnorarContadores
+          ? null
+          : formData.contadorOutManual === ""
+            ? null
+            : parseInt(formData.contadorOutManual),
         quantidade_notas_entrada: formData.quantidade_notas_entrada
           ? parseFloat(formData.quantidade_notas_entrada)
           : null,
         valor_entrada_maquininha_pix: formData.valor_entrada_maquininha_pix
           ? parseFloat(formData.valor_entrada_maquininha_pix)
           : null,
+        ignoreInOut: Boolean(formData.ignoreInOut),
         retiradaEstoque: formData.retiradaEstoque,
         retiradaProduto: parseInt(formData.retiradaProduto) || 0,
         observacoes: formData.observacao || "",
@@ -185,15 +273,13 @@ export default function MovimentacaoMaquina() {
       });
       setSuccess("Movimentação registrada com sucesso!");
       setTimeout(() => {
-        navigate(`/roteiros/${roteiroId}/executar`, { 
+        navigate(`/roteiros/${roteiroId}/executar`, {
           replace: true,
-          state: { lojaId: lojaId }
+          state: { lojaId: lojaId },
         });
       }, 1200);
     } catch (err) {
-      setError(
-        err?.response?.data?.error || "Erro ao registrar movimentação.",
-      );
+      setError(err?.response?.data?.error || "Erro ao registrar movimentação.");
     }
   };
 
@@ -225,89 +311,151 @@ export default function MovimentacaoMaquina() {
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  📥 Contador IN Digital (Entrada)
-                </label>
-                <input
-                  type="number"
-                  name="contadorInDigital"
-                  value={formData.contadorInDigital}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="0"
-                  min="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Número do contador IN Digital da máquina
+            {!isFuncionarioNormal ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📥 Contador IN Digital (Entrada)
+                    </label>
+                    <input
+                      type="number"
+                      name="contadorInDigital"
+                      value={formData.contadorInDigital}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="0"
+                      min="0"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Número do contador IN Digital da máquina
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📤 Contador OUT Digital (Saída)
+                    </label>
+                    <input
+                      type="number"
+                      name="contadorOutDigital"
+                      value={formData.contadorOutDigital}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="0"
+                      min="0"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Número do contador OUT Digital da máquina
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📥 Contador IN Manual
+                    </label>
+                    <input
+                      type="number"
+                      name="contadorInManual"
+                      value={formData.contadorInManual}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="0"
+                      min="0"
+                      required={
+                        isFuncionarioTodasLojas && !formData.ignoreInOut
+                      }
+                      disabled={formData.ignoreInOut}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Número do contador IN manual
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📤 Contador OUT Manual
+                    </label>
+                    <input
+                      type="number"
+                      name="contadorOutManual"
+                      value={formData.contadorOutManual}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="0"
+                      min="0"
+                      required={
+                        isFuncionarioTodasLojas && !formData.ignoreInOut
+                      }
+                      disabled={formData.ignoreInOut}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Número do contador OUT manual
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center mt-2 mb-4">
+                  <input
+                    type="checkbox"
+                    id="ignoreInOut"
+                    name="ignoreInOut"
+                    checked={formData.ignoreInOut || false}
+                    onChange={handleChange}
+                    className="mr-2"
+                  />
+                  <label
+                    htmlFor="ignoreInOut"
+                    className="text-sm text-gray-700"
+                  >
+                    Não preciso informar IN/OUT nesta movimentação
+                  </label>
+                </div>
+
+                {resumoCalculo && (
+                  <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <p className="text-sm text-indigo-900 font-semibold">
+                      Sugestões automáticas de contadores
+                    </p>
+                    <p className="text-xs text-indigo-700 mt-1">
+                      OUT sugerido acumulado:{" "}
+                      {resumoCalculo.contadorOutSugerido || 0}
+                    </p>
+                    <p className="text-xs text-indigo-700">
+                      Era para ter na máquina:{" "}
+                      {resumoCalculo.totalPreEsperado ?? 0}
+                    </p>
+                    <p className="text-xs text-indigo-700">
+                      Sugestão de abastecimento: {sugestaoAbastecimento ?? 0}
+                    </p>
+                  </div>
+                )}
+
+                {alertaDivergencia && (
+                  <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                    <p className="text-xs font-bold text-yellow-800 mb-1">
+                      Atenção: possível divergência de contagem
+                    </p>
+                    {alertaDivergencia.tipo === "out_abaixo_sugerido" ? (
+                      <p className="text-xs text-yellow-700">
+                        OUT digitado ({alertaDivergencia.contadorOutDigitado})
+                        está abaixo do OUT sugerido acumulado (
+                        {alertaDivergencia.contadorOutSugerido}).
+                      </p>
+                    ) : (
+                      <p className="text-xs text-yellow-700">
+                        Era para ter {alertaDivergencia.totalPreEsperado} na
+                        máquina, mas foi informado{" "}
+                        {alertaDivergencia.totalPreInformado}.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  Para o perfil de funcionário, os campos IN/OUT não precisam
+                  ser digitados nesta movimentação.
                 </p>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  📤 Contador OUT Digital (Saída)
-                </label>
-                <input
-                  type="number"
-                  name="contadorOutDigital"
-                  value={formData.contadorOutDigital}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="0"
-                  min="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Número do contador OUT Digital da máquina
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  📥 Contador IN Manual
-                </label>
-                <input
-                  type="number"
-                  name="contadorInManual"
-                  value={formData.contadorInManual}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="0"
-                  min="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Número do contador IN manual
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  📤 Contador OUT Manual
-                </label>
-                <input
-                  type="number"
-                  name="contadorOutManual"
-                  value={formData.contadorOutManual}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="0"
-                  min="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Número do contador OUT manual
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center mt-2 mb-4">
-              <input
-                type="checkbox"
-                id="ignoreInOut"
-                name="ignoreInOut"
-                checked={formData.ignoreInOut || false}
-                onChange={handleChange}
-                className="mr-2"
-              />
-              <label htmlFor="ignoreInOut" className="text-sm text-gray-700">
-                Não preciso informar IN/OUT nesta movimentação
-              </label>
-            </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -467,9 +615,11 @@ export default function MovimentacaoMaquina() {
             <div className="flex gap-4 justify-end pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => navigate(`/roteiros/${roteiroId}/executar`, { 
-                  state: { lojaId: lojaId }
-                })}
+                onClick={() =>
+                  navigate(`/roteiros/${roteiroId}/executar`, {
+                    state: { lojaId: lojaId },
+                  })
+                }
                 className="btn-secondary"
               >
                 Voltar
