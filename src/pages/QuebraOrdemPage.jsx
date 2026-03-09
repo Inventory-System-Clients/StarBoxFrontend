@@ -13,6 +13,7 @@ export function QuebraOrdemPage() {
   const [error, setError] = useState("");
   const [filtroLoja, setFiltroLoja] = useState("");
   const [filtroRoteiro, setFiltroRoteiro] = useState("");
+    // Controle de ocultação agora é feito pelo campo status_justificativa no banco
 
   useEffect(() => {
     carregarQuebrasOrdem();
@@ -27,9 +28,9 @@ export function QuebraOrdemPage() {
         api.get("/roteiros"),
       ]);
 
-      // Filtrar apenas movimentações que têm justificativa de quebra de ordem
+      // Filtrar apenas justificativas de quebra de ordem com status 'nova'
       const movimentacoesComQuebra = movRes.data.filter(
-        (mov) => mov.justificativa_ordem
+        (mov) => mov.justificativa_ordem && mov.status_justificativa === 'nova'
       );
 
       // Enriquecer dados com informações de loja e roteiro
@@ -71,15 +72,11 @@ export function QuebraOrdemPage() {
   };
 
   // Filtrar quebras
-  const quebrasFiltradas = quebrasOrdem.filter((quebra) => {
-    const matchLoja = filtroLoja
-      ? quebra.lojaNome.toLowerCase().includes(filtroLoja.toLowerCase())
-      : true;
-    const matchRoteiro = filtroRoteiro
-      ? quebra.roteiroNome.toLowerCase().includes(filtroRoteiro.toLowerCase())
-      : true;
-    return matchLoja && matchRoteiro;
-  });
+  const quebrasFiltradas = quebrasOrdem
+    .filter((quebra) =>
+      (!filtroLoja || quebra.lojaNome?.toLowerCase().includes(filtroLoja.toLowerCase())) &&
+      (!filtroRoteiro || quebra.roteiroNome?.toLowerCase().includes(filtroRoteiro.toLowerCase()))
+    );
 
   if (loading) return <PageLoader />;
 
@@ -249,13 +246,28 @@ export function QuebraOrdemPage() {
                   </div>
 
                   {/* Justificativa */}
-                  <div className="p-4 bg-orange-50 border-l-4 border-orange-500 rounded-lg">
-                    <p className="text-sm font-bold text-orange-900 mb-2">
-                      📝 Justificativa do Funcionário:
-                    </p>
-                    <p className="text-gray-900 whitespace-pre-wrap">
-                      {quebra.justificativa_ordem}
-                    </p>
+                  <div className="p-4 bg-orange-50 border-l-4 border-orange-500 rounded-lg flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-orange-900 mb-2">
+                        📝 Justificativa do Funcionário:
+                      </p>
+                      <p className="text-gray-900 whitespace-pre-wrap">
+                        {quebra.justificativa_ordem}
+                      </p>
+                    </div>
+                    <button
+                      className="ml-4 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                      onClick={async () => {
+                        try {
+                          await api.patch(`/movimentacoes/${quebra.id}/ocultar-justificativa`);
+                          carregarQuebrasOrdem();
+                        } catch (err) {
+                          alert('Erro ao ocultar justificativa: ' + (err.response?.data?.error || err.message));
+                        }
+                      }}
+                    >
+                      OK
+                    </button>
                   </div>
 
                   {/* Informações Adicionais */}
