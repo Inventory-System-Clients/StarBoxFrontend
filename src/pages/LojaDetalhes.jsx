@@ -537,6 +537,19 @@ export function LojaDetalhes() {
                                 </p>
                               </div>
                             </div>
+                            
+                            {/* Justificativa de Quebra de Ordem */}
+                            {mov.justificativa_ordem && (
+                              <div className="mt-3 pt-3 border-t border-orange-200 bg-orange-50 p-3 rounded-lg">
+                                <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1">
+                                  ⚠️ ORDEM DO ROTEIRO ALTERADA
+                                </p>
+                                <p className="text-sm text-orange-900">
+                                  <strong>Justificativa:</strong> {mov.justificativa_ordem}
+                                </p>
+                              </div>
+                            )}
+
                             {mov.observacoes && (
                               <p className="text-sm text-gray-600 mt-3 italic">
                                 💬 {mov.observacoes}

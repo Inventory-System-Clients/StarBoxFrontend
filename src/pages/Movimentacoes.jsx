@@ -177,6 +177,15 @@ export function Movimentacoes() {
         api.get("/lojas"),
       ]);
 
+      console.log("🔍 Movimentações carregadas:", movRes.data);
+      console.log("🔍 Movimentações com justificativa:", 
+        movRes.data?.filter(m => m.justificativa_ordem).map(m => ({
+          id: m.id,
+          justificativa: m.justificativa_ordem,
+          data: m.createdAt
+        }))
+      );
+
       setMovimentacoes(movRes.data || []);
       setMaquinas(maqRes.data || []);
       setProdutos(prodRes.data || []);
@@ -474,8 +483,8 @@ export function Movimentacoes() {
     ? movimentacoes.filter((mov) => {
         const maquina = maquinas.find((m) => m.id === mov.maquinaId);
         return maquina?.lojaId === filtroLojaListagem;
-      })
-    : movimentacoes;
+      }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    : movimentacoes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const stats = [
     {
@@ -620,6 +629,23 @@ export function Movimentacoes() {
           <span className="font-semibold text-blue-600">{mov.fichas || 0}</span>
         </div>
       ),
+    },
+    {
+      key: "justificativa",
+      label: "Quebra de Ordem",
+      render: (mov) => {
+        console.log(`🔍 Renderizando justificativa para mov ${mov.id}:`, mov.justificativa_ordem);
+        return mov.justificativa_ordem ? (
+          <div className="max-w-xs">
+            <div className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs">
+              <span className="font-bold text-orange-800">⚠️</span>
+              <p className="text-orange-900 mt-1">{mov.justificativa_ordem}</p>
+            </div>
+          </div>
+        ) : (
+          <span className="text-gray-400 text-xs">-</span>
+        );
+      }
     },
     {
       key: "observacao",
@@ -1219,6 +1245,14 @@ export function Movimentacoes() {
                 </span>
               )}
             </h3>
+
+            {(() => {
+              console.log("🔍 Movimentações filtradas para exibição:", movimentacoesFiltradas);
+              console.log("🔍 Movimentações com justificativa na lista filtrada:", 
+                movimentacoesFiltradas.filter(m => m.justificativa_ordem)
+              );
+              return null;
+            })()}
 
             {movimentacoesFiltradas.length > 0 ? (
               <DataTable headers={columns} data={movimentacoesFiltradas} />

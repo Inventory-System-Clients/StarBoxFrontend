@@ -250,6 +250,7 @@ export function MaquinaDetalhes() {
                   <th className="text-left py-2">Entrada</th>
                   <th className="text-left py-2">Saída</th>
                   <th className="text-left py-2">Fichas</th>
+                  <th className="text-left py-2">Quebra de Ordem</th>
                   <th className="text-left py-2">Observação</th>
                 </tr>
               </thead>
@@ -268,6 +269,17 @@ export function MaquinaDetalhes() {
                       {mov.sairam > 0 ? `-${mov.sairam}` : "-"}
                     </td>
                     <td>{mov.fichas || 0}</td>
+                    <td>
+                      {mov.justificativa_ordem ? (
+                        <div className="max-w-xs">
+                          <span className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-900">
+                            ⚠️ {mov.justificativa_ordem}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td>{mov.observacoes || "-"}</td>
                   </tr>
                 ))}

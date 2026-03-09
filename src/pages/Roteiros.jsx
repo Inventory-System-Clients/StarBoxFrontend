@@ -85,6 +85,7 @@ export function Roteiros() {
   // --- ESTADOS DE DRAG & DROP ---
   const [draggedLoja, setDraggedLoja] = useState(null);
   const [draggedFromRoteiro, setDraggedFromRoteiro] = useState(null);
+  const [draggedOverIndex, setDraggedOverIndex] = useState(null);
 
   // Depende de usuario?.role para esperar o AuthContext hidratar do localStorage
   useEffect(() => {
@@ -137,6 +138,18 @@ export function Roteiros() {
       carregarDadosIniciais();
     } catch (err) {
       setError("Erro ao mover loja.");
+    }
+  };
+
+  const handleReordenarLoja = async (roteiroId, lojaId, novaOrdem) => {
+    try {
+      await api.patch(`/roteiros/${roteiroId}/reordenar-loja`, {
+        lojaId,
+        novaOrdem,
+      });
+      carregarDadosIniciais();
+    } catch (err) {
+      setError("Erro ao reordenar loja.");
     }
   };
 
@@ -209,10 +222,30 @@ export function Roteiros() {
     setDraggedFromRoteiro(roteiroId);
   };
 
-  const onDrop = (e, roteiroDestinoId) => {
+  const onDragOver = (e, index) => {
     e.preventDefault();
-    if (!draggedLoja || draggedFromRoteiro === roteiroDestinoId) return;
-    handleMoverLoja(draggedLoja.id, draggedFromRoteiro, roteiroDestinoId);
+    setDraggedOverIndex(index);
+  };
+
+  const onDragLeave = () => {
+    setDraggedOverIndex(null);
+  };
+
+  const onDrop = (e, roteiroDestinoId, dropIndex = null) => {
+    e.preventDefault();
+    setDraggedOverIndex(null);
+    
+    if (!draggedLoja) return;
+
+    // Se é o mesmo roteiro, reordenar
+    if (draggedFromRoteiro === roteiroDestinoId && dropIndex !== null) {
+      handleReordenarLoja(roteiroDestinoId, draggedLoja.id, dropIndex);
+    } 
+    // Se é roteiro diferente, mover
+    else if (draggedFromRoteiro !== roteiroDestinoId) {
+      handleMoverLoja(draggedLoja.id, draggedFromRoteiro, roteiroDestinoId);
+    }
+    
     setDraggedLoja(null);
     setDraggedFromRoteiro(null);
   };
@@ -403,16 +436,28 @@ export function Roteiros() {
                 </div>
                 <div className="min-h-[120px] bg-gray-50 rounded-lg p-3 border border-gray-100">
                   {roteiro.lojas?.length > 0 ? (
-                    roteiro.lojas.map((loja) => (
-                      <div
-                        key={loja.id}
-                        draggable={usuario?.role === "ADMIN"}
-                        onDragStart={() => onDragStart(loja, roteiro.id)}
-                        className="bg-white p-3 rounded-md border border-gray-200 shadow-sm mb-2 text-sm flex items-center gap-2 cursor-move hover:border-blue-300 transition-colors"
-                      >
-                        <span className="text-gray-400">☰</span> 🏪 {loja.nome}
-                      </div>
-                    ))
+                    roteiro.lojas
+                      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
+                      .map((loja, index) => (
+                        <div
+                          key={loja.id}
+                          draggable={usuario?.role === "ADMIN"}
+                          onDragStart={() => onDragStart(loja, roteiro.id)}
+                          onDragOver={(e) => onDragOver(e, index)}
+                          onDragLeave={onDragLeave}
+                          onDrop={(e) => onDrop(e, roteiro.id, index)}
+                          className={`bg-white p-3 rounded-md border shadow-sm mb-2 text-sm flex items-center gap-2 transition-colors
+                            ${usuario?.role === "ADMIN" ? "cursor-move hover:border-blue-300" : ""}
+                            ${draggedOverIndex === index && draggedFromRoteiro === roteiro.id ? "border-blue-500 border-2 bg-blue-50" : "border-gray-200"}
+                          `}
+                        >
+                          <span className="text-gray-400">☰</span>
+                          <span className="bg-[#24094E] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                            {index + 1}
+                          </span>
+                          🏪 {loja.nome}
+                        </div>
+                      ))
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8 opacity-30">
                       <span className="text-2xl">📦</span>

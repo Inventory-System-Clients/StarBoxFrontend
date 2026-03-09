@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
@@ -10,6 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 export default function RoteiroExecucao() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { usuario } = useAuth();
   const [roteiro, setRoteiro] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,9 +28,31 @@ export default function RoteiroExecucao() {
   const [manutencaoPendente, setManutencaoPendente] = useState(null);
   const [modalManutencao, setModalManutencao] = useState(false);
 
+  // Estados para controle de ordem
+  const [modalJustificativa, setModalJustificativa] = useState({
+    aberto: false,
+    lojaId: null,
+    lojaNome: "",
+    lojaIdEsperada: null,
+    lojaEsperadaNome: "",
+    justificativa: "",
+  });
+
   useEffect(() => {
     carregarRoteiro();
   }, [id]);
+
+  // Efeito para selecionar automaticamente a loja quando volta da movimentação
+  useEffect(() => {
+    if (roteiro && location.state?.lojaId) {
+      const loja = roteiro.lojas?.find(l => l.id === location.state.lojaId);
+      if (loja) {
+        setLojaSelecionada(loja);
+        // Limpar o state para não manter o lojaId em navegações futuras
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [roteiro, location.state]);
 
   const carregarRoteiro = async () => {
     try {
@@ -69,11 +92,67 @@ export default function RoteiroExecucao() {
   };
 
   const handleSelecionarLoja = async (loja) => {
+    // Verificar ordem das lojas
+    if (roteiro?.lojas) {
+      const lojasOrdenadas = [...roteiro.lojas].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+      const lojasFinalizada = lojasOrdenadas.filter(l => l.status === "finalizado");
+      const proximalLojaIndex = lojasFinalizada.length;
+      const proximaLoja = lojasOrdenadas[proximalLojaIndex];
+      
+      // Se não é a próxima loja na ordem e ainda tem lojas pendentes antes
+      if (proximaLoja && proximaLoja.id !== loja.id && loja.status !== "finalizado") {
+        setModalJustificativa({
+          aberto: true,
+          lojaId: loja.id,
+          lojaNome: loja.nome,
+          lojaIdEsperada: proximaLoja.id,
+          lojaEsperadaNome: proximaLoja.nome,
+          justificativa: "",
+        });
+        return;
+      }
+    }
+
     setLojaSelecionada(loja);
     
     // Verificar se há manutenções pendentes nesta loja
     if (loja && loja.id) {
       await verificarManutencoesPendentes(loja.id);
+    }
+  };
+
+  const confirmarSelecaoComJustificativa = async () => {
+    if (!modalJustificativa.justificativa.trim()) {
+      setError("Por favor, informe o motivo de pular a loja anterior.");
+      return;
+    }
+
+    try {
+      // Salvar justificativa via API
+      await api.post(`/roteiros/${id}/justificar-ordem`, {
+        lojaId: modalJustificativa.lojaId,
+        lojaIdEsperada: modalJustificativa.lojaIdEsperada,
+        justificativa: modalJustificativa.justificativa,
+      });
+
+      const loja = roteiro.lojas.find(l => l.id === modalJustificativa.lojaId);
+      setLojaSelecionada(loja);
+      
+      // Verificar manutenções
+      if (loja && loja.id) {
+        await verificarManutencoesPendentes(loja.id);
+      }
+
+      setModalJustificativa({
+        aberto: false,
+        lojaId: null,
+        lojaNome: "",
+        lojaIdEsperada: null,
+        lojaEsperadaNome: "",
+        justificativa: "",
+      });
+    } catch (err) {
+      setError("Erro ao salvar justificativa.");
     }
   };
 
@@ -170,25 +249,32 @@ export default function RoteiroExecucao() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {roteiro.lojas && roteiro.lojas.length > 0 ? (
-              roteiro.lojas.map((loja) => (
-                <button
-                  key={loja.id}
-                  onClick={() => handleSelecionarLoja(loja)}
-                  className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start 
-                    ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
-                    ${loja.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
-                >
-                  <span>🏪 {loja.nome}</span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    {loja.cidade}, {loja.estado}
-                  </span>
-                  {loja.status === "finalizado" && (
-                    <span className="mt-1 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
-                      Finalizada
+              [...roteiro.lojas]
+                .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
+                .map((loja, index) => (
+                  <button
+                    key={loja.id}
+                    onClick={() => handleSelecionarLoja(loja)}
+                    className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start 
+                      ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
+                      ${loja.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="bg-[#24094E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">
+                        {index + 1}
+                      </span>
+                      <span>🏪 {loja.nome}</span>
+                    </div>
+                    <span className="text-xs text-gray-500 ml-9">
+                      {loja.cidade}, {loja.estado}
                     </span>
-                  )}
-                </button>
-              ))
+                    {loja.status === "finalizado" && (
+                      <span className="mt-1 ml-9 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
+                        Finalizada
+                      </span>
+                    )}
+                  </button>
+                ))
             ) : (
               <div className="col-span-2 text-center text-gray-400">
                 Nenhuma loja disponível neste roteiro.
@@ -294,6 +380,53 @@ export default function RoteiroExecucao() {
                   {modalFinalizar.loading ? "Finalizando..." : "Finalizar Rota"}
                 </button>
               )}
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={modalJustificativa.aberto}
+          onClose={() => setModalJustificativa({ aberto: false, lojaId: null, lojaNome: "", lojaIdEsperada: null, lojaEsperadaNome: "", justificativa: "" })}
+          title="Justificar alteração de ordem"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+              <p className="text-yellow-800 font-semibold mb-2">
+                ⚠️ Você está pulando a ordem das lojas!
+              </p>
+              <p className="text-sm text-yellow-700">
+                Loja esperada: <span className="font-bold">{modalJustificativa.lojaEsperadaNome}</span>
+              </p>
+              <p className="text-sm text-yellow-700">
+                Loja selecionada: <span className="font-bold">{modalJustificativa.lojaNome}</span>
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Por que você está pulando a ordem?
+              </label>
+              <textarea
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                rows="4"
+                placeholder="Ex: A loja estava fechada, problema de acesso, etc."
+                value={modalJustificativa.justificativa}
+                onChange={(e) => setModalJustificativa(prev => ({ ...prev, justificativa: e.target.value }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="btn-secondary"
+                onClick={() => setModalJustificativa({ aberto: false, lojaId: null, lojaNome: "", lojaIdEsperada: null, lojaEsperadaNome: "", justificativa: "" })}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={confirmarSelecaoComJustificativa}
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         </Modal>

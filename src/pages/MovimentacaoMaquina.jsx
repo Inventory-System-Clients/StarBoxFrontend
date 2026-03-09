@@ -185,7 +185,10 @@ export default function MovimentacaoMaquina() {
       });
       setSuccess("Movimentação registrada com sucesso!");
       setTimeout(() => {
-        navigate(`/roteiros/${roteiroId}/executar`, { replace: true });
+        navigate(`/roteiros/${roteiroId}/executar`, { 
+          replace: true,
+          state: { lojaId: lojaId }
+        });
       }, 1200);
     } catch (err) {
       setError(
@@ -464,7 +467,9 @@ export default function MovimentacaoMaquina() {
             <div className="flex gap-4 justify-end pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/roteiros/${roteiroId}/executar`, { 
+                  state: { lojaId: lojaId }
+                })}
                 className="btn-secondary"
               >
                 Voltar

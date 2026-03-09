@@ -35,6 +35,7 @@ import FinanceiroRoutes from "./pages/FinanceiroRoutes.jsx";
 import Alertas from "./pages/Alertas";
 import SecurityLockPage from "./pages/SecurityLockPage.jsx";
 import GerenciarCarrinhosPage from "./pages/GerenciarCarrinhosPage.jsx";
+import { QuebraOrdemPage } from "./pages/QuebraOrdemPage.jsx";
 import "./App.css";
 
 function AppRoutes() {
@@ -54,6 +55,14 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/controle-seguranca" element={<SecurityLockPage />} />
+      <Route
+        path="/quebra-ordem"
+        element={
+          <PrivateRoute>
+            <QuebraOrdemPage />
+          </PrivateRoute>
+        }
+      />
       <Route
         path="/manutencoes"
         element={
