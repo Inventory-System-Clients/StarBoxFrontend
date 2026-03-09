@@ -106,6 +106,7 @@ export function Usuarios() {
                 <option value="FUNCIONARIO_TODAS_LOJAS">
                   Funcionário (todas as lojas)
                 </option>
+                <option value="GERENCIADOR">Gerenciador</option>
               </select>
             </div>
 
@@ -173,16 +174,20 @@ export function Usuarios() {
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           usuario.role === "ADMIN"
                             ? "bg-primary/20 text-primary"
-                            : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-blue-100 text-blue-800"
+                            : usuario.role === "GERENCIADOR"
+                              ? "bg-amber-100 text-amber-800"
+                              : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-blue-100 text-blue-800"
                         }`}
                       >
                         {usuario.role === "ADMIN"
                           ? "Admin"
-                          : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
-                            ? "Funcionário (todas as lojas)"
-                            : "Funcionário"}
+                          : usuario.role === "GERENCIADOR"
+                            ? "Gerenciador"
+                            : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
+                              ? "Funcionário (todas as lojas)"
+                              : "Funcionário"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">
