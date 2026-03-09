@@ -31,7 +31,7 @@ export default function GerenciarCarrinhosPage() {
 
   const carregarFuncionarios = async () => {
     try {
-      const response = await api.get("/usuarios?role=FUNCIONARIO&ativo=true");
+      const response = await api.get("/usuarios/funcionarios");
       setFuncionarios(response.data || []);
       setLoading(false);
     } catch (error) {
@@ -81,8 +81,8 @@ export default function GerenciarCarrinhosPage() {
       // Atualizar lista de peças (decrementar estoque localmente)
       setPecasDisponiveis((prev) =>
         prev.map((p) =>
-          p.id === pecaId ? { ...p, quantidade: p.quantidade - 1 } : p
-        )
+          p.id === pecaId ? { ...p, quantidade: p.quantidade - 1 } : p,
+        ),
       );
 
       // Recarregar carrinho
@@ -91,7 +91,7 @@ export default function GerenciarCarrinhosPage() {
     } catch (error) {
       console.error("Erro ao adicionar peça ao carrinho:", error);
       alert(
-        error.response?.data?.error || "Erro ao adicionar peça ao carrinho"
+        error.response?.data?.error || "Erro ao adicionar peça ao carrinho",
       );
     }
   };
@@ -99,26 +99,30 @@ export default function GerenciarCarrinhosPage() {
   const removerPecaDoCarrinho = async (pecaId) => {
     if (!funcionarioSelecionado) return;
 
-    if (!window.confirm("Deseja realmente remover esta peça do carrinho? Ela será devolvida ao estoque.")) {
+    if (
+      !window.confirm(
+        "Deseja realmente remover esta peça do carrinho? Ela será devolvida ao estoque.",
+      )
+    ) {
       return;
     }
 
     try {
       await api.delete(
-        `/usuarios/${funcionarioSelecionado.id}/carrinho/${pecaId}`
+        `/usuarios/${funcionarioSelecionado.id}/carrinho/${pecaId}`,
       );
 
       // Atualizar lista de peças (incrementar estoque localmente)
       const item = carrinhoFuncionario.find(
-        (i) => i.pecaId === pecaId || i.Peca?.id === pecaId
+        (i) => i.pecaId === pecaId || i.Peca?.id === pecaId,
       );
       if (item) {
         setPecasDisponiveis((prev) =>
           prev.map((p) =>
             p.id === pecaId
               ? { ...p, quantidade: p.quantidade + (item.quantidade || 1) }
-              : p
-          )
+              : p,
+          ),
         );
       }
 
@@ -131,14 +135,16 @@ export default function GerenciarCarrinhosPage() {
     }
   };
 
-  const funcionariosFiltrados = funcionarios.filter((f) =>
-    f.nome?.toLowerCase().includes(buscaFuncionario.toLowerCase()) ||
-    f.email?.toLowerCase().includes(buscaFuncionario.toLowerCase())
+  const funcionariosFiltrados = funcionarios.filter(
+    (f) =>
+      f.nome?.toLowerCase().includes(buscaFuncionario.toLowerCase()) ||
+      f.email?.toLowerCase().includes(buscaFuncionario.toLowerCase()),
   );
 
-  const pecasFiltradas = pecasDisponiveis.filter((p) =>
-    p.nome?.toLowerCase().includes(buscaPeca.toLowerCase()) ||
-    p.codigo?.toLowerCase().includes(buscaPeca.toLowerCase())
+  const pecasFiltradas = pecasDisponiveis.filter(
+    (p) =>
+      p.nome?.toLowerCase().includes(buscaPeca.toLowerCase()) ||
+      p.codigo?.toLowerCase().includes(buscaPeca.toLowerCase()),
   );
 
   if (loading) return <PageLoader />;
@@ -174,7 +180,9 @@ export default function GerenciarCarrinhosPage() {
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {funcionariosFiltrados.length === 0 ? (
-                <p className="text-gray-500 text-sm">Nenhum funcionário encontrado</p>
+                <p className="text-gray-500 text-sm">
+                  Nenhum funcionário encontrado
+                </p>
               ) : (
                 funcionariosFiltrados.map((func) => (
                   <button
@@ -186,7 +194,9 @@ export default function GerenciarCarrinhosPage() {
                         : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
                     }`}
                   >
-                    <div className="font-semibold text-gray-800">{func.nome}</div>
+                    <div className="font-semibold text-gray-800">
+                      {func.nome}
+                    </div>
                     <div className="text-xs text-gray-500">{func.email}</div>
                   </button>
                 ))
@@ -219,19 +229,21 @@ export default function GerenciarCarrinhosPage() {
                 {carrinhoFuncionario.map((item) => {
                   // Tentar múltiplas formas de acessar os dados da peça
                   let peca = item.Peca || item.peca || item.Pecum || {};
-                  
+
                   // Se não encontrou a peça no include, buscar na lista de peças disponíveis
                   if (!peca.nome && item.pecaId) {
                     const pecaEncontrada = pecasDisponiveis.find(
-                      (p) => p.id === item.pecaId || String(p.id) === String(item.pecaId)
+                      (p) =>
+                        p.id === item.pecaId ||
+                        String(p.id) === String(item.pecaId),
                     );
                     if (pecaEncontrada) {
                       peca = pecaEncontrada;
                     }
                   }
-                  
+
                   console.log("Item do carrinho:", item, "Peça:", peca);
-                  
+
                   return (
                     <div
                       key={item.id || item.pecaId}
@@ -239,7 +251,8 @@ export default function GerenciarCarrinhosPage() {
                     >
                       <div className="flex-1">
                         <div className="font-semibold text-gray-800">
-                          {peca.nome || `Peça ID: ${item.pecaId || "desconhecida"}`}
+                          {peca.nome ||
+                            `Peça ID: ${item.pecaId || "desconhecida"}`}
                         </div>
                         <div className="text-xs text-gray-500">
                           Código: {peca.codigo || "N/A"}
@@ -287,7 +300,9 @@ export default function GerenciarCarrinhosPage() {
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {pecasFiltradas.length === 0 ? (
-                  <p className="text-gray-500 text-sm">Nenhuma peça disponível</p>
+                  <p className="text-gray-500 text-sm">
+                    Nenhuma peça disponível
+                  </p>
                 ) : (
                   pecasFiltradas.map((peca) => (
                     <div

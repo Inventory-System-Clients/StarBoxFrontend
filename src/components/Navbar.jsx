@@ -22,8 +22,13 @@ export default function Navbar() {
   };
 
   return (
-
-    <nav className="text-[#62A1D9] shadow-2xl border-b-4 border-[#62A1D9] sticky top-0 z-50" style={{ background: 'linear-gradient(90deg, #62A1D9 0%, #24094E 35%, #24094E 100%)' }}>
+    <nav
+      className="text-[#62A1D9] shadow-2xl border-b-4 border-[#62A1D9] sticky top-0 z-50"
+      style={{
+        background:
+          "linear-gradient(90deg, #62A1D9 0%, #24094E 35%, #24094E 100%)",
+      }}
+    >
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex items-center justify-between h-30">
           {/* Logo e Nome */}
@@ -36,7 +41,11 @@ export default function Navbar() {
                 src="/starbox-logo.png"
                 alt="StarBox Logo"
                 className="p-4 w-22 h-8 sm:w-30 sm:h-10 lg:w-38 lg:h-12 object-contain transition-transform duration-300 group-hover:scale-105"
-                style={{ maxWidth: "180px", height: "auto", background: 'transparent' }}
+                style={{
+                  maxWidth: "180px",
+                  height: "auto",
+                  background: "transparent",
+                }}
                 onError={(e) => {
                   e.target.style.display = "none";
                 }}
@@ -59,19 +68,25 @@ export default function Navbar() {
                   🏪 Lojas
                 </NavLink>
 
-
-                <NavLink to="/produtos" active={isActive("/produtos")}> 
+                <NavLink to="/produtos" active={isActive("/produtos")}>
                   🧸 Produtos
                 </NavLink>
 
-                {(usuario?.role === "ADMIN" || usuario?.role === "FUNCIONARIO" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
-                  <NavLink to="/pecas" active={isActive("/pecas")}> 
+                {(usuario?.role === "ADMIN" ||
+                  usuario?.role === "FUNCIONARIO" ||
+                  usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                  usuario?.role === "MANUTENCAO" ||
+                  usuario?.role === "GERENCIADOR") && (
+                  <NavLink to="/pecas" active={isActive("/pecas")}>
                     🛠️ Peças
                   </NavLink>
                 )}
 
                 {usuario?.role === "ADMIN" && (
-                  <NavLink to="/gerenciar-carrinhos" active={isActive("/gerenciar-carrinhos")}> 
+                  <NavLink
+                    to="/gerenciar-carrinhos"
+                    active={isActive("/gerenciar-carrinhos")}
+                  >
                     🛒 Carrinhos
                   </NavLink>
                 )}
@@ -109,7 +124,9 @@ export default function Navbar() {
               <div className="text-xs text-accent-cream flex items-center justify-end gap-1">
                 {usuario?.role === "ADMIN"
                   ? "🛡️ Administrador"
-                  : "👤 Funcionário"}
+                  : usuario?.role === "FUNCIONARIO_TODAS_LOJAS"
+                    ? "👤 Funcionário (todas as lojas)"
+                    : "👤 Funcionário"}
               </div>
             </div>
 
@@ -138,15 +155,25 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
-            {(usuario?.role === "ADMIN" || usuario?.role === "FUNCIONARIO" || usuario?.role === "MANUTENCAO" || usuario?.role === "GERENCIADOR") && (
-              <MobileNavLink to="/pecas" active={isActive("/pecas")}
-                onClick={closeMenu}>
+            {(usuario?.role === "ADMIN" ||
+              usuario?.role === "FUNCIONARIO" ||
+              usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+              usuario?.role === "MANUTENCAO" ||
+              usuario?.role === "GERENCIADOR") && (
+              <MobileNavLink
+                to="/pecas"
+                active={isActive("/pecas")}
+                onClick={closeMenu}
+              >
                 🛠️ Peças
               </MobileNavLink>
             )}
             {usuario?.role === "ADMIN" && (
-              <MobileNavLink to="/gerenciar-carrinhos" active={isActive("/gerenciar-carrinhos")}
-                onClick={closeMenu}>
+              <MobileNavLink
+                to="/gerenciar-carrinhos"
+                active={isActive("/gerenciar-carrinhos")}
+                onClick={closeMenu}
+              >
                 🛒 Carrinhos
               </MobileNavLink>
             )}
