@@ -1,26 +1,42 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Plus } from 'lucide-react';
-import { billsAPI, categoriesAPI } from '../services/api';
-import { toast } from 'sonner';
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Plus } from "lucide-react";
+import { billsAPI, categoriesAPI } from "../services/api";
+import { toast } from "sonner";
 
-export default function BillModal({ open, onClose, onSuccess, categories, bill = null, defaultType = 'company' }) {
+export default function BillModal({
+  open,
+  onClose,
+  onSuccess,
+  categories,
+  bill = null,
+  defaultType = "company",
+}) {
   const [formData, setFormData] = useState({
-    name: bill?.name || '',
-    due_date: bill?.due_date || '',
-    city: bill?.city || '',
-    account: bill?.account || '',
-    category: bill?.category || '',
-    observations: bill?.observations || '',
+    name: bill?.name || "",
+    due_date: bill?.due_date || "",
+    city: bill?.city || "",
+    account: bill?.account || "",
+    category: bill?.category || "",
+    observations: bill?.observations || "",
     bill_type: bill?.bill_type || defaultType,
-    amount: bill?.amount || ''
+    amount: bill?.amount || "",
+    payment_method: bill?.payment_method || "boleto",
+    payment_details: bill?.payment_details || "",
+    boleto_em_maos: bill?.boleto_em_maos || false,
   });
-  const [newCategory, setNewCategory] = useState('');
+  const [newCategory, setNewCategory] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -43,21 +59,21 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
       const billData = {
         ...formData,
         category: categoryToUse,
-        amount: amountValue
+        amount: amountValue,
       };
 
       if (bill) {
         await billsAPI.update(bill.id, billData);
-        toast.success('Conta atualizada com sucesso!');
+        toast.success("Conta atualizada com sucesso!");
       } else {
         await billsAPI.create(billData);
-        toast.success('Conta cadastrada com sucesso!');
+        toast.success("Conta cadastrada com sucesso!");
       }
 
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar conta');
+      toast.error(error.response?.data?.detail || "Erro ao salvar conta");
     } finally {
       setLoading(false);
     }
@@ -65,21 +81,26 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bill-modal-content" data-testid="bill-modal">
-        <DialogHeader>
+      <DialogContent
+        className="sm:max-w-[500px] bill-modal-content max-h-[90vh] overflow-y-auto"
+        data-testid="bill-modal"
+      >
+        <DialogHeader className="sticky top-0 bg-white z-10 pb-2 border-b">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            {bill ? 'Editar Conta' : 'Cadastrar Conta à Pagar'}
+            {bill ? "Editar Conta" : "Cadastrar Conta à Pagar"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4 pb-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Nome *</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="Ex: Conta de Luz"
                 required
                 data-testid="input-name"
@@ -91,7 +112,9 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
                 id="due_date"
                 type="date"
                 value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, due_date: e.target.value })
+                }
                 required
                 data-testid="input-due-date"
               />
@@ -107,7 +130,9 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
                 step="0.01"
                 min="0"
                 value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, amount: e.target.value })
+                }
                 placeholder="0.00"
                 required
                 data-testid="input-amount"
@@ -121,7 +146,9 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
             <Input
               id="city"
               value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, city: e.target.value })
+              }
               placeholder="São Paulo"
               required
               data-testid="input-city"
@@ -133,7 +160,9 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
             <Input
               id="account"
               value={formData.account}
-              onChange={(e) => setFormData({ ...formData, account: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, account: e.target.value })
+              }
               placeholder="Conta de Luz - 123456"
               required
               data-testid="input-account"
@@ -168,13 +197,17 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
               <select
                 className="input-field"
                 value={formData.category}
-                onChange={e => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
                 required
                 data-testid="select-category"
               >
                 <option value="">Selecione uma categoria</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -185,7 +218,9 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
             <select
               className="input-field"
               value={formData.bill_type}
-              onChange={e => setFormData({ ...formData, bill_type: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, bill_type: e.target.value })
+              }
               required
               data-testid="select-bill-type"
             >
@@ -196,18 +231,92 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
           </div>
 
           <div>
+            <Label htmlFor="payment_method">Método de Pagamento *</Label>
+            <select
+              className="input-field"
+              value={formData.payment_method}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  payment_method: e.target.value,
+                  payment_details: "",
+                })
+              }
+              required
+              data-testid="select-payment-method"
+            >
+              <option value="boleto">Boleto</option>
+              <option value="pix">PIX</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+
+          {formData.payment_method === "pix" && (
+            <div>
+              <Label htmlFor="payment_details">Número ou Chave PIX *</Label>
+              <Input
+                id="payment_details"
+                value={formData.payment_details}
+                onChange={(e) =>
+                  setFormData({ ...formData, payment_details: e.target.value })
+                }
+                placeholder="Ex: 12345678900 ou email@example.com ou CPF/CNPJ"
+                required={formData.payment_method === "pix"}
+                data-testid="input-pix-key"
+              />
+            </div>
+          )}
+
+          {formData.payment_method === "email" && (
+            <div>
+              <Label htmlFor="payment_details">Email de Pagamento *</Label>
+              <Input
+                id="payment_details"
+                type="email"
+                value={formData.payment_details}
+                onChange={(e) =>
+                  setFormData({ ...formData, payment_details: e.target.value })
+                }
+                placeholder="Ex: conta@empresa.com"
+                required={formData.payment_method === "email"}
+                data-testid="input-payment-email"
+              />
+            </div>
+          )}
+
+          {formData.payment_method === "boleto" && (
+            <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+              <input
+                type="checkbox"
+                id="boleto_em_maos"
+                checked={formData.boleto_em_maos}
+                onChange={(e) =>
+                  setFormData({ ...formData, boleto_em_maos: e.target.checked })
+                }
+                className="w-4 h-4 rounded cursor-pointer"
+                data-testid="checkbox-boleto-em-maos"
+              />
+              <Label htmlFor="boleto_em_maos" className="cursor-pointer mb-0">
+                Boleto em mãos / Recebido
+              </Label>
+            </div>
+          )}
+
+          <div>
             <Label htmlFor="observations">Observações</Label>
             <Textarea
               id="observations"
               value={formData.observations}
-              onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, observations: e.target.value })
+              }
               placeholder="Internet / App / Email"
               rows={3}
               data-testid="input-observations"
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-3 pt-4 sticky bottom-0 bg-white border-t mt-4">
             <Button
               type="button"
               variant="outline"
@@ -223,7 +332,7 @@ export default function BillModal({ open, onClose, onSuccess, categories, bill =
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               data-testid="submit-button"
             >
-              {loading ? 'Salvando...' : bill ? 'Atualizar' : 'Cadastrar'}
+              {loading ? "Salvando..." : bill ? "Atualizar" : "Cadastrar"}
             </Button>
           </div>
         </form>
