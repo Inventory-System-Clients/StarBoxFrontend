@@ -5,6 +5,12 @@ import { PageLoader } from "../components/Loading";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../contexts/AuthContext";
 
+const INTERVALO_ALERTA_PERSISTENTE_DIAS = 45;
+const STATUS_CONCLUIDOS = ["feito", "concluida"];
+
+const statusEhConcluido = (status) =>
+  STATUS_CONCLUIDOS.includes(String(status || "").toLowerCase());
+
 function Manutencoes() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === "ADMIN";
@@ -15,7 +21,9 @@ function Manutencoes() {
   const [success, setSuccess] = useState("");
 
   const [filtroLoja, setFiltroLoja] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("nao_concluidas");
+  const [filtroDataInicio, setFiltroDataInicio] = useState("");
+  const [filtroDataFim, setFiltroDataFim] = useState("");
 
   const [showNovaManutencao, setShowNovaManutencao] = useState(false);
   const [novaManutencao, setNovaManutencao] = useState({
@@ -98,16 +106,103 @@ function Manutencoes() {
   }, [manutencoes]);
 
   const filtradas = useMemo(() => {
+    const dataInicioMs = filtroDataInicio
+      ? new Date(`${filtroDataInicio}T00:00:00`).getTime()
+      : null;
+    const dataFimMs = filtroDataFim
+      ? new Date(`${filtroDataFim}T23:59:59.999`).getTime()
+      : null;
+
     return manutencoes.filter((m) => {
       if (!isAdmin) {
         if (m.funcionarioId !== usuario?.id) return false;
       }
 
+      const dataManutencaoMs = new Date(m.createdAt).getTime();
+      if (!Number.isFinite(dataManutencaoMs)) return false;
+
       const okLoja = !filtroLoja || m.loja?.nome === filtroLoja;
-      const okStatus = !filtroStatus || m.status === filtroStatus;
-      return okLoja && okStatus;
+      const okStatus =
+        filtroStatus === "nao_concluidas"
+          ? !statusEhConcluido(m.status)
+          : !filtroStatus || m.status === filtroStatus;
+      const okDataInicio =
+        dataInicioMs === null || dataManutencaoMs >= dataInicioMs;
+      const okDataFim = dataFimMs === null || dataManutencaoMs <= dataFimMs;
+
+      return okLoja && okStatus && okDataInicio && okDataFim;
     });
-  }, [filtroLoja, filtroStatus, isAdmin, manutencoes, usuario?.id]);
+  }, [
+    filtroDataFim,
+    filtroDataInicio,
+    filtroLoja,
+    filtroStatus,
+    isAdmin,
+    manutencoes,
+    usuario?.id,
+  ]);
+
+  const manutencoesPersistentes = useMemo(() => {
+    if (!isAdmin) return [];
+
+    const limiteIntervaloMs =
+      INTERVALO_ALERTA_PERSISTENTE_DIAS * 24 * 60 * 60 * 1000;
+
+    const concluidas = manutencoes.filter(
+      (m) => (m.status === "feito" || m.status === "concluida") && m.maquinaId,
+    );
+
+    const agrupadasPorMaquina = concluidas.reduce((acc, manutencao) => {
+      const chave = String(manutencao.maquinaId);
+      if (!acc[chave]) acc[chave] = [];
+      acc[chave].push(manutencao);
+      return acc;
+    }, {});
+
+    const persistentes = Object.values(agrupadasPorMaquina)
+      .filter((lista) => lista.length > 1)
+      .map((lista) => {
+        const ordenadas = [...lista].sort((a, b) => {
+          const dataA = new Date(a.concluidoEm || a.createdAt).getTime();
+          const dataB = new Date(b.concluidoEm || b.createdAt).getTime();
+          return dataB - dataA;
+        });
+
+        const dataAtualTs = new Date(
+          ordenadas[0].concluidoEm || ordenadas[0].createdAt,
+        ).getTime();
+        const dataUltimaTs = new Date(
+          ordenadas[1].concluidoEm || ordenadas[1].createdAt,
+        ).getTime();
+
+        if (!Number.isFinite(dataAtualTs) || !Number.isFinite(dataUltimaTs)) {
+          return null;
+        }
+
+        const intervaloEntreManutencoesMs = Math.abs(
+          dataAtualTs - dataUltimaTs,
+        );
+
+        if (intervaloEntreManutencoesMs > limiteIntervaloMs) {
+          return null;
+        }
+
+        return {
+          maquinaId: ordenadas[0].maquinaId,
+          maquinaNome: ordenadas[0].maquina?.nome || "Máquina sem nome",
+          lojaNome: ordenadas[0].loja?.nome || "Loja não informada",
+          dataAtual: ordenadas[0].concluidoEm || ordenadas[0].createdAt,
+          dataUltima: ordenadas[1].concluidoEm || ordenadas[1].createdAt,
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b.dataAtual).getTime() - new Date(a.dataAtual).getTime(),
+      );
+
+    return persistentes;
+  }, [isAdmin, manutencoes]);
 
   const formatarDataHora = (valor) => {
     if (!valor) return "-";
@@ -290,6 +385,7 @@ function Manutencoes() {
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
           >
+            <option value="nao_concluidas">Não concluídas</option>
             <option value="">Todos os status</option>
             {statusFiltro.map((status) => (
               <option key={status} value={status}>
@@ -297,6 +393,36 @@ function Manutencoes() {
               </option>
             ))}
           </select>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-600">
+              Data inicial
+            </label>
+            <input
+              className="input-field"
+              type="date"
+              value={filtroDataInicio}
+              onChange={(e) => setFiltroDataInicio(e.target.value)}
+              max={filtroDataFim || undefined}
+              aria-label="Filtrar data inicial"
+              title="Data inicial"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-600">
+              Data final
+            </label>
+            <input
+              className="input-field"
+              type="date"
+              value={filtroDataFim}
+              onChange={(e) => setFiltroDataFim(e.target.value)}
+              min={filtroDataInicio || undefined}
+              aria-label="Filtrar data final"
+              title="Data final"
+            />
+          </div>
         </div>
 
         {showNovaManutencao && (
@@ -514,6 +640,40 @@ function Manutencoes() {
           </div>
         )}
 
+        {isAdmin && manutencoesPersistentes.length > 0 && (
+          <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <h3 className="text-lg font-bold text-amber-900">
+              ⚠️ Manutenções persistentes
+            </h3>
+            <p className="mt-1 text-sm text-amber-800">
+              Estas máquinas tiveram mais de uma manutenção concluída em até{" "}
+              {INTERVALO_ALERTA_PERSISTENTE_DIAS} dias. Isso pode indicar que a
+              manutenção anterior não resolveu o problema.
+            </p>
+
+            <div className="mt-3 space-y-3">
+              {manutencoesPersistentes.map((item) => (
+                <div
+                  key={item.maquinaId}
+                  className="rounded-md border border-amber-200 bg-white p-3"
+                >
+                  <div className="font-semibold text-gray-900">
+                    {item.maquinaNome} - {item.lojaNome}
+                  </div>
+                  <div className="mt-1 text-sm text-gray-700">
+                    <strong>Data da última manutenção:</strong>{" "}
+                    {formatarDataHora(item.dataUltima)}
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <strong>Data da manutenção de agora:</strong>{" "}
+                    {formatarDataHora(item.dataAtual)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {detalhe && !editando && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
@@ -565,19 +725,25 @@ function Manutencoes() {
                 </div>
 
                 {/* Explicações dos funcionários */}
-                {(detalhe.explicacao_nao_fazer || detalhe.explicacao_sem_peca) && (
+                {(detalhe.explicacao_nao_fazer ||
+                  detalhe.explicacao_sem_peca) && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="font-bold text-gray-800 mb-3">📝 Explicações dos Funcionários</h4>
-                    
+                    <h4 className="font-bold text-gray-800 mb-3">
+                      📝 Explicações dos Funcionários
+                    </h4>
+
                     {detalhe.explicacao_nao_fazer && (
                       <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
                         <p className="text-xs font-semibold text-orange-800 mb-1">
                           Por que não foi feita:
                         </p>
-                        <p className="text-sm text-gray-700">{detalhe.explicacao_nao_fazer}</p>
+                        <p className="text-sm text-gray-700">
+                          {detalhe.explicacao_nao_fazer}
+                        </p>
                         {detalhe.verificadoPor && (
                           <p className="text-xs text-gray-500 mt-1">
-                            - {detalhe.verificadoPor.nome} ({formatarDataHora(detalhe.verificadoEm)})
+                            - {detalhe.verificadoPor.nome} (
+                            {formatarDataHora(detalhe.verificadoEm)})
                           </p>
                         )}
                       </div>
@@ -588,10 +754,13 @@ function Manutencoes() {
                         <p className="text-xs font-semibold text-yellow-800 mb-1">
                           Por que não usou peças:
                         </p>
-                        <p className="text-sm text-gray-700">{detalhe.explicacao_sem_peca}</p>
+                        <p className="text-sm text-gray-700">
+                          {detalhe.explicacao_sem_peca}
+                        </p>
                         {detalhe.concluidoPor && (
                           <p className="text-xs text-gray-500 mt-1">
-                            - {detalhe.concluidoPor.nome} ({formatarDataHora(detalhe.concluidoEm)})
+                            - {detalhe.concluidoPor.nome} (
+                            {formatarDataHora(detalhe.concluidoEm)})
                           </p>
                         )}
                       </div>
