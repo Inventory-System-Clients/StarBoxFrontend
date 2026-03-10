@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
-import { buscarRoteiros, buscarRelatorioRoteiroPeriodo } from "../services/roteiros";
+import { buscarRoteiros } from "../services/roteiros";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { PageHeader } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
+import { RelatorioTodasLojas } from "../components/RelatorioTodasLojas";
+
+const TODAS_LOJAS_VALUE = "__TODAS_AS_LOJAS__";
 
 export function Relatorios() {
   const [dashboard, setDashboard] = useState(null);
@@ -30,7 +33,10 @@ export function Relatorios() {
       const response = await api.get("/lojas");
       setLojas(response.data);
     } catch (error) {
-      setError("Erro ao carregar lojas: " + (error.response?.data?.error || error.message));
+      setError(
+        "Erro ao carregar lojas: " +
+          (error.response?.data?.error || error.message),
+      );
       setLojas([]);
     } finally {
       setLoadingLojas(false);
@@ -57,10 +63,11 @@ export function Relatorios() {
   useEffect(() => {
     carregarLojas();
     // Carregar roteiros
-    buscarRoteiros().then(setRoteiros).catch(() => setRoteiros([]));
+    buscarRoteiros()
+      .then(setRoteiros)
+      .catch(() => setRoteiros([]));
     definirDatasDefault && definirDatasDefault();
   }, []);
-
 
   const handleImprimir = () => {
     window.print();
@@ -72,6 +79,66 @@ export function Relatorios() {
     seteDiasAtras.setDate(hoje.getDate() - 7);
     setDataFim(hoje.toISOString().split("T")[0]);
     setDataInicio(seteDiasAtras.toISOString().split("T")[0]);
+  };
+
+  const formatarDataISO = (data) => {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, "0");
+    const dia = String(data.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  const obterMesmoDiaNoMesAnterior = (dataTexto) => {
+    const dataBase = new Date(`${dataTexto}T00:00:00`);
+    if (Number.isNaN(dataBase.getTime())) return dataTexto;
+
+    const ano = dataBase.getFullYear();
+    const mes = dataBase.getMonth();
+    const dia = dataBase.getDate();
+    const ultimoDiaMesAnterior = new Date(ano, mes, 0).getDate();
+    const diaAjustado = Math.min(dia, ultimoDiaMesAnterior);
+
+    return formatarDataISO(new Date(ano, mes - 1, diaAjustado));
+  };
+
+  const toNumber = (valor) => Number(valor || 0);
+
+  const montarIndicadorComparacao = (
+    valorAtual,
+    valorAnterior,
+    melhorQuando = "maior",
+  ) => {
+    const atual = toNumber(valorAtual);
+    const anterior = toNumber(valorAnterior);
+    const diferenca = atual - anterior;
+
+    let percentual = 0;
+    if (Math.abs(anterior) > 0.0001) {
+      percentual = (diferenca / Math.abs(anterior)) * 100;
+    } else if (Math.abs(atual) > 0.0001) {
+      percentual = 100;
+    }
+
+    const direcao =
+      diferenca > 0.0001 ? "acima" : diferenca < -0.0001 ? "abaixo" : "igual";
+
+    let status = "igual";
+    if (direcao !== "igual") {
+      if (melhorQuando === "menor") {
+        status = diferenca < 0 ? "melhor" : "pior";
+      } else {
+        status = diferenca > 0 ? "melhor" : "pior";
+      }
+    }
+
+    return {
+      atual,
+      anterior,
+      diferenca,
+      percentual,
+      direcao,
+      status,
+    };
   };
 
   const gerarRelatorio = async () => {
@@ -93,7 +160,102 @@ export function Relatorios() {
       setComissaoData(null);
       setLucroData(null);
       setMovimentacoesData(null);
-      if (roteiroSelecionado) {
+      if (lojaSelecionada === TODAS_LOJAS_VALUE) {
+        const response = await api.get("/relatorios/todas-lojas", {
+          params: { dataInicio, dataFim },
+        });
+
+        let comparativoMensal = null;
+        try {
+          const dataInicioMesAnterior = obterMesmoDiaNoMesAnterior(dataInicio);
+          const dataFimMesAnterior = obterMesmoDiaNoMesAnterior(dataFim);
+
+          const responseMesAnterior = await api.get("/relatorios/todas-lojas", {
+            params: {
+              dataInicio: dataInicioMesAnterior,
+              dataFim: dataFimMesAnterior,
+            },
+          });
+
+          const totaisAtual = response.data?.totais || {};
+          const totaisAnterior = responseMesAnterior.data?.totais || {};
+
+          const valorConsolidadoAtual =
+            toNumber(totaisAtual.lucroBrutoTotal) ||
+            toNumber(totaisAtual.dinheiroTotal) +
+              toNumber(totaisAtual.cartaoPixTotal);
+
+          const valorConsolidadoAnterior =
+            toNumber(totaisAnterior.lucroBrutoTotal) ||
+            toNumber(totaisAnterior.dinheiroTotal) +
+              toNumber(totaisAnterior.cartaoPixTotal);
+
+          comparativoMensal = {
+            periodoAtual: {
+              inicio: dataInicio,
+              fim: dataFim,
+            },
+            periodoAnterior: {
+              inicio: dataInicioMesAnterior,
+              fim: dataFimMesAnterior,
+            },
+            metricas: [
+              {
+                chave: "lucroLiquidoTotal",
+                titulo: "Lucro Líquido Total",
+                icone: "📉",
+                indicador: montarIndicadorComparacao(
+                  toNumber(totaisAtual.lucroLiquidoTotal),
+                  toNumber(totaisAnterior.lucroLiquidoTotal),
+                  "maior",
+                ),
+              },
+              {
+                chave: "valorFichasTotal",
+                titulo: "Valor das Fichas (Estimado)",
+                icone: "🎟️",
+                observacao:
+                  "Estimado com valor médio de R$ 2,50 por ficha no consolidado.",
+                indicador: montarIndicadorComparacao(
+                  toNumber(totaisAtual.fichasTotal) * 2.5,
+                  toNumber(totaisAnterior.fichasTotal) * 2.5,
+                  "maior",
+                ),
+              },
+              {
+                chave: "valorConsolidado",
+                titulo: "Valor Consolidado",
+                icone: "💰",
+                indicador: montarIndicadorComparacao(
+                  valorConsolidadoAtual,
+                  valorConsolidadoAnterior,
+                  "maior",
+                ),
+              },
+              {
+                chave: "custoSaidaProdutos",
+                titulo: "Custo de Saída dos Produtos",
+                icone: "💸",
+                indicador: montarIndicadorComparacao(
+                  toNumber(totaisAtual.custoProdutosTotal),
+                  toNumber(totaisAnterior.custoProdutosTotal),
+                  "menor",
+                ),
+              },
+            ],
+          };
+        } catch (erroComparativoTodasLojas) {
+          console.warn(
+            "Não foi possível gerar comparativo de todas as lojas com o mês passado:",
+            erroComparativoTodasLojas,
+          );
+        }
+
+        setRelatorio({
+          ...response.data,
+          comparativoMensal,
+        });
+      } else if (roteiroSelecionado) {
         // Buscar relatório de roteiro inteiro
         const response = await api.get("/relatorios/roteiro", {
           params: { roteiroId: roteiroSelecionado, dataInicio, dataFim },
@@ -101,77 +263,120 @@ export function Relatorios() {
         setRelatorio({ tipo: "roteiro", ...response.data });
       } else if (lojaSelecionada) {
         // Buscar relatório de loja + dashboard + comissão + produtos em paralelo
-        const [impressaoRes, comissaoRes, lucroRes, movRes, produtosRes] = await Promise.all([
-          api.get("/relatorios/impressao", {
-            params: { lojaId: lojaSelecionada, dataInicio, dataFim },
-          }),
-          api.get("/movimentacoes/relatorio/comissao-dia", {
-            params: { lojaId: lojaSelecionada, data: dataFim },
-          }).catch(() => ({ data: null })),
-          api.get("/movimentacoes/relatorio/lucro-dia", {
-            params: { lojaId: lojaSelecionada, data: dataFim },
-          }).catch(err => { console.error('Erro lucro-dia:', err.response?.data || err.message); return { data: null }; }),
-          api.get("/movimentacoes/relatorio/movimentacoes-dia", {
-            params: { lojaId: lojaSelecionada, data: dataFim },
-          }).catch(() => ({ data: null })),
-          api.get("/produtos").catch(() => ({ data: [] })),
-        ]);
+        const [impressaoRes, comissaoRes, lucroRes, movRes, produtosRes] =
+          await Promise.all([
+            api.get("/relatorios/impressao", {
+              params: { lojaId: lojaSelecionada, dataInicio, dataFim },
+            }),
+            api
+              .get("/movimentacoes/relatorio/comissao-dia", {
+                params: { lojaId: lojaSelecionada, data: dataFim },
+              })
+              .catch(() => ({ data: null })),
+            api
+              .get("/movimentacoes/relatorio/lucro-dia", {
+                params: { lojaId: lojaSelecionada, data: dataFim },
+              })
+              .catch((err) => {
+                console.error(
+                  "Erro lucro-dia:",
+                  err.response?.data || err.message,
+                );
+                return { data: null };
+              }),
+            api
+              .get("/movimentacoes/relatorio/movimentacoes-dia", {
+                params: { lojaId: lojaSelecionada, data: dataFim },
+              })
+              .catch(() => ({ data: null })),
+            api.get("/produtos").catch(() => ({ data: [] })),
+          ]);
         // Também carregar dashboard
         await carregarDashboard(lojaSelecionada, dataInicio, dataFim);
-        
+
         // Criar mapa de preços dos produtos (id -> {preco, custoUnitario})
         const produtosMap = {};
-        const produtosList = Array.isArray(produtosRes.data) ? produtosRes.data : (produtosRes.data?.produtos || produtosRes.data?.rows || []);
-        produtosList.forEach(p => {
+        const produtosList = Array.isArray(produtosRes.data)
+          ? produtosRes.data
+          : produtosRes.data?.produtos || produtosRes.data?.rows || [];
+        produtosList.forEach((p) => {
           produtosMap[p.id] = {
-            nome: p.nome || '',
+            nome: p.nome || "",
             preco: Number(p.preco || 0),
             custoUnitario: Number(p.custoUnitario || 0),
           };
         });
         setProdutosPrecos(produtosMap);
-        
+
         // Enriquecer produtosSairam com preços dos produtos
         const dados = impressaoRes.data;
         if (dados.produtosSairam) {
-          dados.produtosSairam = dados.produtosSairam.map(p => ({
+          dados.produtosSairam = dados.produtosSairam.map((p) => ({
             ...p,
             preco: p.preco || produtosMap[p.id]?.preco || 0,
-            custoUnitario: p.custoUnitario || produtosMap[p.id]?.custoUnitario || 0,
-            valorUnitario: p.preco || p.valorUnitario || p.custoUnitario || produtosMap[p.id]?.preco || produtosMap[p.id]?.custoUnitario || 0,
+            custoUnitario:
+              p.custoUnitario || produtosMap[p.id]?.custoUnitario || 0,
+            valorUnitario:
+              p.preco ||
+              p.valorUnitario ||
+              p.custoUnitario ||
+              produtosMap[p.id]?.preco ||
+              produtosMap[p.id]?.custoUnitario ||
+              0,
           }));
         }
         if (dados.maquinas) {
-          dados.maquinas = dados.maquinas.map(m => ({
+          dados.maquinas = dados.maquinas.map((m) => ({
             ...m,
-            produtosSairam: m.produtosSairam?.map(p => ({
-              ...p,
-              preco: p.preco || produtosMap[p.id]?.preco || 0,
-              custoUnitario: p.custoUnitario || produtosMap[p.id]?.custoUnitario || 0,
-              valorUnitario: p.preco || p.valorUnitario || p.custoUnitario || produtosMap[p.id]?.preco || produtosMap[p.id]?.custoUnitario || 0,
-            })) || [],
+            produtosSairam:
+              m.produtosSairam?.map((p) => ({
+                ...p,
+                preco: p.preco || produtosMap[p.id]?.preco || 0,
+                custoUnitario:
+                  p.custoUnitario || produtosMap[p.id]?.custoUnitario || 0,
+                valorUnitario:
+                  p.preco ||
+                  p.valorUnitario ||
+                  p.custoUnitario ||
+                  produtosMap[p.id]?.preco ||
+                  produtosMap[p.id]?.custoUnitario ||
+                  0,
+              })) || [],
           }));
         }
-        
+
         setRelatorio(dados);
         // DEBUG: ver campos dos produtos
-        console.log('produtosSairam consolidado (enriquecido):', dados?.produtosSairam);
+        console.log(
+          "produtosSairam consolidado (enriquecido):",
+          dados?.produtosSairam,
+        );
         if (dados?.maquinas?.[0]?.produtosSairam) {
-          console.log('produtosSairam máquina[0] (enriquecido):', dados.maquinas[0].produtosSairam);
+          console.log(
+            "produtosSairam máquina[0] (enriquecido):",
+            dados.maquinas[0].produtosSairam,
+          );
         }
-        console.log('produtosMap (preços):', produtosMap);
-        console.log('lucroData:', lucroRes.data);
+        console.log("produtosMap (preços):", produtosMap);
+        console.log("lucroData:", lucroRes.data);
         setComissaoData(comissaoRes.data);
         setLucroData(lucroRes.data);
         // Agregar movimentações por máquina (dinheiro, cartão/pix)
         if (movRes.data) {
-          const movs = Array.isArray(movRes.data) ? movRes.data : (movRes.data.movimentacoes || []);
+          const movs = Array.isArray(movRes.data)
+            ? movRes.data
+            : movRes.data.movimentacoes || [];
           const porMaquina = {};
-          movs.forEach(mov => {
+          movs.forEach((mov) => {
             const mId = mov.maquinaId;
-            if (!porMaquina[mId]) porMaquina[mId] = { dinheiro: 0, pixCartao: 0 };
-            porMaquina[mId].dinheiro += Number(mov.quantidade_notas_entrada || 0);
-            porMaquina[mId].pixCartao += Number(mov.valor_entrada_maquininha_pix || 0);
+            if (!porMaquina[mId])
+              porMaquina[mId] = { dinheiro: 0, pixCartao: 0 };
+            porMaquina[mId].dinheiro += Number(
+              mov.quantidade_notas_entrada || 0,
+            );
+            porMaquina[mId].pixCartao += Number(
+              mov.valor_entrada_maquininha_pix || 0,
+            );
           });
           setMovimentacoesData(porMaquina);
         }
@@ -179,7 +384,8 @@ export function Relatorios() {
     } catch (error) {
       let errorMessage = "Erro ao gerar relatório. Tente novamente.";
       if (error.response?.status === 404) {
-        errorMessage = "⚠️ Endpoint não encontrado. O servidor pode estar atualizando. Aguarde alguns minutos e tente novamente.";
+        errorMessage =
+          "⚠️ Endpoint não encontrado. O servidor pode estar atualizando. Aguarde alguns minutos e tente novamente.";
       } else if (error.response?.status === 500) {
         errorMessage = `⚠️ Erro no servidor: ${error.response?.data?.error || "Erro interno no servidor"}. Verifique se há dados para o período selecionado.`;
       } else if (error.response?.status === 400) {
@@ -215,26 +421,33 @@ export function Relatorios() {
           <h3 className="text-lg font-bold text-gray-900 mb-4">Filtros</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">🗂️ Roteiro</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🗂️ Roteiro
+              </label>
               <select
                 value={roteiroSelecionado}
-                onChange={e => {
+                onChange={(e) => {
                   setRoteiroSelecionado(e.target.value);
                   setLojaSelecionada("");
                 }}
                 className="input-field w-full"
+                disabled={lojaSelecionada === TODAS_LOJAS_VALUE}
               >
                 <option value="">Selecione um roteiro (opcional)</option>
                 {roteiros.map((r) => (
-                  <option key={r.id} value={r.id}>{r.nome}</option>
+                  <option key={r.id} value={r.id}>
+                    {r.nome}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">🏪 Loja</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🏪 Loja
+              </label>
               <select
                 value={lojaSelecionada}
-                onChange={e => {
+                onChange={(e) => {
                   setLojaSelecionada(e.target.value);
                   setRoteiroSelecionado("");
                 }}
@@ -242,26 +455,33 @@ export function Relatorios() {
                 disabled={!!roteiroSelecionado}
               >
                 <option value="">Selecione uma loja</option>
+                <option value={TODAS_LOJAS_VALUE}>Todas as lojas</option>
                 {lojas.map((loja) => (
-                  <option key={loja.id} value={loja.id}>{loja.nome}</option>
+                  <option key={loja.id} value={loja.id}>
+                    {loja.nome}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">📅 Data Inicial *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📅 Data Inicial *
+              </label>
               <input
                 type="date"
                 value={dataInicio}
-                onChange={e => setDataInicio(e.target.value)}
+                onChange={(e) => setDataInicio(e.target.value)}
                 className="input-field w-full"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">📅 Data Final *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📅 Data Final *
+              </label>
               <input
                 type="date"
                 value={dataFim}
-                onChange={e => setDataFim(e.target.value)}
+                onChange={(e) => setDataFim(e.target.value)}
                 className="input-field w-full"
               />
             </div>
@@ -300,7 +520,11 @@ export function Relatorios() {
         )}
 
         {/* Relatório */}
-        {relatorio && !loading && (
+        {relatorio && !loading && relatorio.tipo === "todas-lojas" && (
+          <RelatorioTodasLojas relatorio={relatorio} />
+        )}
+
+        {relatorio && !loading && relatorio.tipo !== "todas-lojas" && (
           <div className="space-y-6">
             {/* Cards de Totais Gerais - endpoint lucro-dia (fallback: dashboard) */}
             {(lucroData || dashboard) && (
@@ -314,60 +538,107 @@ export function Relatorios() {
                   <div className="card bg-linear-to-br from-cyan-400 to-green-600 text-white relative">
                     <div className="text-2xl sm:text-3xl mb-2">💵💳</div>
                     <div className="text-2xl sm:text-3xl font-bold">
-                      R$ {Number(lucroData?.receitaBruta || dashboard?.totais?.faturamento || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R${" "}
+                      {Number(
+                        lucroData?.receitaBruta ||
+                          dashboard?.totais?.faturamento ||
+                          0,
+                      ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </div>
                     <div className="flex gap-2 mt-2 text-xs sm:text-sm opacity-90">
-                      <span className="bg-white/30 rounded px-2 py-0.5">Dinheiro: R$ {Number(lucroData?.detalhesReceita?.dinheiro || dashboard?.totais?.dinheiro || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                      <span className="bg-white/30 rounded px-2 py-0.5">Cartão/Pix: R$ {Number(lucroData?.detalhesReceita?.pixCartao || dashboard?.totais?.pix || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                      <span className="bg-white/30 rounded px-2 py-0.5">
+                        Dinheiro: R${" "}
+                        {Number(
+                          lucroData?.detalhesReceita?.dinheiro ||
+                            dashboard?.totais?.dinheiro ||
+                            0,
+                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="bg-white/30 rounded px-2 py-0.5">
+                        Cartão/Pix: R${" "}
+                        {Number(
+                          lucroData?.detalhesReceita?.pixCartao ||
+                            dashboard?.totais?.pix ||
+                            0,
+                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
-                    <div className="text-xs sm:text-sm opacity-80 mt-1">Total recebido em dinheiro, cartão e pix</div>
+                    <div className="text-xs sm:text-sm opacity-80 mt-1">
+                      Total recebido em dinheiro, cartão e pix
+                    </div>
                   </div>
                   {/* Produtos que saíram (valor total) */}
                   <div className="card bg-linear-to-br from-red-500 to-red-600 text-white relative">
                     <div className="text-2xl sm:text-3xl mb-2">📤</div>
                     {(() => {
-                      const getPreco = (p) => Number(p.preco || p.valorUnitario || p.custoUnitario || p.valor || 0);
+                      const getPreco = (p) =>
+                        Number(
+                          p.preco ||
+                            p.valorUnitario ||
+                            p.custoUnitario ||
+                            p.valor ||
+                            0,
+                        );
 
                       // Total saíram: soma authoritative dos totais de cada máquina
-                      const totalSairam = relatorio.maquinas?.reduce(
-                        (acc, m) => acc + (Number(m.totais?.produtosSairam) || 0), 0
-                      ) || 0;
+                      const totalSairam =
+                        relatorio.maquinas?.reduce(
+                          (acc, m) =>
+                            acc + (Number(m.totais?.produtosSairam) || 0),
+                          0,
+                        ) || 0;
 
                       // Agregar todos os produtos que saíram com preço para calcular preço médio ponderado
                       const mapaAgregado = {};
                       const fontes = [
                         ...(relatorio.produtosSairam || []),
-                        ...(relatorio.maquinas?.flatMap(m => m.produtosSairam || []) || []),
+                        ...(relatorio.maquinas?.flatMap(
+                          (m) => m.produtosSairam || [],
+                        ) || []),
                       ];
-                      fontes.forEach(p => {
+                      fontes.forEach((p) => {
                         const key = p.id || p.nome;
                         if (!key) return;
-                        if (!mapaAgregado[key]) mapaAgregado[key] = { ...p, quantidade: 0 };
-                        mapaAgregado[key].quantidade += Number(p.quantidade) || 0;
+                        if (!mapaAgregado[key])
+                          mapaAgregado[key] = { ...p, quantidade: 0 };
+                        mapaAgregado[key].quantidade +=
+                          Number(p.quantidade) || 0;
                       });
                       // Fallback: se nenhum produto encontrado nas listas, usar produtosPrecos (mapa de /produtos)
                       let produtosAgregados = Object.values(mapaAgregado);
                       if (produtosAgregados.length === 0) {
-                        produtosAgregados = Object.entries(produtosPrecos).map(([id, p]) => ({
-                          id,
-                          nome: p.nome || id,
-                          preco: p.preco,
-                          custoUnitario: p.custoUnitario,
-                          quantidade: 0,
-                        }));
+                        produtosAgregados = Object.entries(produtosPrecos).map(
+                          ([id, p]) => ({
+                            id,
+                            nome: p.nome || id,
+                            preco: p.preco,
+                            custoUnitario: p.custoUnitario,
+                            quantidade: 0,
+                          }),
+                        );
                       }
 
                       // Preço médio ponderado: Σ(qty × preco) / Σ(qty)
                       // Se qtd não disponível: 1 produto → preço direto; N produtos → média simples
-                      const somaQty = produtosAgregados.reduce((s, p) => s + (Number(p.quantidade) || 0), 0);
-                      const somaValor = produtosAgregados.reduce((s, p) => s + (Number(p.quantidade) || 0) * getPreco(p), 0);
+                      const somaQty = produtosAgregados.reduce(
+                        (s, p) => s + (Number(p.quantidade) || 0),
+                        0,
+                      );
+                      const somaValor = produtosAgregados.reduce(
+                        (s, p) => s + (Number(p.quantidade) || 0) * getPreco(p),
+                        0,
+                      );
                       let precoMedio = 0;
                       if (somaQty > 0) {
                         precoMedio = somaValor / somaQty;
                       } else if (produtosAgregados.length === 1) {
                         precoMedio = getPreco(produtosAgregados[0]);
                       } else if (produtosAgregados.length > 1) {
-                        precoMedio = produtosAgregados.reduce((s, p) => s + getPreco(p), 0) / produtosAgregados.length;
+                        precoMedio =
+                          produtosAgregados.reduce(
+                            (s, p) => s + getPreco(p),
+                            0,
+                          ) / produtosAgregados.length;
                       }
 
                       const totalValor = totalSairam * precoMedio;
@@ -375,77 +646,144 @@ export function Relatorios() {
                       return (
                         <>
                           <div className="text-2xl sm:text-3xl font-bold">
-                            R$ {totalValor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R${" "}
+                            {totalValor.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-2 text-xs opacity-90">
                             <span className="bg-white/30 rounded px-2 py-0.5">
-                              {totalSairam} unid. × R$ {precoMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (preço médio)
+                              {totalSairam} unid. × R${" "}
+                              {precoMedio.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                              })}{" "}
+                              (preço médio)
                             </span>
                           </div>
                           {produtosAgregados.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1 text-xs opacity-80">
-                              {produtosAgregados.map(p => (
-                                <span key={p.id || p.nome} className="bg-white/20 rounded px-2 py-0.5">
-                                  {p.nome}: R$ {getPreco(p).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              {produtosAgregados.map((p) => (
+                                <span
+                                  key={p.id || p.nome}
+                                  className="bg-white/20 rounded px-2 py-0.5"
+                                >
+                                  {p.nome}: R${" "}
+                                  {getPreco(p).toLocaleString("pt-BR", {
+                                    minimumFractionDigits: 2,
+                                  })}
                                 </span>
                               ))}
                             </div>
                           )}
-                          <div className="text-xs sm:text-sm opacity-80 mt-1">Valor total dos produtos que saíram (gasto)</div>
+                          <div className="text-xs sm:text-sm opacity-80 mt-1">
+                            Valor total dos produtos que saíram (gasto)
+                          </div>
                         </>
                       );
                     })()}
                   </div>
                 </div>
 
-
                 {/* Lucro - Custo: resumo simples */}
                 <div className="mt-8 space-y-4">
                   {(() => {
-                    const receita = Number(dashboard?.totais?.faturamento || lucroData?.receitaBruta || 0);
+                    const receita = Number(
+                      dashboard?.totais?.faturamento ||
+                        lucroData?.receitaBruta ||
+                        0,
+                    );
                     // Custo produtos = totalSairam × preço médio (mesma lógica do card acima)
-                    const getPreco = (p) => Number(p.preco || p.valorUnitario || p.custoUnitario || 0);
-                    const totalSairam = relatorio.maquinas?.reduce(
-                      (acc, m) => acc + (Number(m.totais?.produtosSairam) || 0), 0
-                    ) || 0;
+                    const getPreco = (p) =>
+                      Number(
+                        p.preco || p.valorUnitario || p.custoUnitario || 0,
+                      );
+                    const totalSairam =
+                      relatorio.maquinas?.reduce(
+                        (acc, m) =>
+                          acc + (Number(m.totais?.produtosSairam) || 0),
+                        0,
+                      ) || 0;
                     const fontes = [
                       ...(relatorio.produtosSairam || []),
-                      ...(relatorio.maquinas?.flatMap(m => m.produtosSairam || []) || []),
+                      ...(relatorio.maquinas?.flatMap(
+                        (m) => m.produtosSairam || [],
+                      ) || []),
                     ];
                     const mapaAgregado = {};
-                    fontes.forEach(p => {
+                    fontes.forEach((p) => {
                       const key = p.id || p.nome;
                       if (!key) return;
-                      if (!mapaAgregado[key]) mapaAgregado[key] = { ...p, quantidade: 0 };
+                      if (!mapaAgregado[key])
+                        mapaAgregado[key] = { ...p, quantidade: 0 };
                       mapaAgregado[key].quantidade += Number(p.quantidade) || 0;
                     });
                     let produtosAgregados = Object.values(mapaAgregado);
                     if (produtosAgregados.length === 0) {
-                      produtosAgregados = Object.entries(produtosPrecos).map(([id, p]) => ({
-                        id, nome: p.nome || id, preco: p.preco, custoUnitario: p.custoUnitario, quantidade: 0,
-                      }));
+                      produtosAgregados = Object.entries(produtosPrecos).map(
+                        ([id, p]) => ({
+                          id,
+                          nome: p.nome || id,
+                          preco: p.preco,
+                          custoUnitario: p.custoUnitario,
+                          quantidade: 0,
+                        }),
+                      );
                     }
-                    const somaQty = produtosAgregados.reduce((s, p) => s + (Number(p.quantidade) || 0), 0);
-                    const somaValor = produtosAgregados.reduce((s, p) => s + (Number(p.quantidade) || 0) * getPreco(p), 0);
+                    const somaQty = produtosAgregados.reduce(
+                      (s, p) => s + (Number(p.quantidade) || 0),
+                      0,
+                    );
+                    const somaValor = produtosAgregados.reduce(
+                      (s, p) => s + (Number(p.quantidade) || 0) * getPreco(p),
+                      0,
+                    );
                     let precoMedio = 0;
                     if (somaQty > 0) precoMedio = somaValor / somaQty;
-                    else if (produtosAgregados.length === 1) precoMedio = getPreco(produtosAgregados[0]);
-                    else if (produtosAgregados.length > 1) precoMedio = produtosAgregados.reduce((s, p) => s + getPreco(p), 0) / produtosAgregados.length;
+                    else if (produtosAgregados.length === 1)
+                      precoMedio = getPreco(produtosAgregados[0]);
+                    else if (produtosAgregados.length > 1)
+                      precoMedio =
+                        produtosAgregados.reduce((s, p) => s + getPreco(p), 0) /
+                        produtosAgregados.length;
                     const custoProdutos = totalSairam * precoMedio;
-                    const custosAdicionais = typeof relatorio._custos === 'number' ? relatorio._custos : 0;
+                    const custosAdicionais =
+                      typeof relatorio._custos === "number"
+                        ? relatorio._custos
+                        : 0;
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="bg-white/80 rounded-xl p-3 text-center border border-purple-200">
-                          <div className="text-lg font-bold text-green-700">R$ {receita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">💰 Receita Bruta</div>
+                          <div className="text-lg font-bold text-green-700">
+                            R${" "}
+                            {receita.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            💰 Receita Bruta
+                          </div>
                         </div>
                         <div className="bg-white/80 rounded-xl p-3 text-center border border-purple-200">
-                          <div className="text-lg font-bold text-red-600">− R$ {custoProdutos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">🧸 Custo Produtos</div>
+                          <div className="text-lg font-bold text-red-600">
+                            − R${" "}
+                            {custoProdutos.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            🧸 Custo Produtos
+                          </div>
                         </div>
                         <div className="bg-white/80 rounded-xl p-3 text-center border border-purple-200">
-                          <div className="text-lg font-bold text-red-600">− R$ {custosAdicionais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">📋 Fixos / Variáveis</div>
+                          <div className="text-lg font-bold text-red-600">
+                            − R${" "}
+                            {custosAdicionais.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            📋 Fixos / Variáveis
+                          </div>
                         </div>
                       </div>
                     );
@@ -454,20 +792,29 @@ export function Relatorios() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Custos adicionais manuais */}
                     <div className="card bg-linear-to-br from-gray-100 to-gray-300 text-gray-900 flex flex-col justify-between">
-                      <label className="font-bold mb-2">Custos Adicionais (R$)</label>
+                      <label className="font-bold mb-2">
+                        Custos Adicionais (R$)
+                      </label>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
-                        value={typeof relatorio._custos === 'number' ? relatorio._custos : ''}
-                        onChange={e => {
+                        value={
+                          typeof relatorio._custos === "number"
+                            ? relatorio._custos
+                            : ""
+                        }
+                        onChange={(e) => {
                           const valor = parseFloat(e.target.value) || 0;
-                          setRelatorio(prev => ({ ...prev, _custos: valor }));
+                          setRelatorio((prev) => ({ ...prev, _custos: valor }));
                         }}
                         className="input-field w-full text-lg font-bold"
                         placeholder="Ex.: aluguel, luz, etc."
                       />
-                      <span className="text-xs text-gray-600 mt-1">Custos extras não incluídos no sistema (subtraídos do lucro abaixo)</span>
+                      <span className="text-xs text-gray-600 mt-1">
+                        Custos extras não incluídos no sistema (subtraídos do
+                        lucro abaixo)
+                      </span>
                     </div>
 
                     {/* Lucro líquido final */}
@@ -476,45 +823,94 @@ export function Relatorios() {
                       <div className="text-2xl sm:text-3xl font-bold">
                         {(() => {
                           // Receita = dinheiro + cartão/pix
-                          const receita = Number(dashboard?.totais?.faturamento || lucroData?.receitaBruta || 0);
+                          const receita = Number(
+                            dashboard?.totais?.faturamento ||
+                              lucroData?.receitaBruta ||
+                              0,
+                          );
 
                           // Custo produtos = totalSairam × preço médio (mesma lógica do card acima)
-                          const getPreco = (p) => Number(p.preco || p.valorUnitario || p.custoUnitario || 0);
-                          const totalSairam = relatorio.maquinas?.reduce(
-                            (acc, m) => acc + (Number(m.totais?.produtosSairam) || 0), 0
-                          ) || 0;
+                          const getPreco = (p) =>
+                            Number(
+                              p.preco ||
+                                p.valorUnitario ||
+                                p.custoUnitario ||
+                                0,
+                            );
+                          const totalSairam =
+                            relatorio.maquinas?.reduce(
+                              (acc, m) =>
+                                acc + (Number(m.totais?.produtosSairam) || 0),
+                              0,
+                            ) || 0;
                           const fontes = [
                             ...(relatorio.produtosSairam || []),
-                            ...(relatorio.maquinas?.flatMap(m => m.produtosSairam || []) || []),
+                            ...(relatorio.maquinas?.flatMap(
+                              (m) => m.produtosSairam || [],
+                            ) || []),
                           ];
                           const mapaAgregado = {};
-                          fontes.forEach(p => {
+                          fontes.forEach((p) => {
                             const key = p.id || p.nome;
                             if (!key) return;
-                            if (!mapaAgregado[key]) mapaAgregado[key] = { ...p, quantidade: 0 };
-                            mapaAgregado[key].quantidade += Number(p.quantidade) || 0;
+                            if (!mapaAgregado[key])
+                              mapaAgregado[key] = { ...p, quantidade: 0 };
+                            mapaAgregado[key].quantidade +=
+                              Number(p.quantidade) || 0;
                           });
                           let produtosAgregados = Object.values(mapaAgregado);
                           if (produtosAgregados.length === 0) {
-                            produtosAgregados = Object.entries(produtosPrecos).map(([id, p]) => ({
-                              id, nome: p.nome || id, preco: p.preco, custoUnitario: p.custoUnitario, quantidade: 0,
+                            produtosAgregados = Object.entries(
+                              produtosPrecos,
+                            ).map(([id, p]) => ({
+                              id,
+                              nome: p.nome || id,
+                              preco: p.preco,
+                              custoUnitario: p.custoUnitario,
+                              quantidade: 0,
                             }));
                           }
-                          const somaQty = produtosAgregados.reduce((s, p) => s + (Number(p.quantidade) || 0), 0);
-                          const somaValor = produtosAgregados.reduce((s, p) => s + (Number(p.quantidade) || 0) * getPreco(p), 0);
+                          const somaQty = produtosAgregados.reduce(
+                            (s, p) => s + (Number(p.quantidade) || 0),
+                            0,
+                          );
+                          const somaValor = produtosAgregados.reduce(
+                            (s, p) =>
+                              s + (Number(p.quantidade) || 0) * getPreco(p),
+                            0,
+                          );
                           let precoMedio = 0;
                           if (somaQty > 0) precoMedio = somaValor / somaQty;
-                          else if (produtosAgregados.length === 1) precoMedio = getPreco(produtosAgregados[0]);
-                          else if (produtosAgregados.length > 1) precoMedio = produtosAgregados.reduce((s, p) => s + getPreco(p), 0) / produtosAgregados.length;
+                          else if (produtosAgregados.length === 1)
+                            precoMedio = getPreco(produtosAgregados[0]);
+                          else if (produtosAgregados.length > 1)
+                            precoMedio =
+                              produtosAgregados.reduce(
+                                (s, p) => s + getPreco(p),
+                                0,
+                              ) / produtosAgregados.length;
 
                           const custoProdutos = totalSairam * precoMedio;
-                          const custosExtra = typeof relatorio._custos === 'number' ? relatorio._custos : 0;
-                          const lucroFinal = receita - custoProdutos - custosExtra;
+                          const custosExtra =
+                            typeof relatorio._custos === "number"
+                              ? relatorio._custos
+                              : 0;
+                          const lucroFinal =
+                            receita - custoProdutos - custosExtra;
                           return (
                             <>
                               <span>Lucro Líquido: </span>
-                              <span className={lucroFinal >= 0 ? 'text-white' : 'text-red-200'}>
-                                R$ {lucroFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              <span
+                                className={
+                                  lucroFinal >= 0
+                                    ? "text-white"
+                                    : "text-red-200"
+                                }
+                              >
+                                R${" "}
+                                {lucroFinal.toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 2,
+                                })}
                               </span>
                             </>
                           );
@@ -593,11 +989,21 @@ export function Relatorios() {
                           <div className="text-xl sm:text-3xl font-bold text-center">
                             R${" "}
                             {(() => {
-                              const fromImpressao = Number(maquina.totais.dinheiro || 0);
-                              if (fromImpressao > 0) return fromImpressao.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+                              const fromImpressao = Number(
+                                maquina.totais.dinheiro || 0,
+                              );
+                              if (fromImpressao > 0)
+                                return fromImpressao.toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 2,
+                                });
                               // Fallback: dashboard.performanceMaquinas (soma de quantidade_notas_entrada por máquina)
-                              const perf = dashboard?.performanceMaquinas?.find(p => p.nome === maquina.maquina.nome);
-                              return Number(perf?.dinheiro || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+                              const perf = dashboard?.performanceMaquinas?.find(
+                                (p) => p.nome === maquina.maquina.nome,
+                              );
+                              return Number(perf?.dinheiro || 0).toLocaleString(
+                                "pt-BR",
+                                { minimumFractionDigits: 2 },
+                              );
                             })()}
                           </div>
                           <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
@@ -612,11 +1018,21 @@ export function Relatorios() {
                           <div className="text-xl sm:text-3xl font-bold text-center">
                             R${" "}
                             {(() => {
-                              const fromImpressao = Number(maquina.totais.cartaoPix || 0);
-                              if (fromImpressao > 0) return fromImpressao.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+                              const fromImpressao = Number(
+                                maquina.totais.cartaoPix || 0,
+                              );
+                              if (fromImpressao > 0)
+                                return fromImpressao.toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 2,
+                                });
                               // Fallback: dashboard.performanceMaquinas (soma de valor_entrada_maquininha_pix por máquina)
-                              const perf = dashboard?.performanceMaquinas?.find(p => p.nome === maquina.maquina.nome);
-                              return Number(perf?.pix || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+                              const perf = dashboard?.performanceMaquinas?.find(
+                                (p) => p.nome === maquina.maquina.nome,
+                              );
+                              return Number(perf?.pix || 0).toLocaleString(
+                                "pt-BR",
+                                { minimumFractionDigits: 2 },
+                              );
                             })()}
                           </div>
                           <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
@@ -672,13 +1088,21 @@ export function Relatorios() {
                             R${" "}
                             {(() => {
                               // Buscar receita real da máquina via comissaoData
-                              const det = comissaoData?.detalhesPorMaquina?.find(d => d.maquinaId === maquina.maquina.id);
+                              const det =
+                                comissaoData?.detalhesPorMaquina?.find(
+                                  (d) => d.maquinaId === maquina.maquina.id,
+                                );
                               if (det) {
                                 const receita = Number(det.receitaTotal || 0);
                                 const comissao = Number(det.comissaoTotal || 0);
-                                return (receita - comissao).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+                                return (receita - comissao).toLocaleString(
+                                  "pt-BR",
+                                  { minimumFractionDigits: 2 },
+                                );
                               }
-                              return Number(0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+                              return Number(0).toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                              });
                             })()}
                           </div>
                           <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
@@ -736,303 +1160,336 @@ export function Relatorios() {
                                   </div>
                                 </div>
                               ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 bg-white rounded-lg">
-                              <p className="text-6xl mb-2">📭</p>
-                              <p className="text-gray-500 font-medium">
-                                Nenhum produto saiu
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-white rounded-lg">
+                            <p className="text-6xl mb-2">📭</p>
+                            <p className="text-gray-500 font-medium">
+                              Nenhum produto saiu
+                            </p>
+                          </div>
+                        )}
+                      </div>
 
-                        {/* Produtos que Entraram */}
-                        <div className="bg-green-50 p-3 sm:p-5 rounded-xl border-2 border-green-200">
-                          <h4 className="text-base sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2 bg-green-500 text-white p-2 sm:p-3 rounded-lg">
-                            <span className="text-xl sm:text-2xl">📥</span>
-                            <span className="text-sm sm:text-base">
-                              Produtos que ENTRARAM
-                            </span>
-                            <span className="ml-auto bg-white text-green-500 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold">
-                              {maquina.totais.produtosEntraram}
-                            </span>
-                          </h4>
-                          {maquina.produtosEntraram &&
-                          maquina.produtosEntraram.length > 0 ? (
-                            <div className="space-y-2 sm:space-y-3">
-                              {maquina.produtosEntraram
-                                .sort((a, b) => b.quantidade - a.quantidade)
-                                .map((produto) => (
-                                  <div
-                                    key={produto.id}
-                                    className="bg-white p-3 sm:p-4 rounded-lg border-2 border-green-300 shadow-md"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                        <span className="text-2xl sm:text-4xl shrink-0">
-                                          {produto.emoji || "📦"}
-                                        </span>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="font-bold text-sm sm:text-lg text-gray-900 truncate">
-                                            {produto.nome}
-                                          </div>
-                                          <div className="text-xs sm:text-sm text-gray-600 truncate">
-                                            📋 Cód:{" "}
-                                            <span className="font-mono">
-                                              {produto.codigo || "S/C"}
-                                            </span>
-                                          </div>
+                      {/* Produtos que Entraram */}
+                      <div className="bg-green-50 p-3 sm:p-5 rounded-xl border-2 border-green-200">
+                        <h4 className="text-base sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2 bg-green-500 text-white p-2 sm:p-3 rounded-lg">
+                          <span className="text-xl sm:text-2xl">📥</span>
+                          <span className="text-sm sm:text-base">
+                            Produtos que ENTRARAM
+                          </span>
+                          <span className="ml-auto bg-white text-green-500 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold">
+                            {maquina.totais.produtosEntraram}
+                          </span>
+                        </h4>
+                        {maquina.produtosEntraram &&
+                        maquina.produtosEntraram.length > 0 ? (
+                          <div className="space-y-2 sm:space-y-3">
+                            {maquina.produtosEntraram
+                              .sort((a, b) => b.quantidade - a.quantidade)
+                              .map((produto) => (
+                                <div
+                                  key={produto.id}
+                                  className="bg-white p-3 sm:p-4 rounded-lg border-2 border-green-300 shadow-md"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                      <span className="text-2xl sm:text-4xl shrink-0">
+                                        {produto.emoji || "📦"}
+                                      </span>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-sm sm:text-lg text-gray-900 truncate">
+                                          {produto.nome}
+                                        </div>
+                                        <div className="text-xs sm:text-sm text-gray-600 truncate">
+                                          📋 Cód:{" "}
+                                          <span className="font-mono">
+                                            {produto.codigo || "S/C"}
+                                          </span>
                                         </div>
                                       </div>
-                                      <div className="bg-green-500 text-white px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-xl shrink-0">
-                                        {produto.quantidade.toLocaleString(
-                                          "pt-BR",
-                                        )}
-                                      </div>
+                                    </div>
+                                    <div className="bg-green-500 text-white px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-xl shrink-0">
+                                      {produto.quantidade.toLocaleString(
+                                        "pt-BR",
+                                      )}
                                     </div>
                                   </div>
-                                ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-6 sm:py-8 bg-white rounded-lg">
-                              <p className="text-4xl sm:text-6xl mb-2">📭</p>
-                              <p className="text-sm sm:text-base text-gray-500 font-medium">
-                                Nenhum produto entrou
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 sm:py-8 bg-white rounded-lg">
+                            <p className="text-4xl sm:text-6xl mb-2">📭</p>
+                            <p className="text-sm sm:text-base text-gray-500 font-medium">
+                              Nenhum produto entrou
+                            </p>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Separador entre máquinas */}
-                      {index < relatorio.maquinas.length - 1 && (
-                        <div className="mt-8 pt-6 border-t-4 border-dashed border-gray-300">
-                          <p className="text-center text-gray-500 text-sm font-medium">
-                            ⬇️ Próxima Máquina ⬇️
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  ))}
+
+                    {/* Separador entre máquinas */}
+                    {index < relatorio.maquinas.length - 1 && (
+                      <div className="mt-8 pt-6 border-t-4 border-dashed border-gray-300">
+                        <p className="text-center text-gray-500 text-sm font-medium">
+                          ⬇️ Próxima Máquina ⬇️
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Gráfico de saída por máquina */}
+            {relatorio.graficoSaidaPorMaquina &&
+              relatorio.graficoSaidaPorMaquina.length > 0 && (
+                <div className="card bg-linear-to-r from-blue-50 to-blue-100 border-2 border-blue-300 mt-8">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-2xl">📊</span>
+                    Gráfico: Saída de Produtos por Máquina
+                  </h3>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    {(() => {
+                      const maxSairam = Math.max(
+                        ...relatorio.graficoSaidaPorMaquina.map(
+                          (i) => i.produtosSairam,
+                        ),
+                        1,
+                      );
+                      const MAX_BAR_HEIGHT = 200;
+                      return relatorio.graficoSaidaPorMaquina.map((item) => {
+                        const barHeight = Math.max(
+                          (item.produtosSairam / maxSairam) * MAX_BAR_HEIGHT,
+                          4,
+                        );
+                        return (
+                          <div
+                            key={item.maquina}
+                            className="flex flex-col items-center"
+                          >
+                            <div className="font-bold text-lg text-blue-700">
+                              {item.maquina}
+                            </div>
+                            <div
+                              className="w-12 flex items-end"
+                              style={{ height: MAX_BAR_HEIGHT }}
+                            >
+                              <div
+                                style={{
+                                  height: `${barHeight}px`,
+                                  background: "#1976d2",
+                                  width: "100%",
+                                  borderRadius: 4,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="text-sm text-gray-700 mt-2">
+                              {item.produtosSairam} saíram
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
               )}
-
-              {/* Gráfico de saída por máquina */}
-              {relatorio.graficoSaidaPorMaquina &&
-                relatorio.graficoSaidaPorMaquina.length > 0 && (
-                  <div className="card bg-linear-to-r from-blue-50 to-blue-100 border-2 border-blue-300 mt-8">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <span className="text-2xl">📊</span>
-                      Gráfico: Saída de Produtos por Máquina
-                    </h3>
-                    <div className="flex flex-wrap gap-4 items-end">
-                      {(() => {
-                        const maxSairam = Math.max(...relatorio.graficoSaidaPorMaquina.map(i => i.produtosSairam), 1);
-                        const MAX_BAR_HEIGHT = 200;
-                        return relatorio.graficoSaidaPorMaquina.map((item) => {
-                          const barHeight = Math.max((item.produtosSairam / maxSairam) * MAX_BAR_HEIGHT, 4);
-                          return (
-                            <div
-                              key={item.maquina}
-                              className="flex flex-col items-center"
-                            >
-                              <div className="font-bold text-lg text-blue-700">
-                                {item.maquina}
-                              </div>
-                              <div className="w-12 flex items-end" style={{ height: MAX_BAR_HEIGHT }}>
-                                <div
-                                  style={{
-                                    height: `${barHeight}px`,
-                                    background: "#1976d2",
-                                    width: "100%",
-                                    borderRadius: 4,
-                                  }}
-                                ></div>
-                              </div>
-                              <div className="text-sm text-gray-700 mt-2">
-                                {item.produtosSairam} saíram
-                              </div>
+            {/* Gráfico de saída por produto */}
+            {relatorio.graficoSaidaPorProduto &&
+              relatorio.graficoSaidaPorProduto.length > 0 && (
+                <div className="card bg-linear-to-r from-green-50 to-green-100 border-2 border-green-300 mt-8">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-2xl">📦</span>
+                    Gráfico: Saída de Produtos por Tipo
+                  </h3>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    {(() => {
+                      const maxQtd = Math.max(
+                        ...relatorio.graficoSaidaPorProduto.map(
+                          (i) => i.quantidade,
+                        ),
+                        1,
+                      );
+                      const MAX_BAR_HEIGHT = 200;
+                      return relatorio.graficoSaidaPorProduto.map((item) => {
+                        const barHeight = Math.max(
+                          (item.quantidade / maxQtd) * MAX_BAR_HEIGHT,
+                          4,
+                        );
+                        return (
+                          <div
+                            key={item.produto}
+                            className="flex flex-col items-center"
+                          >
+                            <div className="font-bold text-lg text-green-700">
+                              {item.produto}
                             </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-                )}
-              {/* Gráfico de saída por produto */}
-              {relatorio.graficoSaidaPorProduto &&
-                relatorio.graficoSaidaPorProduto.length > 0 && (
-                  <div className="card bg-linear-to-r from-green-50 to-green-100 border-2 border-green-300 mt-8">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <span className="text-2xl">📦</span>
-                      Gráfico: Saída de Produtos por Tipo
-                    </h3>
-                    <div className="flex flex-wrap gap-4 items-end">
-                      {(() => {
-                        const maxQtd = Math.max(...relatorio.graficoSaidaPorProduto.map(i => i.quantidade), 1);
-                        const MAX_BAR_HEIGHT = 200;
-                        return relatorio.graficoSaidaPorProduto.map((item) => {
-                          const barHeight = Math.max((item.quantidade / maxQtd) * MAX_BAR_HEIGHT, 4);
-                          return (
                             <div
-                              key={item.produto}
-                              className="flex flex-col items-center"
+                              className="w-12 flex items-end"
+                              style={{ height: MAX_BAR_HEIGHT }}
                             >
-                              <div className="font-bold text-lg text-green-700">
-                                {item.produto}
-                              </div>
-                              <div className="w-12 flex items-end" style={{ height: MAX_BAR_HEIGHT }}>
-                                <div
-                                  style={{
-                                    height: `${barHeight}px`,
-                                    background: "#43a047",
-                                    width: "100%",
-                                    borderRadius: 4,
-                                  }}
-                                ></div>
-                              </div>
-                              <div className="text-sm text-gray-700 mt-2">
-                                {item.quantidade} saíram
-                              </div>
+                              <div
+                                style={{
+                                  height: `${barHeight}px`,
+                                  background: "#43a047",
+                                  width: "100%",
+                                  borderRadius: 4,
+                                }}
+                              ></div>
                             </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-                )}
-              {/* Consolidado Geral de Produtos */}
-              <div className="card bg-linear-to-r from-amber-50 to-orange-100 border-2 border-orange-300">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                  <span className="text-3xl">📊</span>
-                  Consolidado Geral de Produtos
-                </h3>
-                <p className="text-sm text-gray-600 mb-6">
-                  Resumo de todos os produtos (todas as máquinas somadas)
-                </p>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Produtos que Saíram - Consolidado */}
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <span className="text-2xl">📤</span>
-                      Produtos que Saíram (Total Geral)
-                    </h4>
-                    {relatorio.produtosSairam &&
-                    relatorio.produtosSairam.length > 0 ? (
-                      <div className="space-y-2">
-                        {relatorio.produtosSairam
-                          .sort((a, b) => b.quantidade - a.quantidade)
-                          .map((produto) => (
-                            <div
-                              key={produto.id}
-                              className="p-3 bg-white border-2 border-red-200 rounded-lg"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-2xl">
-                                    {produto.emoji || "📦"}
-                                  </span>
-                                  <div>
-                                    <div className="font-bold text-gray-900">
-                                      {produto.nome}
-                                    </div>
-                                    <div className="text-xs text-gray-600">
-                                      Cód: {produto.codigo || "S/C"}
-                                    </div>
-                                  </div>
-                                </div>
-                                <span className="bg-red-500 text-white px-3 py-1 rounded-full font-bold">
-                                  {produto.quantidade.toLocaleString("pt-BR")}
-                                </span>
-                              </div>
+                            <div className="text-sm text-gray-700 mt-2">
+                              {item.quantidade} saíram
                             </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-4xl mb-2">📭</p>
-                        <p className="text-gray-600">Nenhum produto saiu</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Produtos que Entraram - Consolidado */}
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <span className="text-2xl">📥</span>
-                      Produtos que Entraram (Total Geral)
-                    </h4>
-                    {relatorio.produtosEntraram &&
-                    relatorio.produtosEntraram.length > 0 ? (
-                      <div className="space-y-2">
-                        {relatorio.produtosEntraram
-                          .sort((a, b) => b.quantidade - a.quantidade)
-                          .map((produto) => (
-                            <div
-                              key={produto.id}
-                              className="p-3 bg-white border-2 border-green-200 rounded-lg"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-2xl">
-                                    {produto.emoji || "📦"}
-                                  </span>
-                                  <div>
-                                    <div className="font-bold text-gray-900">
-                                      {produto.nome}
-                                    </div>
-                                    <div className="text-xs text-gray-600">
-                                      Cód: {produto.codigo || "S/C"}
-                                    </div>
-                                  </div>
-                                </div>
-                                <span className="bg-green-500 text-white px-3 py-1 rounded-full font-bold">
-                                  {produto.quantidade.toLocaleString("pt-BR")}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-4xl mb-2">📭</p>
-                        <p className="text-gray-600">Nenhum produto entrou</p>
-                      </div>
-                    )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
+              )}
+            {/* Consolidado Geral de Produtos */}
+            <div className="card bg-linear-to-r from-amber-50 to-orange-100 border-2 border-orange-300">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <span className="text-3xl">📊</span>
+                Consolidado Geral de Produtos
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Resumo de todos os produtos (todas as máquinas somadas)
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Produtos que Saíram - Consolidado */}
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-2xl">📤</span>
+                    Produtos que Saíram (Total Geral)
+                  </h4>
+                  {relatorio.produtosSairam &&
+                  relatorio.produtosSairam.length > 0 ? (
+                    <div className="space-y-2">
+                      {relatorio.produtosSairam
+                        .sort((a, b) => b.quantidade - a.quantidade)
+                        .map((produto) => (
+                          <div
+                            key={produto.id}
+                            className="p-3 bg-white border-2 border-red-200 rounded-lg"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">
+                                  {produto.emoji || "📦"}
+                                </span>
+                                <div>
+                                  <div className="font-bold text-gray-900">
+                                    {produto.nome}
+                                  </div>
+                                  <div className="text-xs text-gray-600">
+                                    Cód: {produto.codigo || "S/C"}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="bg-red-500 text-white px-3 py-1 rounded-full font-bold">
+                                {produto.quantidade.toLocaleString("pt-BR")}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-4xl mb-2">📭</p>
+                      <p className="text-gray-600">Nenhum produto saiu</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Produtos que Entraram - Consolidado */}
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-2xl">📥</span>
+                    Produtos que Entraram (Total Geral)
+                  </h4>
+                  {relatorio.produtosEntraram &&
+                  relatorio.produtosEntraram.length > 0 ? (
+                    <div className="space-y-2">
+                      {relatorio.produtosEntraram
+                        .sort((a, b) => b.quantidade - a.quantidade)
+                        .map((produto) => (
+                          <div
+                            key={produto.id}
+                            className="p-3 bg-white border-2 border-green-200 rounded-lg"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">
+                                  {produto.emoji || "📦"}
+                                </span>
+                                <div>
+                                  <div className="font-bold text-gray-900">
+                                    {produto.nome}
+                                  </div>
+                                  <div className="text-xs text-gray-600">
+                                    Cód: {produto.codigo || "S/C"}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="bg-green-500 text-white px-3 py-1 rounded-full font-bold">
+                                {produto.quantidade.toLocaleString("pt-BR")}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-4xl mb-2">📭</p>
+                      <p className="text-gray-600">Nenhum produto entrou</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            
+            </div>
 
             {/* Dias sem movimentação por loja (roteiro) */}
             {relatorio && relatorio.lojas && roteiroSelecionado && (
               <div className="mt-8">
-                <h3 className="text-lg font-bold mb-4">Dias sem movimentação por loja</h3>
+                <h3 className="text-lg font-bold mb-4">
+                  Dias sem movimentação por loja
+                </h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full border text-xs">
                     <thead>
                       <tr className="bg-gray-200">
                         <th className="border px-2 py-1">Loja</th>
-                        <th className="border px-2 py-1">Dias sem movimentação</th>
+                        <th className="border px-2 py-1">
+                          Dias sem movimentação
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {relatorio.lojas.map((loja, idx) => (
                         <tr key={loja.id || loja.nome || idx}>
-                          <td className="border px-2 py-1 font-semibold">{loja.nome || `Loja ${idx + 1}`}</td>
+                          <td className="border px-2 py-1 font-semibold">
+                            {loja.nome || `Loja ${idx + 1}`}
+                          </td>
                           <td className="border px-2 py-1">
-                            {loja.diasSemMovimentacao && loja.diasSemMovimentacao.length > 0 ? (
+                            {loja.diasSemMovimentacao &&
+                            loja.diasSemMovimentacao.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {loja.diasSemMovimentacao.map((dia, i) => (
-                                  <span key={dia + '-' + i} className="bg-red-200 text-red-800 rounded px-2 py-0.5 text-xs font-bold">
+                                  <span
+                                    key={dia + "-" + i}
+                                    className="bg-red-200 text-red-800 rounded px-2 py-0.5 text-xs font-bold"
+                                  >
                                     {dia}
                                   </span>
                                 ))}
                               </div>
                             ) : (
-                              <span className="bg-green-100 text-green-800 rounded px-2 py-0.5 text-xs">Sem dias sem movimentação</span>
+                              <span className="bg-green-100 text-green-800 rounded px-2 py-0.5 text-xs">
+                                Sem dias sem movimentação
+                              </span>
                             )}
                           </td>
                         </tr>
