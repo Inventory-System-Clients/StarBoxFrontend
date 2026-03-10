@@ -11,10 +11,6 @@ export default function MovimentacaoMaquina() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const isFuncionarioNormal = usuario?.role === "FUNCIONARIO";
-  const isRoleInOutObrigatorio = [
-    "FUNCIONARIO_TODAS_LOJAS",
-    "CONTROLADOR_ESTOQUE",
-  ].includes(usuario?.role);
 
   // Estados para formulário
   const [formData, setFormData] = useState({
@@ -52,7 +48,7 @@ export default function MovimentacaoMaquina() {
         ]);
         setMaquina(maqRes.data);
         setProdutos(prodRes.data);
-      } catch (err) {
+      } catch {
         setError("Erro ao carregar dados da máquina ou produtos.");
       } finally {
         setLoading(false);
@@ -83,21 +79,12 @@ export default function MovimentacaoMaquina() {
         return;
       }
 
-      const contadorInReferencia =
-        formData.contadorInManual !== ""
-          ? formData.contadorInManual
-          : formData.contadorInDigital;
-      const contadorOutReferencia =
-        formData.contadorOutManual !== ""
-          ? formData.contadorOutManual
-          : formData.contadorOutDigital;
+      const contadorOutDigitalReferencia = formData.contadorOutDigital;
 
       const params = { maquinaId };
       if (!isFuncionarioNormal && !formData.ignoreInOut) {
-        if (contadorInReferencia !== "")
-          params.contadorIn = contadorInReferencia;
-        if (contadorOutReferencia !== "") {
-          params.contadorOut = contadorOutReferencia;
+        if (contadorOutDigitalReferencia !== "") {
+          params.contadorOut = contadorOutDigitalReferencia;
         }
       }
 
@@ -118,8 +105,7 @@ export default function MovimentacaoMaquina() {
         const temContadoresDigitados =
           !isFuncionarioNormal &&
           !formData.ignoreInOut &&
-          contadorInReferencia !== "" &&
-          contadorOutReferencia !== "";
+          contadorOutDigitalReferencia !== "";
 
         if (temContadoresDigitados) {
           setFormData((prev) => ({
@@ -127,7 +113,7 @@ export default function MovimentacaoMaquina() {
             quantidadeAtualMaquina: quantidadeCalculada,
           }));
         }
-      } catch (err) {
+      } catch {
         setResumoCalculo(null);
         setSugestaoAbastecimento(null);
       }
@@ -138,9 +124,6 @@ export default function MovimentacaoMaquina() {
     maquina,
     maquinaId,
     isFuncionarioNormal,
-    formData.contadorInManual,
-    formData.contadorOutManual,
-    formData.contadorInDigital,
     formData.contadorOutDigital,
     formData.ignoreInOut,
   ]);
@@ -148,12 +131,7 @@ export default function MovimentacaoMaquina() {
   // Sugestão de abastecimento usando backend
   const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
   useEffect(() => {
-    const contadorOutReferencia =
-      formData.contadorOutManual !== ""
-        ? formData.contadorOutManual
-        : formData.contadorOutDigital;
-
-    const contadorOutDigitado = parseInt(contadorOutReferencia, 10);
+    const contadorOutDigitado = parseInt(formData.contadorOutDigital, 10);
     const totalPreInformado = parseInt(formData.quantidadeAtualMaquina, 10);
 
     if (isFuncionarioNormal || !resumoCalculo) {
@@ -163,7 +141,7 @@ export default function MovimentacaoMaquina() {
 
     if (
       !formData.ignoreInOut &&
-      contadorOutReferencia !== "" &&
+      formData.contadorOutDigital !== "" &&
       !Number.isNaN(contadorOutDigitado) &&
       contadorOutDigitado < (resumoCalculo.contadorOutSugerido || 0)
     ) {
@@ -177,7 +155,7 @@ export default function MovimentacaoMaquina() {
 
     if (
       !formData.ignoreInOut &&
-      contadorOutReferencia !== "" &&
+      formData.contadorOutDigital !== "" &&
       formData.quantidadeAtualMaquina !== "" &&
       !Number.isNaN(totalPreInformado)
     ) {
@@ -202,7 +180,6 @@ export default function MovimentacaoMaquina() {
   }, [
     isFuncionarioNormal,
     resumoCalculo,
-    formData.contadorOutManual,
     formData.contadorOutDigital,
     formData.quantidadeAtualMaquina,
     formData.ignoreInOut,
@@ -239,6 +216,24 @@ export default function MovimentacaoMaquina() {
     setSuccess("");
     try {
       const deveIgnorarContadores = isFuncionarioNormal || formData.ignoreInOut;
+      const parseContadorOpcional = (valor) => {
+        if (valor === "" || valor === null || valor === undefined) return null;
+        const numero = parseInt(valor, 10);
+        return Number.isNaN(numero) ? null : numero;
+      };
+
+      const contadorInManualInformado = parseContadorOpcional(
+        formData.contadorInManual,
+      );
+      const contadorOutManualInformado = parseContadorOpcional(
+        formData.contadorOutManual,
+      );
+      const contadorInDigitalInformado = parseContadorOpcional(
+        formData.contadorInDigital,
+      );
+      const contadorOutDigitalInformado = parseContadorOpcional(
+        formData.contadorOutDigital,
+      );
 
       const produtosParaEnviar = [
         {
@@ -259,14 +254,16 @@ export default function MovimentacaoMaquina() {
         fichas: parseInt(formData.fichas) || 0,
         contadorIn: deveIgnorarContadores
           ? null
-          : formData.contadorInManual === ""
-            ? null
-            : parseInt(formData.contadorInManual),
+          : (contadorInManualInformado ?? contadorInDigitalInformado),
         contadorOut: deveIgnorarContadores
           ? null
-          : formData.contadorOutManual === ""
-            ? null
-            : parseInt(formData.contadorOutManual),
+          : (contadorOutManualInformado ?? contadorOutDigitalInformado),
+        contadorInDigital: deveIgnorarContadores
+          ? null
+          : contadorInDigitalInformado,
+        contadorOutDigital: deveIgnorarContadores
+          ? null
+          : contadorOutDigitalInformado,
         quantidade_notas_entrada: formData.quantidade_notas_entrada
           ? parseFloat(formData.quantidade_notas_entrada)
           : null,
@@ -407,11 +404,10 @@ export default function MovimentacaoMaquina() {
                       className="input-field"
                       placeholder="0"
                       min="0"
-                      required={isRoleInOutObrigatorio && !formData.ignoreInOut}
                       disabled={formData.ignoreInOut}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Número do contador IN manual
+                      Número do contador IN manual (opcional)
                     </p>
                   </div>
                   <div>
@@ -426,11 +422,10 @@ export default function MovimentacaoMaquina() {
                       className="input-field"
                       placeholder="0"
                       min="0"
-                      required={isRoleInOutObrigatorio && !formData.ignoreInOut}
                       disabled={formData.ignoreInOut}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Número do contador OUT manual
+                      Número do contador OUT manual (opcional)
                     </p>
                   </div>
                 </div>
