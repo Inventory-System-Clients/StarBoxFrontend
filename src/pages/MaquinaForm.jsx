@@ -44,10 +44,41 @@ export function MaquinaForm() {
     if (isEdit) {
       carregarMaquina();
     } else {
+      carregarProximoCodigo();
       setLoadingData(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const carregarProximoCodigo = async () => {
+    try {
+      const response = await api.get("/maquinas");
+      const maquinas = response.data;
+      
+      if (!maquinas || maquinas.length === 0) {
+        setFormData(prev => ({ ...prev, codigo: "1" }));
+        return;
+      }
+
+      // Extrai números dos códigos existentes
+      const codigos = maquinas.map(m => {
+        const codigo = String(m.codigo || "");
+        // Extrai apenas números do código (ex: "MAQ-001" -> 1, "123" -> 123)
+        const numero = parseInt(codigo.replace(/\D/g, ""), 10);
+        return isNaN(numero) ? 0 : numero;
+      });
+
+      // Encontra o maior código e incrementa
+      const maiorCodigo = Math.max(...codigos, 0);
+      const proximoCodigo = maiorCodigo + 1;
+      
+      setFormData(prev => ({ ...prev, codigo: String(proximoCodigo) }));
+    } catch (error) {
+      console.error("Erro ao carregar próximo código:", error);
+      // Em caso de erro, deixa vazio para o usuário preencher
+      setFormData(prev => ({ ...prev, codigo: "" }));
+    }
+  };
 
   const carregarLojas = async () => {
     try {
