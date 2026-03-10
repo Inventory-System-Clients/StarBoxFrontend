@@ -92,6 +92,19 @@ export function Lojas() {
           />
         </svg>
       ),
+      render: (loja) => {
+        const partes = [
+          loja.endereco,
+          loja.numero && `nº ${loja.numero}`,
+          loja.bairro,
+          loja.cidade && loja.estado && `${loja.cidade}/${loja.estado}`,
+        ].filter(Boolean);
+        return (
+          <span className="text-sm text-gray-700">
+            {partes.length > 0 ? partes.join(', ') : '-'}
+          </span>
+        );
+      },
     },
     {
       label: "Telefone",

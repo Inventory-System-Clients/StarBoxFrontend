@@ -199,16 +199,15 @@ export function LojaDetalhes() {
 
               <div className="md:col-span-2">
                 <label className="text-sm font-semibold text-gray-500">
-                  Endereço
+                  Endereço Completo
                 </label>
                 <p className="text-gray-900">
-                  {loja.endereco}
-                  {loja.cidade && loja.estado && (
-                    <span className="text-gray-600">
-                      {" "}
-                      - {loja.cidade}, {loja.estado}
-                    </span>
-                  )}
+                  {[
+                    loja.endereco,
+                    loja.numero && `nº ${loja.numero}`,
+                    loja.bairro,
+                    loja.cidade && loja.estado && `${loja.cidade}/${loja.estado}`,
+                  ].filter(Boolean).join(', ')}
                   {loja.cep && (
                     <span className="text-gray-600"> - CEP: {loja.cep}</span>
                   )}

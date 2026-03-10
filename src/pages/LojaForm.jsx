@@ -30,6 +30,8 @@ export function LojaForm() {
   const [formData, setFormData] = useState({
     nome: "",
     endereco: "",
+    numero: "",
+    bairro: "",
     cidade: "",
     estado: "",
     cep: "",
@@ -216,6 +218,8 @@ export function LojaForm() {
       const data = {
         nome: formData.nome.trim(),
         endereco: formData.endereco.trim(),
+        numero: formData.numero?.trim() || null,
+        bairro: formData.bairro?.trim() || null,
         cidade: formData.cidade.trim(),
         estado: formData.estado,
         cep: formData.cep?.trim() || null,
@@ -561,9 +565,9 @@ export function LojaForm() {
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Endereço Completo *
+                    Endereço *
                   </label>
                   <input
                     type="text"
@@ -571,8 +575,38 @@ export function LojaForm() {
                     value={formData.endereco}
                     onChange={handleChange}
                     className="input-field"
-                    placeholder="Rua, número, complemento"
+                    placeholder="Ex: Rua das Flores"
                     required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Número
+                  </label>
+                  <input
+                    type="text"
+                    name="numero"
+                    value={formData.numero}
+                    onChange={handleChange}
+                    className="input-field"
+                    placeholder="Ex: 123"
+                    maxLength={20}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Bairro
+                  </label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    value={formData.bairro}
+                    onChange={handleChange}
+                    className="input-field"
+                    placeholder="Ex: Centro"
+                    maxLength={100}
                   />
                 </div>
 
