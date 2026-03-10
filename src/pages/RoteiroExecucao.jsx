@@ -23,7 +23,7 @@ export default function RoteiroExecucao() {
     etapa: 1,
     loading: false,
   });
-  
+
   // Estados para manutenção
   const [manutencaoPendente, setManutencaoPendente] = useState(null);
   const [modalManutencao, setModalManutencao] = useState(false);
@@ -38,6 +38,11 @@ export default function RoteiroExecucao() {
     justificativa: "",
   });
 
+  const lojaEstaConcluida = (status) =>
+    ["concluido", "concluida", "finalizado", "finalizada"].includes(
+      String(status || "").toLowerCase(),
+    );
+
   useEffect(() => {
     carregarRoteiro();
   }, [id]);
@@ -45,7 +50,7 @@ export default function RoteiroExecucao() {
   // Efeito para selecionar automaticamente a loja quando volta da movimentação
   useEffect(() => {
     if (roteiro && location.state?.lojaId) {
-      const loja = roteiro.lojas?.find(l => l.id === location.state.lojaId);
+      const loja = roteiro.lojas?.find((l) => l.id === location.state.lojaId);
       if (loja) {
         setLojaSelecionada(loja);
         // Limpar o state para não manter o lojaId em navegações futuras
@@ -77,7 +82,7 @@ export default function RoteiroExecucao() {
         },
       });
       const manutencoesPendentes = res.data || [];
-      
+
       if (manutencoesPendentes.length > 0) {
         // Pega a primeira manutenção pendente
         setManutencaoPendente(manutencoesPendentes[0]);
@@ -94,13 +99,19 @@ export default function RoteiroExecucao() {
   const handleSelecionarLoja = async (loja) => {
     // Verificar ordem das lojas
     if (roteiro?.lojas) {
-      const lojasOrdenadas = [...roteiro.lojas].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-      const lojasConcluidas = lojasOrdenadas.filter(l => l.status === "concluido");
-      const proximalLojaIndex = lojasConcluidas.length;
-      const proximaLoja = lojasOrdenadas[proximalLojaIndex];
-      
+      const lojasOrdenadas = [...roteiro.lojas].sort(
+        (a, b) => (a.ordem || 0) - (b.ordem || 0),
+      );
+      const proximaLoja = lojasOrdenadas.find(
+        (l) => !lojaEstaConcluida(l.status),
+      );
+
       // Se não é a próxima loja na ordem e ainda tem lojas pendentes antes
-      if (proximaLoja && proximaLoja.id !== loja.id && loja.status !== "concluido") {
+      if (
+        proximaLoja &&
+        proximaLoja.id !== loja.id &&
+        !lojaEstaConcluida(loja.status)
+      ) {
         setModalJustificativa({
           aberto: true,
           lojaId: loja.id,
@@ -114,7 +125,7 @@ export default function RoteiroExecucao() {
     }
 
     setLojaSelecionada(loja);
-    
+
     // Verificar se há manutenções pendentes nesta loja
     if (loja && loja.id) {
       await verificarManutencoesPendentes(loja.id);
@@ -135,9 +146,11 @@ export default function RoteiroExecucao() {
         justificativa: modalJustificativa.justificativa,
       });
 
-      const loja = roteiro.lojas.find(l => l.id === modalJustificativa.lojaId);
+      const loja = roteiro.lojas.find(
+        (l) => l.id === modalJustificativa.lojaId,
+      );
       setLojaSelecionada(loja);
-      
+
       // Verificar manutenções
       if (loja && loja.id) {
         await verificarManutencoesPendentes(loja.id);
@@ -257,7 +270,7 @@ export default function RoteiroExecucao() {
                     onClick={() => handleSelecionarLoja(loja)}
                     className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start 
                       ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
-                      ${loja.status === "concluido" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+                      ${lojaEstaConcluida(loja.status) ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
                   >
                     <div className="flex items-center gap-2 w-full">
                       <span className="bg-[#24094E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">
@@ -268,7 +281,7 @@ export default function RoteiroExecucao() {
                     <span className="text-xs text-gray-500 ml-9">
                       {loja.cidade}, {loja.estado}
                     </span>
-                    {loja.status === "concluido" && (
+                    {lojaEstaConcluida(loja.status) && (
                       <span className="mt-1 ml-9 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
                         Concluída
                       </span>
@@ -386,7 +399,16 @@ export default function RoteiroExecucao() {
 
         <Modal
           isOpen={modalJustificativa.aberto}
-          onClose={() => setModalJustificativa({ aberto: false, lojaId: null, lojaNome: "", lojaIdEsperada: null, lojaEsperadaNome: "", justificativa: "" })}
+          onClose={() =>
+            setModalJustificativa({
+              aberto: false,
+              lojaId: null,
+              lojaNome: "",
+              lojaIdEsperada: null,
+              lojaEsperadaNome: "",
+              justificativa: "",
+            })
+          }
           title="Justificar alteração de ordem"
           size="md"
         >
@@ -396,10 +418,14 @@ export default function RoteiroExecucao() {
                 ⚠️ Você está pulando a ordem das lojas!
               </p>
               <p className="text-sm text-yellow-700">
-                Loja esperada: <span className="font-bold">{modalJustificativa.lojaEsperadaNome}</span>
+                Loja esperada:{" "}
+                <span className="font-bold">
+                  {modalJustificativa.lojaEsperadaNome}
+                </span>
               </p>
               <p className="text-sm text-yellow-700">
-                Loja selecionada: <span className="font-bold">{modalJustificativa.lojaNome}</span>
+                Loja selecionada:{" "}
+                <span className="font-bold">{modalJustificativa.lojaNome}</span>
               </p>
             </div>
             <div>
@@ -411,13 +437,27 @@ export default function RoteiroExecucao() {
                 rows="4"
                 placeholder="Ex: A loja estava fechada, problema de acesso, etc."
                 value={modalJustificativa.justificativa}
-                onChange={(e) => setModalJustificativa(prev => ({ ...prev, justificativa: e.target.value }))}
+                onChange={(e) =>
+                  setModalJustificativa((prev) => ({
+                    ...prev,
+                    justificativa: e.target.value,
+                  }))
+                }
               />
             </div>
             <div className="flex justify-end gap-2">
               <button
                 className="btn-secondary"
-                onClick={() => setModalJustificativa({ aberto: false, lojaId: null, lojaNome: "", lojaIdEsperada: null, lojaEsperadaNome: "", justificativa: "" })}
+                onClick={() =>
+                  setModalJustificativa({
+                    aberto: false,
+                    lojaId: null,
+                    lojaNome: "",
+                    lojaIdEsperada: null,
+                    lojaEsperadaNome: "",
+                    justificativa: "",
+                  })
+                }
               >
                 Cancelar
               </button>
