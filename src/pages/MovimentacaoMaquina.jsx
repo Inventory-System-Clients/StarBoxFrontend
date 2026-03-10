@@ -11,7 +11,10 @@ export default function MovimentacaoMaquina() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const isFuncionarioNormal = usuario?.role === "FUNCIONARIO";
-  const isFuncionarioTodasLojas = usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
+  const isRoleInOutObrigatorio = [
+    "FUNCIONARIO_TODAS_LOJAS",
+    "CONTROLADOR_ESTOQUE",
+  ].includes(usuario?.role);
 
   // Estados para formulário
   const [formData, setFormData] = useState({
@@ -25,6 +28,8 @@ export default function MovimentacaoMaquina() {
     observacao: "",
     retiradaEstoque: false,
     retiradaProduto: 0,
+    retiradaProdutoDevolverEstoque: false,
+    origemEstoque: "usuario",
     ignoreInOut: false,
     quantidade_notas_entrada: "",
     valor_entrada_maquininha_pix: "",
@@ -241,9 +246,12 @@ export default function MovimentacaoMaquina() {
           quantidadeSaiu: 0,
           quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
           retiradaProduto: parseInt(formData.retiradaProduto) || 0,
+          retiradaProdutoDevolverEstoque:
+            formData.retiradaProdutoDevolverEstoque || false,
         },
       ];
-      await api.post("/movimentacoes", {
+
+      const payload = {
         maquinaId: maquinaId,
         roteiroId: roteiroId,
         totalPre: parseInt(formData.quantidadeAtualMaquina) || 0,
@@ -267,10 +275,49 @@ export default function MovimentacaoMaquina() {
           : null,
         ignoreInOut: Boolean(formData.ignoreInOut),
         retiradaEstoque: formData.retiradaEstoque,
+        origemEstoque: formData.origemEstoque || "usuario",
         retiradaProduto: parseInt(formData.retiradaProduto) || 0,
         observacoes: formData.observacao || "",
         produtos: produtosParaEnviar,
-      });
+      };
+
+      const enviarMovimentacao = (confirmarUsoEstoqueLoja = false) =>
+        api.post("/movimentacoes", {
+          ...payload,
+          confirmarUsoEstoqueLoja,
+        });
+
+      try {
+        await enviarMovimentacao(false);
+      } catch (postError) {
+        const precisaConfirmarLoja =
+          postError?.response?.status === 409 &&
+          postError?.response?.data?.codigo === "CONFIRMAR_USO_ESTOQUE_LOJA";
+
+        if (!precisaConfirmarLoja) {
+          throw postError;
+        }
+
+        const detalhes = postError?.response?.data?.detalhes || [];
+        const resumoDetalhes = detalhes
+          .map((item) => {
+            const nome = item.produtoNome || item.produtoId;
+            return `- ${nome}: saldo pessoal ${item.saldoUsuario}`;
+          })
+          .join("\n");
+
+        const confirmar = window.confirm(
+          `Voce possui saldo no estoque pessoal para alguns produtos:\n\n${resumoDetalhes}\n\nDeseja retirar do estoque da loja mesmo assim?`,
+        );
+
+        if (!confirmar) {
+          setError("Movimentacao cancelada. Origem de estoque nao confirmada.");
+          return;
+        }
+
+        await enviarMovimentacao(true);
+      }
+
       setSuccess("Movimentação registrada com sucesso!");
       setTimeout(() => {
         navigate(`/roteiros/${roteiroId}/executar`, {
@@ -360,9 +407,7 @@ export default function MovimentacaoMaquina() {
                       className="input-field"
                       placeholder="0"
                       min="0"
-                      required={
-                        isFuncionarioTodasLojas && !formData.ignoreInOut
-                      }
+                      required={isRoleInOutObrigatorio && !formData.ignoreInOut}
                       disabled={formData.ignoreInOut}
                     />
                     <p className="text-xs text-gray-500 mt-1">
@@ -381,9 +426,7 @@ export default function MovimentacaoMaquina() {
                       className="input-field"
                       placeholder="0"
                       min="0"
-                      required={
-                        isFuncionarioTodasLojas && !formData.ignoreInOut
-                      }
+                      required={isRoleInOutObrigatorio && !formData.ignoreInOut}
                       disabled={formData.ignoreInOut}
                     />
                     <p className="text-xs text-gray-500 mt-1">
@@ -598,6 +641,23 @@ export default function MovimentacaoMaquina() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Origem do Estoque
+              </label>
+              <select
+                name="origemEstoque"
+                value={formData.origemEstoque || "usuario"}
+                onChange={handleChange}
+                className="select-field"
+              >
+                <option value="usuario">Meu estoque</option>
+                <option value="loja">Estoque da loja</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Ao escolher estoque da loja, pode ser solicitada confirmação.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">

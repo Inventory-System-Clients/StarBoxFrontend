@@ -72,6 +72,8 @@ export function Movimentacoes() {
     observacao: "",
     retiradaEstoque: false,
     retiradaProduto: 0,
+    retiradaProdutoDevolverEstoque: false,
+    origemEstoque: "usuario",
     ignoreInOut: false,
   });
 
@@ -119,7 +121,8 @@ export function Movimentacoes() {
       try {
         const params = { maquinaId: formData.maquina_id };
         if (!formData.ignoreInOut) {
-          if (formData.contadorIn !== "") params.contadorIn = formData.contadorIn;
+          if (formData.contadorIn !== "")
+            params.contadorIn = formData.contadorIn;
           if (formData.contadorOut !== "") {
             params.contadorOut = formData.contadorOut;
           }
@@ -164,7 +167,9 @@ export function Movimentacoes() {
         }
 
         const totalPreEsperado = parseInt(
-          response.data?.totalPreEsperado ?? response.data?.quantidadeAtual ?? 0,
+          response.data?.totalPreEsperado ??
+            response.data?.quantidadeAtual ??
+            0,
           10,
         );
         const diferenca = Math.abs(totalPreInformado - totalPreEsperado);
@@ -343,6 +348,7 @@ export function Movimentacoes() {
           : null,
         ignoreInOut: Boolean(formData.ignoreInOut),
         retiradaEstoque: formData.retiradaEstoque,
+        origemEstoque: formData.origemEstoque || "usuario",
         contadorMaquina: null,
         observacoes: observacaoFinal || null,
         produtos: [
@@ -351,11 +357,50 @@ export function Movimentacoes() {
             quantidadeSaiu: quantidadeSaiu,
             quantidadeAbastecida: quantidadeAdicionada,
             retiradaProduto: retiradaProduto,
+            retiradaProdutoDevolverEstoque:
+              formData.retiradaProdutoDevolverEstoque || false,
           },
         ],
       };
+
       console.log("Movimentacao enviada:", data);
-      await api.post("/movimentacoes", data);
+
+      const enviarMovimentacao = (confirmarUsoEstoqueLoja = false) =>
+        api.post("/movimentacoes", {
+          ...data,
+          confirmarUsoEstoqueLoja,
+        });
+
+      try {
+        await enviarMovimentacao(false);
+      } catch (postError) {
+        const precisaConfirmarLoja =
+          postError?.response?.status === 409 &&
+          postError?.response?.data?.codigo === "CONFIRMAR_USO_ESTOQUE_LOJA";
+
+        if (!precisaConfirmarLoja) {
+          throw postError;
+        }
+
+        const detalhes = postError?.response?.data?.detalhes || [];
+        const resumoDetalhes = detalhes
+          .map((item) => {
+            const nome = item.produtoNome || item.produtoId;
+            return `- ${nome}: saldo pessoal ${item.saldoUsuario}`;
+          })
+          .join("\n");
+
+        const confirmar = window.confirm(
+          `Voce possui saldo no estoque pessoal para alguns produtos:\n\n${resumoDetalhes}\n\nDeseja retirar do estoque da loja mesmo assim?`,
+        );
+
+        if (!confirmar) {
+          setError("Movimentacao cancelada. Origem de estoque nao confirmada.");
+          return;
+        }
+
+        await enviarMovimentacao(true);
+      }
 
       // Logs para depuração do filtro
       console.log("Todas movimentações:", movimentacoes);
@@ -404,6 +449,7 @@ export function Movimentacoes() {
         retiradaEstoque: false,
         retiradaProduto: 0,
         retiradaProdutoDevolverEstoque: false,
+        origemEstoque: "usuario",
         ignoreInOut: isFuncionarioNormal,
       });
       setEstoqueAnterior(0);
@@ -952,13 +998,16 @@ export function Movimentacoes() {
                         Sugestões automáticas de contagem
                       </p>
                       <p className="text-xs text-indigo-700 mt-1">
-                        OUT sugerido acumulado: {resumoContadores.contadorOutSugerido || 0}
+                        OUT sugerido acumulado:{" "}
+                        {resumoContadores.contadorOutSugerido || 0}
                       </p>
                       <p className="text-xs text-indigo-700">
-                        Era para ter na máquina: {resumoContadores.totalPreEsperado ?? 0}
+                        Era para ter na máquina:{" "}
+                        {resumoContadores.totalPreEsperado ?? 0}
                       </p>
                       <p className="text-xs text-indigo-700">
-                        Sugestão de abastecimento: {resumoContadores.sugestaoAbastecimento ?? 0}
+                        Sugestão de abastecimento:{" "}
+                        {resumoContadores.sugestaoAbastecimento ?? 0}
                       </p>
                     </div>
                   )}
@@ -1009,14 +1058,15 @@ export function Movimentacoes() {
                           </p>
                           {alertaDivergencia.tipo === "out_abaixo_sugerido" ? (
                             <p className="text-xs text-yellow-700">
-                              OUT digitado ({alertaDivergencia.contadorOutAtual})
-                              está abaixo do OUT sugerido acumulado (
+                              OUT digitado ({alertaDivergencia.contadorOutAtual}
+                              ) está abaixo do OUT sugerido acumulado (
                               {alertaDivergencia.contadorOutSugerido}).
                             </p>
                           ) : (
                             <p className="text-xs text-yellow-700">
-                              Era para ter {alertaDivergencia.totalPreEsperado} na
-                              máquina, mas foi informado {alertaDivergencia.totalPreInformado}.
+                              Era para ter {alertaDivergencia.totalPreEsperado}{" "}
+                              na máquina, mas foi informado{" "}
+                              {alertaDivergencia.totalPreInformado}.
                             </p>
                           )}
                         </div>
@@ -1238,6 +1288,25 @@ export function Movimentacoes() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Origem do Estoque
+                  </label>
+                  <select
+                    name="origemEstoque"
+                    value={formData.origemEstoque || "usuario"}
+                    onChange={handleChange}
+                    className="select-field"
+                  >
+                    <option value="usuario">Meu estoque</option>
+                    <option value="loja">Estoque da loja</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ao escolher estoque da loja, pode ser solicitada
+                    confirmação.
+                  </p>
                 </div>
 
                 <div className="md:col-span-2">

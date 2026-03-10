@@ -13,60 +13,67 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import Swal from "sweetalert2";
 
 export function Dashboard() {
-    // Função para gerar PDF de comissão
-    const handleGerarPdfComissao = async () => {
-      if (!lojaSelecionada) return;
-      const hoje = new Date();
-      const dataISO = hoje.toISOString().slice(0, 10);
-      const dataFormatada = hoje.toLocaleDateString("pt-BR");
-      try {
-        const [lucroRes, comissaoRes] = await Promise.all([
-          api.get("/movimentacao/relatorio/lucro-dia", {
-            params: { lojaId: lojaSelecionada.id, data: dataISO },
-          }),
-          api.get("/movimentacao/relatorio/comissao-dia", {
-            params: { lojaId: lojaSelecionada.id, data: dataISO },
-          }),
-        ]);
+  // Função para gerar PDF de comissão
+  const handleGerarPdfComissao = async () => {
+    if (!lojaSelecionada) return;
+    const hoje = new Date();
+    const dataISO = hoje.toISOString().slice(0, 10);
+    const dataFormatada = hoje.toLocaleDateString("pt-BR");
+    try {
+      const [lucroRes, comissaoRes] = await Promise.all([
+        api.get("/movimentacao/relatorio/lucro-dia", {
+          params: { lojaId: lojaSelecionada.id, data: dataISO },
+        }),
+        api.get("/movimentacao/relatorio/comissao-dia", {
+          params: { lojaId: lojaSelecionada.id, data: dataISO },
+        }),
+      ]);
 
-        const lucro = lucroRes.data;
-        const comissao = comissaoRes.data;
+      const lucro = lucroRes.data;
+      const comissao = comissaoRes.data;
 
-        const detalhesMaquinas = (comissao.detalhesPorMaquina || []).map((det) => ({
+      const detalhesMaquinas = (comissao.detalhesPorMaquina || []).map(
+        (det) => ({
           nome: det.maquinaNome,
           receita: Number(det.receitaTotal || 0),
           percentual: Number(det.percentualComissao || 0),
           comissao: Number(det.comissaoTotal || 0),
-        }));
+        }),
+      );
 
-        gerarPdfComissao({
-          loja: lojaSelecionada,
-          data: dataFormatada,
-          receitaBruta: Number(lucro.receitaBruta || 0),
-          detalhesReceita: {
-            fichasQuantidade: Number(lucro.detalhesReceita?.fichasQuantidade || 0),
-            fichasValor: Number(lucro.detalhesReceita?.fichasValor || 0),
-            dinheiro: Number(lucro.detalhesReceita?.dinheiro || 0),
-            pixCartao: Number(lucro.detalhesReceita?.pixCartao || 0),
-          },
-          custoProdutos: Number(lucro.custoProdutos || 0),
-          comissaoTotal: Number(lucro.comissaoTotal || comissao.comissaoTotal || 0),
-          custosFixos: Number(lucro.custosFixos || 0),
-          custosVariaveis: Number(lucro.custosVariaveis || 0),
-          lucroLiquido: Number(lucro.lucroTotal || 0),
-          detalhesMaquinas,
-        });
-      } catch (err) {
-        Swal.fire({
-          icon: "error",
-          title: "Erro ao gerar relatório",
-          text: err?.response?.status === 400
+      gerarPdfComissao({
+        loja: lojaSelecionada,
+        data: dataFormatada,
+        receitaBruta: Number(lucro.receitaBruta || 0),
+        detalhesReceita: {
+          fichasQuantidade: Number(
+            lucro.detalhesReceita?.fichasQuantidade || 0,
+          ),
+          fichasValor: Number(lucro.detalhesReceita?.fichasValor || 0),
+          dinheiro: Number(lucro.detalhesReceita?.dinheiro || 0),
+          pixCartao: Number(lucro.detalhesReceita?.pixCartao || 0),
+        },
+        custoProdutos: Number(lucro.custoProdutos || 0),
+        comissaoTotal: Number(
+          lucro.comissaoTotal || comissao.comissaoTotal || 0,
+        ),
+        custosFixos: Number(lucro.custosFixos || 0),
+        custosVariaveis: Number(lucro.custosVariaveis || 0),
+        lucroLiquido: Number(lucro.lucroTotal || 0),
+        detalhesMaquinas,
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Erro ao gerar relatório",
+        text:
+          err?.response?.status === 400
             ? "Selecione uma loja."
             : err?.message || "Não foi possível buscar os dados.",
-          confirmButtonColor: "#fbbf24",
-        });
-      }
-    };
+        confirmButtonColor: "#fbbf24",
+      });
+    }
+  };
   const navigate = useNavigate();
   const [mostrarTodosAlertasMaquinas, setMostrarTodosAlertasMaquinas] =
     useState(false);
@@ -326,6 +333,7 @@ export function Dashboard() {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [alertasEstoqueLoja, setAlertasEstoqueLoja] = useState([]);
+  const [alertasEstoqueUsuario, setAlertasEstoqueUsuario] = useState([]);
 
   // Estados para estoque das lojas
   const [lojasComEstoque, setLojasComEstoque] = useState([]);
@@ -362,10 +370,12 @@ export function Dashboard() {
       if (isAdmin) {
         // Calcular datas da última semana
         const hoje = new Date();
-        const seteDiasAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const dataInicioSemana = seteDiasAtras.toISOString().split('T')[0];
-        const dataFimSemana = hoje.toISOString().split('T')[0];
-        
+        const seteDiasAtras = new Date(
+          hoje.getTime() - 7 * 24 * 60 * 60 * 1000,
+        );
+        const dataInicioSemana = seteDiasAtras.toISOString().split("T")[0];
+        const dataFimSemana = hoje.toISOString().split("T")[0];
+
         requisicoes.unshift(
           api.get("/relatorios/alertas-estoque").catch((err) => {
             console.error("Erro ao carregar alertas de máquinas:", err.message);
@@ -376,22 +386,42 @@ export function Dashboard() {
             return { data: null };
           }),
           // Buscar movimentações da semana para calcular faturamento real
-          api.get("/movimentacoes", {
-            params: { dataInicio: dataInicioSemana, dataFim: `${dataFimSemana}T23:59:59`, limite: 10000 }
-          }).catch((err) => {
-            console.error("Erro ao carregar movimentações semanais:", err.message);
-            return { data: [] };
-          }),
+          api
+            .get("/movimentacoes", {
+              params: {
+                dataInicio: dataInicioSemana,
+                dataFim: `${dataFimSemana}T23:59:59`,
+                limite: 10000,
+              },
+            })
+            .catch((err) => {
+              console.error(
+                "Erro ao carregar movimentações semanais:",
+                err.message,
+              );
+              return { data: [] };
+            }),
         );
       }
 
       const resultados = await Promise.all(requisicoes);
 
-      let alertasRes, balancoRes, movSemanaisRes, lojasRes, maquinasRes, produtosRes;
+      let alertasRes,
+        balancoRes,
+        movSemanaisRes,
+        lojasRes,
+        maquinasRes,
+        produtosRes;
 
       if (isAdmin) {
-        [alertasRes, balancoRes, movSemanaisRes, lojasRes, maquinasRes, produtosRes] =
-          resultados;
+        [
+          alertasRes,
+          balancoRes,
+          movSemanaisRes,
+          lojasRes,
+          maquinasRes,
+          produtosRes,
+        ] = resultados;
       } else {
         [lojasRes, maquinasRes, produtosRes] = resultados;
         alertasRes = { data: { alertas: [] } };
@@ -400,14 +430,16 @@ export function Dashboard() {
       }
 
       // Calcular faturamento semanal real a partir das movimentações
-      const movsList = Array.isArray(movSemanaisRes.data) 
-        ? movSemanaisRes.data 
-        : (movSemanaisRes.data?.movimentacoes || movSemanaisRes.data?.rows || []);
+      const movsList = Array.isArray(movSemanaisRes.data)
+        ? movSemanaisRes.data
+        : movSemanaisRes.data?.movimentacoes || movSemanaisRes.data?.rows || [];
       let totalDinheiroSemanal = 0;
       let totalCartaoPixSemanal = 0;
-      movsList.forEach(mov => {
+      movsList.forEach((mov) => {
         totalDinheiroSemanal += parseFloat(mov.quantidade_notas_entrada || 0);
-        totalCartaoPixSemanal += parseFloat(mov.valor_entrada_maquininha_pix || 0);
+        totalCartaoPixSemanal += parseFloat(
+          mov.valor_entrada_maquininha_pix || 0,
+        );
       });
 
       console.log("Lojas carregadas:", lojasRes.data);
@@ -416,7 +448,12 @@ export function Dashboard() {
       if (isAdmin) {
         console.log("Balanço semanal:", balancoRes.data);
         console.log("Movimentações semanais:", movsList.length, "movs");
-        console.log("Faturamento semanal calculado - Dinheiro:", totalDinheiroSemanal, "Cartão/Pix:", totalCartaoPixSemanal);
+        console.log(
+          "Faturamento semanal calculado - Dinheiro:",
+          totalDinheiroSemanal,
+          "Cartão/Pix:",
+          totalCartaoPixSemanal,
+        );
       }
 
       // Injetar totais de dinheiro/cartão no balanço
@@ -424,7 +461,8 @@ export function Dashboard() {
       if (!balancoData.totais) balancoData.totais = {};
       balancoData.totais.totalDinheiro = totalDinheiroSemanal;
       balancoData.totais.totalCartaoPix = totalCartaoPixSemanal;
-      balancoData.totais.receitaReal = totalDinheiroSemanal + totalCartaoPixSemanal;
+      balancoData.totais.receitaReal =
+        totalDinheiroSemanal + totalCartaoPixSemanal;
 
       // Buscar lucro diário do backend
       try {
@@ -448,6 +486,8 @@ export function Dashboard() {
       if (lojasRes.data && lojasRes.data.length > 0) {
         carregarAlertasEstoqueLoja(lojasRes.data);
       }
+
+      carregarAlertasEstoqueUsuario();
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       setStats({ alertas: [], balanco: null, loading: false });
@@ -500,6 +540,19 @@ export function Dashboard() {
     } catch (error) {
       console.error("Erro ao carregar alertas de estoque de lojas:", error);
       setAlertasEstoqueLoja([]);
+    }
+  };
+
+  const carregarAlertasEstoqueUsuario = async () => {
+    try {
+      const response = await api.get("/estoque-usuarios/me/alertas");
+      const alertas = Array.isArray(response.data)
+        ? response.data
+        : response.data?.alertas || [];
+      setAlertasEstoqueUsuario(alertas);
+    } catch (error) {
+      console.error("Erro ao carregar alertas de estoque do usuario:", error);
+      setAlertasEstoqueUsuario([]);
     }
   };
 
@@ -1362,164 +1415,10 @@ export function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
             {/* Faturamento Semanal - Ocupa 2 colunas */}
             <div className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2">
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium opacity-90">
-                      Comparativo Mensal
-                    </h3>
-                    <svg
-                      className="w-8 h-8 opacity-80"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-3xl font-bold">
-                    R${" "}
-                    {(() => {
-                      const dinheiro = Number(stats.balanco?.totais?.totalDinheiro || 0);
-                      const cartaoPix = Number(stats.balanco?.totais?.totalCartaoPix || 0);
-                      const receita = dinheiro + cartaoPix;
-                      return receita > 0
-                        ? receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })
-                        : stats.balanco?.totais?.totalFaturamento?.toFixed(2) || "0,00";
-                    })()}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
-                      💵 R$ {Number(stats.balanco?.totais?.totalDinheiro || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
-                      💳 R$ {Number(stats.balanco?.totais?.totalCartaoPix || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <p className="text-xs opacity-75 mt-1">💰 Últimos 7 dias</p>
-                  {/* Comparação de lucro com mês anterior */}
-                  {(() => {
-                    // Supondo que stats.balanco.lucroPorDia[YYYY-MM-DD] existe
-                    const hoje = new Date();
-                    const diaAtual = hoje.getDate();
-                    const mesAtual = hoje.getMonth() + 1;
-                    const anoAtual = hoje.getFullYear();
-                    function getLucroPeriodo(stats, ano, mes, dias) {
-                      let total = 0;
-                      for (let d = 1; d <= dias; d++) {
-                        const dataStr = `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                        total += Number(stats.balanco?.lucroPorDia?.[dataStr] || 0);
-                      }
-                      return total;
-                    }
-                    const lucroPeriodoAtual = getLucroPeriodo(stats, anoAtual, mesAtual, diaAtual);
-                    const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
-                    const anoMesAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual;
-                    const lucroPeriodoAnterior = getLucroPeriodo(stats, anoMesAnterior, mesAnterior, diaAtual);
-                    const diff = lucroPeriodoAtual - lucroPeriodoAnterior;
-                    const percent = lucroPeriodoAnterior > 0 ? (diff / lucroPeriodoAnterior) * 100 : 0;
-                    return (
-                      <div className="mt-2 text-xs font-semibold">
-                        Lucro até hoje vs mês passado:
-                        <span className={percent >= 0 ? "text-green-700" : "text-red-700"}>
-                          {percent >= 0 ? "▲" : "▼"} {Math.abs(percent).toFixed(1)}%
-                        </span>
-                        <span className="ml-2 text-gray-700">
-                          (R$ {lucroPeriodoAtual.toLocaleString("pt-BR", {minimumFractionDigits: 2})} vs R$ {lucroPeriodoAnterior.toLocaleString("pt-BR", {minimumFractionDigits: 2})})
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-              {/* Prêmios Saídos */}
-              <div className="stat-card bg-linear-to-br from-green-500 to-green-600 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30">
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium opacity-90">
-                      Prêmios Saídos
-                    </h3>
-                    <svg
-                      className="w-8 h-8 opacity-80"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-3xl font-bold">
-                    {stats.balanco?.totais?.totalSairam || 0}
-                  </p>
-                  <p className="text-xs opacity-75 mt-1">
-                    🎁 Pelúcias entregues
-                  </p>
-                </div>
-              </div>
-              {/* Alertas de Estoque */}
-              <div
-                className="stat-card bg-linear-to-br from-red-500 to-red-600 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
-                onClick={() => {
-                  const alertSection = document.getElementById(
-                    "alertas-estoque-maquinas",
-                  );
-                  if (alertSection) {
-                    alertSection.scrollIntoView({ behavior: "smooth" });
-                  }
-                }}
-              >
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium opacity-90">
-                      Alertas de Estoque
-                    </h3>
-                    <svg
-                      className="w-8 h-8 opacity-80"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-3xl font-bold">
-                    {stats.alertas.length + alertasEstoqueLoja.length}
-                  </p>
-                  <p className="text-xs opacity-75 mt-1">
-                    ⚠️ {stats.alertas.length} máquinas · 🏪{" "}
-                    {alertasEstoqueLoja.length} lojas
-                  </p>
-                </div>
-              </div>
-          </div>
-        )}
-        
-        {/* Financeiro, Veículos, Quebra de Ordem e Manutenções */}
-        {usuario?.role === "ADMIN" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-            {/* Financeiro */}
-            <div
-              className="stat-card bg-linear-to-br from-blue-500 to-blue-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
-              onClick={() => navigate("/financeiro/")}
-            >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
-                    Financeiro
+                    Comparativo Mensal
                   </h3>
                   <svg
                     className="w-8 h-8 opacity-80"
@@ -1535,10 +1434,200 @@ export function Dashboard() {
                     />
                   </svg>
                 </div>
-                <p className="text-3xl font-bold">💸</p>
-                <p className="text-xs opacity-75 mt-1">
-                  Gestão Financeira
+                <p className="text-3xl font-bold">
+                  R${" "}
+                  {(() => {
+                    const dinheiro = Number(
+                      stats.balanco?.totais?.totalDinheiro || 0,
+                    );
+                    const cartaoPix = Number(
+                      stats.balanco?.totais?.totalCartaoPix || 0,
+                    );
+                    const receita = dinheiro + cartaoPix;
+                    return receita > 0
+                      ? receita.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })
+                      : stats.balanco?.totais?.totalFaturamento?.toFixed(2) ||
+                          "0,00";
+                  })()}
                 </p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
+                    💵 R${" "}
+                    {Number(
+                      stats.balanco?.totais?.totalDinheiro || 0,
+                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
+                    💳 R${" "}
+                    {Number(
+                      stats.balanco?.totais?.totalCartaoPix || 0,
+                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <p className="text-xs opacity-75 mt-1">💰 Últimos 7 dias</p>
+                {/* Comparação de lucro com mês anterior */}
+                {(() => {
+                  // Supondo que stats.balanco.lucroPorDia[YYYY-MM-DD] existe
+                  const hoje = new Date();
+                  const diaAtual = hoje.getDate();
+                  const mesAtual = hoje.getMonth() + 1;
+                  const anoAtual = hoje.getFullYear();
+                  function getLucroPeriodo(stats, ano, mes, dias) {
+                    let total = 0;
+                    for (let d = 1; d <= dias; d++) {
+                      const dataStr = `${ano}-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                      total += Number(
+                        stats.balanco?.lucroPorDia?.[dataStr] || 0,
+                      );
+                    }
+                    return total;
+                  }
+                  const lucroPeriodoAtual = getLucroPeriodo(
+                    stats,
+                    anoAtual,
+                    mesAtual,
+                    diaAtual,
+                  );
+                  const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
+                  const anoMesAnterior =
+                    mesAtual === 1 ? anoAtual - 1 : anoAtual;
+                  const lucroPeriodoAnterior = getLucroPeriodo(
+                    stats,
+                    anoMesAnterior,
+                    mesAnterior,
+                    diaAtual,
+                  );
+                  const diff = lucroPeriodoAtual - lucroPeriodoAnterior;
+                  const percent =
+                    lucroPeriodoAnterior > 0
+                      ? (diff / lucroPeriodoAnterior) * 100
+                      : 0;
+                  return (
+                    <div className="mt-2 text-xs font-semibold">
+                      Lucro até hoje vs mês passado:
+                      <span
+                        className={
+                          percent >= 0 ? "text-green-700" : "text-red-700"
+                        }
+                      >
+                        {percent >= 0 ? "▲" : "▼"}{" "}
+                        {Math.abs(percent).toFixed(1)}%
+                      </span>
+                      <span className="ml-2 text-gray-700">
+                        (R${" "}
+                        {lucroPeriodoAtual.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}{" "}
+                        vs R${" "}
+                        {lucroPeriodoAnterior.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                        )
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            {/* Prêmios Saídos */}
+            <div className="stat-card bg-linear-to-br from-green-500 to-green-600 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium opacity-90">
+                    Prêmios Saídos
+                  </h3>
+                  <svg
+                    className="w-8 h-8 opacity-80"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
+                    />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold">
+                  {stats.balanco?.totais?.totalSairam || 0}
+                </p>
+                <p className="text-xs opacity-75 mt-1">🎁 Pelúcias entregues</p>
+              </div>
+            </div>
+            {/* Alertas de Estoque */}
+            <div
+              className="stat-card bg-linear-to-br from-red-500 to-red-600 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              onClick={() => {
+                const alertSection = document.getElementById(
+                  "alertas-estoque-maquinas",
+                );
+                if (alertSection) {
+                  alertSection.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+            >
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium opacity-90">
+                    Alertas de Estoque
+                  </h3>
+                  <svg
+                    className="w-8 h-8 opacity-80"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold">
+                  {stats.alertas.length + alertasEstoqueLoja.length}
+                </p>
+                <p className="text-xs opacity-75 mt-1">
+                  ⚠️ {stats.alertas.length} máquinas · 🏪{" "}
+                  {alertasEstoqueLoja.length} lojas
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Financeiro, Veículos, Quebra de Ordem e Manutenções */}
+        {usuario?.role === "ADMIN" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
+            {/* Financeiro */}
+            <div
+              className="stat-card bg-linear-to-br from-blue-500 to-blue-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              onClick={() => navigate("/financeiro/")}
+            >
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium opacity-90">Financeiro</h3>
+                  <svg
+                    className="w-8 h-8 opacity-80"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold">💸</p>
+                <p className="text-xs opacity-75 mt-1">Gestão Financeira</p>
               </div>
             </div>
             {/* Veículos */}
@@ -1576,7 +1665,9 @@ export function Dashboard() {
             >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium opacity-90">Quebra Ordem</h3>
+                  <h3 className="text-sm font-medium opacity-90">
+                    Quebra Ordem
+                  </h3>
                   <svg
                     className="w-8 h-8 opacity-80"
                     fill="none"
@@ -1597,6 +1688,36 @@ export function Dashboard() {
                 </p>
               </div>
             </div>
+            {/* Estoque por Usuário */}
+            <div
+              className="stat-card bg-linear-to-br from-cyan-500 to-cyan-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              onClick={() => navigate("/estoque-usuarios")}
+            >
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium opacity-90">
+                    Estoque por Usuário
+                  </h3>
+                  <svg
+                    className="w-8 h-8 opacity-80"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 13V7a2 2 0 00-2-2h-3V3m0 2h-4m4 0v2M4 7h16M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7"
+                    />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold">📦</p>
+                <p className="text-xs opacity-75 mt-1">
+                  {alertasEstoqueUsuario.length} alertas no seu estoque
+                </p>
+              </div>
+            </div>
             {/* Manutenções */}
             <div
               className="stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
@@ -1604,7 +1725,9 @@ export function Dashboard() {
             >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium opacity-90">Manutenções</h3>
+                  <h3 className="text-sm font-medium opacity-90">
+                    Manutenções
+                  </h3>
                   <svg
                     className="w-8 h-8 opacity-80"
                     fill="none"
@@ -1656,6 +1779,36 @@ export function Dashboard() {
                 </p>
               </div>
             </div>
+            {/* Estoque por Usuário */}
+            <div
+              className="stat-card bg-linear-to-br from-cyan-500 to-cyan-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              onClick={() => navigate("/estoque-usuarios")}
+            >
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium opacity-90">
+                    Meu Estoque
+                  </h3>
+                  <svg
+                    className="w-8 h-8 opacity-80"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 13V7a2 2 0 00-2-2h-3V3m0 2h-4m4 0v2M4 7h16M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7"
+                    />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold">📦</p>
+                <p className="text-xs opacity-75 mt-1">
+                  {alertasEstoqueUsuario.length} alertas pendentes
+                </p>
+              </div>
+            </div>
             {/* Manutenções */}
             <div
               className="stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
@@ -1663,7 +1816,9 @@ export function Dashboard() {
             >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium opacity-90">Manutenções</h3>
+                  <h3 className="text-sm font-medium opacity-90">
+                    Manutenções
+                  </h3>
                   <svg
                     className="w-8 h-8 opacity-80"
                     fill="none"
@@ -2340,12 +2495,12 @@ export function Dashboard() {
                   <span className="text-gray-700 font-semibold">
                     {lojaSelecionada.nome}
                   </span>
-                    <button
-                      className="ml-3 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition font-semibold flex items-center gap-2"
-                      onClick={handleGerarPdfComissao}
-                    >
-                      Gerar PDF Comissão
-                    </button>
+                  <button
+                    className="ml-3 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition font-semibold flex items-center gap-2"
+                    onClick={handleGerarPdfComissao}
+                  >
+                    Gerar PDF Comissão
+                  </button>
                   {maquinaSelecionada && (
                     <>
                       <span className="text-gray-400">/</span>
@@ -2819,7 +2974,8 @@ export function Dashboard() {
                                   ⚠️ ORDEM DO ROTEIRO ALTERADA
                                 </p>
                                 <p className="text-sm text-orange-900">
-                                  <strong>Justificativa:</strong> {mov.justificativa_ordem}
+                                  <strong>Justificativa:</strong>{" "}
+                                  {mov.justificativa_ordem}
                                 </p>
                               </div>
                             )}

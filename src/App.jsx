@@ -36,6 +36,7 @@ import Alertas from "./pages/Alertas";
 import SecurityLockPage from "./pages/SecurityLockPage.jsx";
 import GerenciarCarrinhosPage from "./pages/GerenciarCarrinhosPage.jsx";
 import { QuebraOrdemPage } from "./pages/QuebraOrdemPage.jsx";
+import EstoqueUsuarios from "./pages/EstoqueUsuarios.jsx";
 import "./App.css";
 
 function AppRoutes() {
@@ -228,6 +229,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/estoque-usuarios"
+        element={
+          <PrivateRoute>
+            <EstoqueUsuarios />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/graficos"
         element={
           <PrivateRoute adminOnly>
@@ -246,7 +255,16 @@ function AppRoutes() {
       <Route
         path="/pecas"
         element={
-          <PrivateRoute allowedRoles={["ADMIN", "MANUTENCAO", "GERENCIADOR"]}>
+          <PrivateRoute
+            allowedRoles={[
+              "ADMIN",
+              "MANUTENCAO",
+              "GERENCIADOR",
+              "FUNCIONARIO",
+              "FUNCIONARIO_TODAS_LOJAS",
+              "CONTROLADOR_ESTOQUE",
+            ]}
+          >
             <PecasPage />
           </PrivateRoute>
         }
@@ -254,7 +272,9 @@ function AppRoutes() {
       <Route
         path="/pecas/nova"
         element={
-          <PrivateRoute allowedRoles={["ADMIN", "GERENCIADOR"]}>
+          <PrivateRoute
+            allowedRoles={["ADMIN", "GERENCIADOR", "CONTROLADOR_ESTOQUE"]}
+          >
             <PecasForm />
           </PrivateRoute>
         }

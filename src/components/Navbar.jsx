@@ -72,9 +72,17 @@ export default function Navbar() {
                   🧸 Produtos
                 </NavLink>
 
+                <NavLink
+                  to="/estoque-usuarios"
+                  active={isActive("/estoque-usuarios")}
+                >
+                  📦 Meu Estoque
+                </NavLink>
+
                 {(usuario?.role === "ADMIN" ||
                   usuario?.role === "FUNCIONARIO" ||
                   usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                  usuario?.role === "CONTROLADOR_ESTOQUE" ||
                   usuario?.role === "MANUTENCAO" ||
                   usuario?.role === "GERENCIADOR") && (
                   <NavLink to="/pecas" active={isActive("/pecas")}>
@@ -124,9 +132,15 @@ export default function Navbar() {
               <div className="text-xs text-accent-cream flex items-center justify-end gap-1">
                 {usuario?.role === "ADMIN"
                   ? "🛡️ Administrador"
-                  : usuario?.role === "FUNCIONARIO_TODAS_LOJAS"
-                    ? "👤 Funcionário (todas as lojas)"
-                    : "👤 Funcionário"}
+                  : usuario?.role === "CONTROLADOR_ESTOQUE"
+                    ? "📦 Controlador de Estoque"
+                    : usuario?.role === "GERENCIADOR"
+                      ? "🧩 Gerenciador"
+                      : usuario?.role === "FUNCIONARIO_TODAS_LOJAS"
+                        ? "👤 Funcionário (todas as lojas)"
+                        : usuario?.role === "MANUTENCAO"
+                          ? "🛠️ Manutenção"
+                          : "👤 Funcionário"}
               </div>
             </div>
 
@@ -155,9 +169,17 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
+            <MobileNavLink
+              to="/estoque-usuarios"
+              active={isActive("/estoque-usuarios")}
+              onClick={closeMenu}
+            >
+              📦 Meu Estoque
+            </MobileNavLink>
             {(usuario?.role === "ADMIN" ||
               usuario?.role === "FUNCIONARIO" ||
               usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+              usuario?.role === "CONTROLADOR_ESTOQUE" ||
               usuario?.role === "MANUTENCAO" ||
               usuario?.role === "GERENCIADOR") && (
               <MobileNavLink

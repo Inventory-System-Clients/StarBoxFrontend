@@ -1,9 +1,12 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-export function PrivateRoute({ children, adminOnly = false }) {
-  const { signed, loading, isAdmin } = useAuth();
-  const currentPath = window.location.pathname;
+export function PrivateRoute({
+  children,
+  adminOnly = false,
+  allowedRoles = [],
+}) {
+  const { signed, loading, isAdmin, usuario } = useAuth();
 
   if (loading) {
     return (
@@ -18,6 +21,14 @@ export function PrivateRoute({ children, adminOnly = false }) {
   }
 
   if (adminOnly && !isAdmin()) {
+    return <Navigate to="/" />;
+  }
+
+  if (
+    Array.isArray(allowedRoles) &&
+    allowedRoles.length > 0 &&
+    !allowedRoles.includes(usuario?.role)
+  ) {
     return <Navigate to="/" />;
   }
 

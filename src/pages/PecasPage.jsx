@@ -148,7 +148,9 @@ export default function PecasPage() {
           <h1 className="text-3xl font-bold flex items-center gap-2">
             🛠️ Peças
           </h1>
-          {(usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR") && (
+          {(usuario?.role === "ADMIN" ||
+            usuario?.role === "GERENCIADOR" ||
+            usuario?.role === "CONTROLADOR_ESTOQUE") && (
             <button
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold shadow text-sm"
               onClick={() => (window.location.href = "/pecas/nova")}
@@ -177,6 +179,7 @@ export default function PecasPage() {
                 </th>
                 {(usuario?.role === "FUNCIONARIO" ||
                   usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                  usuario?.role === "CONTROLADOR_ESTOQUE" ||
                   usuario?.role === "MANUTENCAO" ||
                   usuario?.role === "ADMIN" ||
                   usuario?.role === "GERENCIADOR") && (
@@ -194,6 +197,7 @@ export default function PecasPage() {
                   <td className="px-4 py-2 text-gray-700">{peca.quantidade}</td>
                   {(usuario?.role === "FUNCIONARIO" ||
                     usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                    usuario?.role === "CONTROLADOR_ESTOQUE" ||
                     usuario?.role === "MANUTENCAO" ||
                     usuario?.role === "ADMIN" ||
                     usuario?.role === "GERENCIADOR") && (
@@ -216,6 +220,7 @@ export default function PecasPage() {
         {/* Carrinho do usuário */}
         {(usuario?.role === "FUNCIONARIO" ||
           usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+          usuario?.role === "CONTROLADOR_ESTOQUE" ||
           usuario?.role === "MANUTENCAO" ||
           usuario?.role === "ADMIN" ||
           usuario?.role === "GERENCIADOR") && (

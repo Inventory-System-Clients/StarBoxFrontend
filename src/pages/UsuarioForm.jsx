@@ -291,17 +291,22 @@ export function UsuarioForm() {
                   <option value="FUNCIONARIO_TODAS_LOJAS">
                     Funcionário (todas as lojas)
                   </option>
+                  <option value="CONTROLADOR_ESTOQUE">
+                    Controlador de Estoque
+                  </option>
                   <option value="ADMIN">Administrador</option>
                   <option value="GERENCIADOR">Gerenciador</option>
                 </select>
                 <p className="mt-2 text-sm text-gray-500">
                   {formData.role === "ADMIN"
                     ? "Administradores têm acesso total ao sistema"
-                    : formData.role === "GERENCIADOR"
-                      ? "Gerenciadores têm acesso apenas à aba de Peças, podem cadastrar, excluir e gerenciar peças e carrinhos dos funcionários."
-                      : formData.role === "FUNCIONARIO_TODAS_LOJAS"
-                        ? "Funcionários deste perfil visualizam todas as lojas, mas seguem com acesso operacional de funcionário."
-                        : "Funcionários têm acesso limitado às lojas autorizadas"}
+                    : formData.role === "CONTROLADOR_ESTOQUE"
+                      ? "Controlador de estoque acessa todas as lojas, gerencia estoques de usuários e pode operar movimentações."
+                      : formData.role === "GERENCIADOR"
+                        ? "Gerenciadores têm acesso apenas à aba de Peças, podem cadastrar, excluir e gerenciar peças e carrinhos dos funcionários."
+                        : formData.role === "FUNCIONARIO_TODAS_LOJAS"
+                          ? "Funcionários deste perfil visualizam todas as lojas, mas seguem com acesso operacional de funcionário."
+                          : "Funcionários têm acesso limitado às lojas autorizadas"}
                 </p>
               </div>
             </div>
