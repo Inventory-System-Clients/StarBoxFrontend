@@ -79,13 +79,14 @@ export default function ManutencaoModal({
       return;
     }
 
+    // Se não usar peça, a explicação é obrigatória
     if (pecaSelecionada === "nao-usar" && (!explicacaoSemPeca || explicacaoSemPeca.trim().length === 0)) {
       setError("Digite a explicação de porque não usou peças (obrigatório)");
       return;
     }
 
     if (explicacaoSemPeca.length > 100) {
-      setError("A explicação deve ter no máximo 100 caracteres");
+      setError("A observação deve ter no máximo 100 caracteres");
       return;
     }
 
@@ -96,7 +97,7 @@ export default function ManutencaoModal({
       const payload = {
         status: "feito",
         pecaId: pecaSelecionada !== "nao-usar" ? pecaSelecionada : null,
-        explicacao_sem_peca: pecaSelecionada === "nao-usar" ? explicacaoSemPeca : null,
+        explicacao_sem_peca: explicacaoSemPeca.trim() ? explicacaoSemPeca : null,
         concluidoPorId: usuarioId,
       };
 
@@ -279,27 +280,29 @@ export default function ManutencaoModal({
               )}
             </div>
 
-            {pecaSelecionada === "nao-usar" && (
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Por que não vai usar peças? (máx. 100 caracteres)
-                </label>
-                <textarea
-                  className="input-field w-full"
-                  rows="3"
-                  maxLength={100}
-                  value={explicacaoSemPeca}
-                  onChange={(e) => {
-                    setExplicacaoSemPeca(e.target.value);
-                    setError("");
-                  }}
-                  placeholder="Ex: A peça necessária não está disponível no momento..."
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {explicacaoSemPeca.length}/100 caracteres
-                </p>
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                {pecaSelecionada === "nao-usar" 
+                  ? "Por que não vai usar peças? (máx. 100 caracteres) *" 
+                  : "Observações sobre a manutenção (máx. 100 caracteres)"}
+              </label>
+              <textarea
+                className="input-field w-full"
+                rows="3"
+                maxLength={100}
+                value={explicacaoSemPeca}
+                onChange={(e) => {
+                  setExplicacaoSemPeca(e.target.value);
+                  setError("");
+                }}
+                placeholder={pecaSelecionada === "nao-usar" 
+                  ? "Ex: A peça necessária não está disponível no momento..." 
+                  : "Ex: Máquina estava com problema no botão..."}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {explicacaoSemPeca.length}/100 caracteres
+              </p>
+            </div>
 
             <div className="flex gap-3 mt-6">
               <button

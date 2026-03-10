@@ -95,12 +95,12 @@ export default function RoteiroExecucao() {
     // Verificar ordem das lojas
     if (roteiro?.lojas) {
       const lojasOrdenadas = [...roteiro.lojas].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-      const lojasFinalizada = lojasOrdenadas.filter(l => l.status === "finalizado");
-      const proximalLojaIndex = lojasFinalizada.length;
+      const lojasConcluidas = lojasOrdenadas.filter(l => l.status === "concluido");
+      const proximalLojaIndex = lojasConcluidas.length;
       const proximaLoja = lojasOrdenadas[proximalLojaIndex];
       
       // Se não é a próxima loja na ordem e ainda tem lojas pendentes antes
-      if (proximaLoja && proximaLoja.id !== loja.id && loja.status !== "finalizado") {
+      if (proximaLoja && proximaLoja.id !== loja.id && loja.status !== "concluido") {
         setModalJustificativa({
           aberto: true,
           lojaId: loja.id,
@@ -257,7 +257,7 @@ export default function RoteiroExecucao() {
                     onClick={() => handleSelecionarLoja(loja)}
                     className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start 
                       ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
-                      ${loja.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+                      ${loja.status === "concluido" ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
                   >
                     <div className="flex items-center gap-2 w-full">
                       <span className="bg-[#24094E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">
@@ -268,9 +268,9 @@ export default function RoteiroExecucao() {
                     <span className="text-xs text-gray-500 ml-9">
                       {loja.cidade}, {loja.estado}
                     </span>
-                    {loja.status === "finalizado" && (
+                    {loja.status === "concluido" && (
                       <span className="mt-1 ml-9 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
-                        Finalizada
+                        Concluída
                       </span>
                     )}
                   </button>

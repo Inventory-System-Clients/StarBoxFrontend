@@ -1388,26 +1388,48 @@ export function Dashboard() {
               Visão geral do seu sistema de pelúcias
             </p>
           </div>
-          <button
-            onClick={carregarDados}
-            className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
-            title="Atualizar dados"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/estoque-usuarios")}
+              className="bg-[#733D38] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
+              title="Ver meu estoque"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            Atualizar
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
+              </svg>
+              📦 Meu Estoque
+            </button>
+            <button
+              onClick={carregarDados}
+              className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
+              title="Atualizar dados"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Atualizar
+            </button>
+          </div>
         </div>
 
         {/* Cards de Resumo com design moderno - Apenas para ADMIN */}

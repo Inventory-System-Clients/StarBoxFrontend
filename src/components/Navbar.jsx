@@ -72,13 +72,6 @@ export default function Navbar() {
                   🧸 Produtos
                 </NavLink>
 
-                <NavLink
-                  to="/estoque-usuarios"
-                  active={isActive("/estoque-usuarios")}
-                >
-                  📦 Meu Estoque
-                </NavLink>
-
                 {(usuario?.role === "ADMIN" ||
                   usuario?.role === "FUNCIONARIO" ||
                   usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
