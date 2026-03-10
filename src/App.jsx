@@ -31,6 +31,7 @@ import Manutencoes from "./pages/Manutencoes.jsx";
 import PecasPage from "./pages/PecasPage.jsx";
 import PecasForm from "./pages/PecasForm.jsx";
 import Veiculos from "./pages/Veiculos";
+import RevisoesPendentes from "./pages/RevisoesPendentes.jsx";
 import FinanceiroRoutes from "./pages/FinanceiroRoutes.jsx";
 import Alertas from "./pages/Alertas";
 import SecurityLockPage from "./pages/SecurityLockPage.jsx";
@@ -85,6 +86,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Veiculos />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/veiculos/revisoes-pendentes"
+        element={
+          <PrivateRoute>
+            <RevisoesPendentes />
           </PrivateRoute>
         }
       />

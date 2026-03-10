@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import api from "../services/api";
 import { gerarPdfComissao } from "../lib/pdfComissao";
+import { listarRevisoesPendentes } from "../services/revisoesVeiculos";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { PageLoader } from "../components/Loading";
@@ -334,6 +335,7 @@ export function Dashboard() {
   const [dataFim, setDataFim] = useState("");
   const [alertasEstoqueLoja, setAlertasEstoqueLoja] = useState([]);
   const [alertasEstoqueUsuario, setAlertasEstoqueUsuario] = useState([]);
+  const [revisoesPendentes, setRevisoesPendentes] = useState([]);
 
   // Estados para estoque das lojas
   const [lojasComEstoque, setLojasComEstoque] = useState([]);
@@ -499,6 +501,21 @@ export function Dashboard() {
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
+
+  // Carregar revisões pendentes
+  useEffect(() => {
+    const carregarRevisoes = async () => {
+      const revisoes = await listarRevisoesPendentes();
+      setRevisoesPendentes(revisoes.slice(0, 5)); // Top 5
+    };
+
+    carregarRevisoes();
+    
+    // Atualizar a cada 5 minutos
+    const interval = setInterval(carregarRevisoes, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const carregarAlertasEstoqueLoja = async (lojasData) => {
     try {
@@ -1389,26 +1406,7 @@ export function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/estoque-usuarios")}
-              className="bg-[#733D38] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
-              title="Ver meu estoque"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
-              📦 Meu Estoque
-            </button>
+            
             <button
               onClick={carregarDados}
               className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
@@ -1623,7 +1621,7 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Financeiro, Veículos, Quebra de Ordem e Manutenções */}
+        {/* Financeiro, Veículos, Quebra de Ordem, Estoque e Manutenções */}
         {usuario?.role === "ADMIN" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
             {/* Financeiro */}
@@ -1886,6 +1884,95 @@ export function Dashboard() {
               >
                 <span className="text-2xl">⚠️</span> Ver Alertas
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Controle de Revisões de Veículos */}
+        <div className="card-gradient mb-8 border-l-4 border-gray-700 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+              <span className="bg-linear-to-br from-gray-700 to-gray-900 p-2 sm:p-3 rounded-xl text-white">
+                🔧
+              </span>
+              Revisões de Veículos
+            </h2>
+            <p className="text-gray-600 text-sm sm:text-base">
+              Acompanhe e gerencie as revisões periódicas de todos os veículos da frota.
+            </p>
+          </div>
+          <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
+            <button
+              className="bg-gray-700 hover:bg-gray-800 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
+              onClick={() => navigate("/veiculos/revisoes-pendentes")}
+            >
+              <span className="text-2xl">🔧</span> Ver Revisões
+            </button>
+          </div>
+        </div>
+
+        {/* Card de Revisões Pendentes */}
+        {revisoesPendentes.length > 0 && (
+          <div className="card-gradient mb-8 border-l-4 border-red-500 p-4 sm:p-8 rounded-xl shadow-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                  <span className="bg-linear-to-br from-red-500 to-red-600 p-2 sm:p-3 rounded-xl text-white">
+                    🔧
+                  </span>
+                  Revisões de Veículos Pendentes
+                </h2>
+                <p className="text-gray-600 text-sm sm:text-base mb-4">
+                  {revisoesPendentes.length}{" "}
+                  {revisoesPendentes.length === 1
+                    ? "veículo precisa"
+                    : "veículos precisam"}{" "}
+                  de revisão
+                </p>
+                
+                <div className="space-y-2">
+                  {revisoesPendentes.slice(0, 3).map((revisao) => (
+                    <div
+                      key={revisao.veiculoId}
+                      className="bg-white/50 rounded-lg p-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🚗</span>
+                        <div>
+                          <p className="font-bold text-gray-900">
+                            {revisao.veiculoNome}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            KM Atual: {revisao.kmAtual.toLocaleString("pt-BR")}{" "}
+                            | Revisão devida: {revisao.kmRevisaoDevida.toLocaleString("pt-BR")}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                        Atrasada
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                {revisoesPendentes.length > 3 && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    + {revisoesPendentes.length - 3} mais{" "}
+                    {revisoesPendentes.length - 3 === 1
+                      ? "veículo"
+                      : "veículos"}
+                  </p>
+                )}
+              </div>
+              
+              <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
+                <button
+                  className="bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
+                  onClick={() => navigate("/veiculos/revisoes-pendentes")}
+                >
+                  <span className="text-2xl">🔧</span> Ver Revisões
+                </button>
+              </div>
             </div>
           </div>
         )}

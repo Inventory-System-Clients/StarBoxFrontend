@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import Swal from "sweetalert2";
 import { AuthContext } from "../contexts/AuthContext";
+import { reconhecerAlertaRevisao } from "../services/revisoesVeiculos";
 
 import api from "../services/api";
 const emojiVeiculo = (tipo, emoji) => emoji || (tipo === "moto" ? "🏍️" : "🚗");
@@ -30,6 +31,37 @@ export default function ControleVeiculos({
     combustivel: "5",
     limpeza: "esta limpo",
   });
+
+  const handleReconhecerAlerta = async (veiculoId) => {
+    try {
+      await reconhecerAlertaRevisao(veiculoId);
+      Swal.fire({
+        icon: "success",
+        title: "Alerta Reconhecido",
+        text: "O alerta de revisão foi reconhecido com sucesso",
+        confirmButtonColor: "#62A1D9",
+      });
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error("Erro ao reconhecer alerta:", error);
+      // Não mostrar erro se funcionalidade não está disponível ainda
+      if (error?.message?.includes("ainda não disponível")) {
+        Swal.fire({
+          icon: "info",
+          title: "Funcionalidade em Desenvolvimento",
+          text: error.message,
+          confirmButtonColor: "#62A1D9",
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Erro",
+          text: "Não foi possível reconhecer o alerta",
+          confirmButtonColor: "#62A1D9",
+        });
+      }
+    }
+  };
 
   const abrirModal = (veiculo) => {
     setVeiculoSelecionado(veiculo);
@@ -194,9 +226,69 @@ export default function ControleVeiculos({
 
   if (loading) return <div className="p-6">Carregando veículos...</div>;
 
+  // Contar veículos com alerta de revisão
+  const veiculosComAlerta = veiculos.filter(v => v.alertaRevisaoPendente);
+  const totalAlertas = veiculosComAlerta.length;
+
+  const reconhecerTodosAlertas = async () => {
+    try {
+      await Promise.all(
+        veiculosComAlerta.map(v => reconhecerAlertaRevisao(v.id))
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Alertas Reconhecidos",
+        text: `${totalAlertas} alerta(s) reconhecido(s) com sucesso`,
+        confirmButtonColor: "#62A1D9",
+      });
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error("Erro ao reconhecer alertas:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Erro",
+        text: "Não foi possível reconhecer todos os alertas",
+        confirmButtonColor: "#62A1D9",
+      });
+    }
+  };
+
   return (
-    <div className="flex flex-wrap gap-6 p-6">
-      {veiculos.map((veiculo) => {
+    <div className="p-6">
+      {/* Banner de Alertas no Topo */}
+      {totalAlertas > 0 && (
+        <div className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl p-6 shadow-xl border-2 border-orange-600">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-4xl">⚠️</span>
+                <h3 className="text-2xl font-bold">
+                  {totalAlertas} veículo{totalAlertas > 1 ? 's' : ''} precisa{totalAlertas === 1 ? '' : 'm'} de revisão
+                </h3>
+              </div>
+              <p className="text-sm mb-3 leading-relaxed">
+                Os seguintes veículos atingiram a quilometragem de revisão:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {veiculosComAlerta.map(v => (
+                  <li key={v.id}>
+                    <strong>{v.nome}</strong> - {v.km?.toLocaleString('pt-BR')} km
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              onClick={reconhecerTodosAlertas}
+              className="bg-white text-orange-600 hover:bg-orange-50 font-bold py-3 px-6 rounded-lg transition-colors shadow-lg whitespace-nowrap"
+            >
+              OK, Reconhecer Todos
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Lista de Veículos */}
+      <div className="flex flex-wrap gap-6">{veiculos.map((veiculo) => {
         const mov = ultimasMovs[veiculo.id];
         const isRuim = mov?.estado?.toLowerCase() === "ruim";
         const precisaLimpar = mov?.nivel_limpeza
@@ -217,6 +309,29 @@ export default function ControleVeiculos({
             key={veiculo.id}
             className={`rounded-lg shadow-md p-4 w-64 transition-all relative ${cardClass}`}
           >
+            {/* Alerta de Revisão Pendente */}
+            {veiculo.alertaRevisaoPendente && (
+              <div className="mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-lg p-3 shadow-lg border-2 border-orange-600">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">⚠️</span>
+                      <span className="font-bold text-sm">REVISÃO NECESSÁRIA</span>
+                    </div>
+                    <p className="text-xs leading-tight">
+                      Este veículo atingiu {veiculo.km?.toLocaleString('pt-BR')} km e precisa de revisão!
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleReconhecerAlerta(veiculo.id)}
+                  className="mt-2 w-full bg-white text-orange-600 hover:bg-orange-50 text-xs font-bold py-1.5 px-3 rounded transition-colors"
+                >
+                  OK, Entendi
+                </button>
+              </div>
+            )}
+            
             <div className="flex items-center gap-2 text-2xl mb-2">
               <span>{emojiVeiculo(veiculo.tipo, veiculo.emoji)}</span>
               <span className="font-bold text-lg">{veiculo.nome}</span>
@@ -264,6 +379,7 @@ export default function ControleVeiculos({
           </div>
         );
       })}
+      </div>
       {/* Modal Finalizar */}
       {modalFinalizarAberto && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">

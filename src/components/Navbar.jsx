@@ -139,7 +139,7 @@ export default function Navbar() {
 
             <button
               onClick={handleLogout}
-              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+              className="bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
             >
               <LogoutIcon />
               <span className="hidden sm:inline">Sair</span>
@@ -215,7 +215,7 @@ const NavLink = ({ to, active, children }) => (
     to={to}
     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
       active
-        ? "bg-gradient-to-r from-primary to-accent-yellow text-white shadow-lg scale-105"
+        ? "bg-linear-to-r from-primary to-accent-yellow text-white shadow-lg scale-105"
         : "text-gray-300 hover:bg-white/10 hover:text-white"
     }`}
   >
@@ -229,7 +229,7 @@ const MobileNavLink = ({ to, active, onClick, children }) => (
     onClick={onClick}
     className={`block px-4 py-3 rounded-lg text-sm font-medium ${
       active
-        ? "bg-gradient-to-r from-primary to-accent-yellow text-white"
+        ? "bg-linear-to-r from-primary to-accent-yellow text-white"
         : "text-gray-300 hover:bg-white/10"
     }`}
   >
