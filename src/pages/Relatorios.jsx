@@ -24,6 +24,7 @@ export function Relatorios() {
   const [lucroData, setLucroData] = useState(null);
   const [movimentacoesData, setMovimentacoesData] = useState(null);
   const [produtosPrecos, setProdutosPrecos] = useState({});
+  const [abaTicketPremio, setAbaTicketPremio] = useState("loja");
   const [error, setError] = useState("");
 
   // Buscar lista de lojas
@@ -160,6 +161,7 @@ export function Relatorios() {
       setComissaoData(null);
       setLucroData(null);
       setMovimentacoesData(null);
+      setAbaTicketPremio("loja");
       if (lojaSelecionada === TODAS_LOJAS_VALUE) {
         const response = await api.get("/relatorios/todas-lojas", {
           params: { dataInicio, dataFim },
@@ -924,6 +926,212 @@ export function Relatorios() {
                 </div>
               </div>
             )}
+
+            {!roteiroSelecionado && (
+              <div className="card bg-linear-to-r from-indigo-50 to-violet-100 border-2 border-violet-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <h3 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <span className="text-2xl sm:text-3xl">🎯</span>
+                    Aba de Ticket por Prêmio
+                  </h3>
+                  <div className="flex gap-2 no-print">
+                    <button
+                      type="button"
+                      onClick={() => setAbaTicketPremio("loja")}
+                      className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                        abaTicketPremio === "loja"
+                          ? "bg-violet-600 text-white"
+                          : "bg-white text-violet-700 border border-violet-300"
+                      }`}
+                    >
+                      Loja (Total)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAbaTicketPremio("maquinas")}
+                      className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                        abaTicketPremio === "maquinas"
+                          ? "bg-violet-600 text-white"
+                          : "bg-white text-violet-700 border border-violet-300"
+                      }`}
+                    >
+                      Máquinas
+                    </button>
+                  </div>
+                </div>
+
+                {abaTicketPremio === "loja"
+                  ? (() => {
+                      const faturamentoBruto = Number(
+                        relatorio?.ticketPremio?.faturamentoBruto ||
+                          relatorio?.totais?.faturamentoBrutoConsolidado ||
+                          dashboard?.totais?.faturamento ||
+                          0,
+                      );
+                      const saidasPremio = Number(
+                        relatorio?.ticketPremio?.produtosSairam ||
+                          relatorio?.totais?.saidasPremioTotal ||
+                          relatorio?.totais?.produtosSairam ||
+                          0,
+                      );
+                      const ticketPorPremio = Number(
+                        relatorio?.ticketPremio?.ticketPorPremio ||
+                          relatorio?.totais?.ticketPorPremioTotal ||
+                          (saidasPremio > 0
+                            ? faturamentoBruto / saidasPremio
+                            : 0),
+                      );
+
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-linear-to-br from-blue-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
+                            <div className="text-sm opacity-85">
+                              Faturamento Bruto
+                            </div>
+                            <div className="text-2xl font-bold mt-1">
+                              R${" "}
+                              {faturamentoBruto.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="bg-linear-to-br from-red-500 to-rose-700 text-white rounded-xl p-4 shadow-lg">
+                            <div className="text-sm opacity-85">
+                              Produtos Saíram
+                            </div>
+                            <div className="text-2xl font-bold mt-1">
+                              {saidasPremio.toLocaleString("pt-BR")}
+                            </div>
+                          </div>
+
+                          <div className="bg-linear-to-br from-violet-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
+                            <div className="text-sm opacity-85">
+                              Ticket por Prêmio (Total)
+                            </div>
+                            <div className="text-3xl font-black mt-1">
+                              R${" "}
+                              {ticketPorPremio.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                              })}
+                            </div>
+                            <div className="text-xs opacity-90 mt-2">
+                              Fórmula: Faturamento Bruto ÷ Produtos Saíram
+                            </div>
+                            <div className="text-xs opacity-90 mt-1">
+                              R${" "}
+                              {faturamentoBruto.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                              })}{" "}
+                              / {saidasPremio.toLocaleString("pt-BR")} saídas
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  : (() => {
+                      const linhas = (
+                        relatorio?.ticketPremioMaquinas ||
+                        relatorio?.maquinas?.map((item) => ({
+                          maquinaId: item?.maquina?.id,
+                          maquinaNome: item?.maquina?.nome,
+                          maquinaCodigo: item?.maquina?.codigo,
+                          faturamentoBruto:
+                            Number(item?.totais?.faturamentoBruto || 0) ||
+                            Number(item?.totais?.dinheiro || 0) +
+                              Number(item?.totais?.cartaoPix || 0),
+                          produtosSairam: Number(
+                            item?.totais?.produtosSairam || 0,
+                          ),
+                          ticketPorPremio:
+                            Number(item?.totais?.ticketPorPremio || 0) ||
+                            (Number(item?.totais?.produtosSairam || 0) > 0
+                              ? (Number(item?.totais?.faturamentoBruto || 0) ||
+                                  Number(item?.totais?.dinheiro || 0) +
+                                    Number(item?.totais?.cartaoPix || 0)) /
+                                Number(item?.totais?.produtosSairam || 0)
+                              : 0),
+                        })) ||
+                        []
+                      ).sort(
+                        (a, b) =>
+                          Number(b?.ticketPorPremio || 0) -
+                          Number(a?.ticketPorPremio || 0),
+                      );
+
+                      if (!linhas.length) {
+                        return (
+                          <div className="text-center py-6 text-gray-600">
+                            Nenhuma máquina com dados para Ticket por Prêmio.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full bg-white rounded-xl overflow-hidden border border-violet-200">
+                            <thead className="bg-violet-100 text-violet-900">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-sm font-bold">
+                                  Máquina
+                                </th>
+                                <th className="px-4 py-3 text-right text-sm font-bold">
+                                  Faturamento Bruto
+                                </th>
+                                <th className="px-4 py-3 text-right text-sm font-bold">
+                                  Produtos Saíram
+                                </th>
+                                <th className="px-4 py-3 text-right text-sm font-bold">
+                                  Ticket/Prêmio
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {linhas.map((linha) => (
+                                <tr
+                                  key={
+                                    linha.maquinaId ||
+                                    `${linha.maquinaNome}-${linha.maquinaCodigo}`
+                                  }
+                                  className="border-t border-violet-100"
+                                >
+                                  <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                    {linha.maquinaNome || "Máquina"}
+                                    {linha.maquinaCodigo
+                                      ? ` (${linha.maquinaCodigo})`
+                                      : ""}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-right text-gray-800">
+                                    R${" "}
+                                    {Number(
+                                      linha.faturamentoBruto || 0,
+                                    ).toLocaleString("pt-BR", {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-right text-gray-800">
+                                    {Number(
+                                      linha.produtosSairam || 0,
+                                    ).toLocaleString("pt-BR")}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-right font-bold text-violet-700">
+                                    R${" "}
+                                    {Number(
+                                      linha.ticketPorPremio || 0,
+                                    ).toLocaleString("pt-BR", {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+              </div>
+            )}
+
             {/* Detalhamento por máquina */}
             {relatorio.maquinas && relatorio.maquinas.length > 0 && (
               <div className="space-y-6">

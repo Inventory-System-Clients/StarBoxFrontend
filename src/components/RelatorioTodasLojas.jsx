@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 const formatarMoeda = (valor) =>
   `R$ ${Number(valor || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
@@ -93,6 +95,7 @@ const GraficoBarras = ({
 };
 
 export function RelatorioTodasLojas({ relatorio }) {
+  const [abaTicketPremio, setAbaTicketPremio] = useState("resumo");
   const totais = relatorio?.totais || {};
   const destaques = relatorio?.destaques || {};
   const graficos = relatorio?.graficos || {};
@@ -152,6 +155,28 @@ export function RelatorioTodasLojas({ relatorio }) {
           : 0,
     },
   ];
+  const faturamentoBrutoTicketTotal = Number(
+    totais.faturamentoBrutoTicketTotal ?? brutoConsolidado,
+  );
+  const saidasPremioTotal = Number(
+    totais.saidasPremioTotal ?? (totais.produtosSairamTotal || 0),
+  );
+  const ticketPorPremioConsolidado = Number(
+    totais.ticketPorPremioConsolidado ??
+      (saidasPremioTotal > 0
+        ? faturamentoBrutoTicketTotal / saidasPremioTotal
+        : 0),
+  );
+  const rankingTicketPremioLojas = (graficos.rankingTicketPremioLojas || [])
+    .map((item) => ({
+      ...item,
+      lojaNome: item?.lojaNome || item?.nome || "-",
+      ticketPorPremio: Number(item?.ticketPorPremio || 0),
+      saidasPremio: Number(item?.saidasPremio || 0),
+      faturamentoBrutoTicket: Number(item?.faturamentoBrutoTicket || 0),
+    }))
+    .filter((item) => item.saidasPremio > 0)
+    .sort((a, b) => b.ticketPorPremio - a.ticketPorPremio);
 
   return (
     <div className="space-y-6">
@@ -174,7 +199,7 @@ export function RelatorioTodasLojas({ relatorio }) {
       </div>
 
       {comparativoMensal && (
-        <div className="card bg-gradient-to-r from-slate-50 to-indigo-50 border-2 border-indigo-200">
+        <div className="card bg-linear-to-r from-slate-50 to-indigo-50 border-2 border-indigo-200">
           <h4 className="text-lg sm:text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
             <span className="text-2xl sm:text-3xl">📈</span>
             Comparativo com o Mês Passado (mesmos dias)
@@ -357,6 +382,84 @@ export function RelatorioTodasLojas({ relatorio }) {
           </div>
           <div className="text-sm opacity-90">Quantidade de Fichas</div>
         </div>
+      </div>
+
+      <div className="card bg-linear-to-r from-violet-50 to-indigo-100 border-2 border-indigo-300">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h4 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <span className="text-2xl sm:text-3xl">🎯</span>
+            Aba de Ticket por Prêmio
+          </h4>
+
+          <div className="flex gap-2 no-print">
+            <button
+              type="button"
+              onClick={() => setAbaTicketPremio("resumo")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                abaTicketPremio === "resumo"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-indigo-700 border border-indigo-300"
+              }`}
+            >
+              Resumo Geral
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbaTicketPremio("ranking")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                abaTicketPremio === "ranking"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-indigo-700 border border-indigo-300"
+              }`}
+            >
+              Ranking por Loja
+            </button>
+          </div>
+        </div>
+
+        {abaTicketPremio === "resumo" ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-linear-to-br from-blue-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
+              <div className="text-sm opacity-85">Faturamento Bruto</div>
+              <div className="text-2xl font-bold mt-1">
+                {formatarMoeda(faturamentoBrutoTicketTotal)}
+              </div>
+            </div>
+
+            <div className="bg-linear-to-br from-red-500 to-rose-700 text-white rounded-xl p-4 shadow-lg">
+              <div className="text-sm opacity-85">Produtos Saíram</div>
+              <div className="text-2xl font-bold mt-1">
+                {Number(saidasPremioTotal || 0).toLocaleString("pt-BR")}
+              </div>
+            </div>
+
+            <div className="bg-linear-to-br from-indigo-500 to-violet-700 text-white rounded-xl p-4 shadow-lg">
+              <div className="text-sm opacity-85">
+                Ticket por Prêmio (Total)
+              </div>
+              <div className="text-3xl font-black mt-1">
+                {formatarMoeda(ticketPorPremioConsolidado)}
+              </div>
+              <div className="text-xs opacity-90 mt-2">
+                Fórmula: Faturamento Bruto ÷ Produtos Saíram
+              </div>
+              <div className="text-xs opacity-90 mt-1">
+                {formatarMoeda(faturamentoBrutoTicketTotal)} /{" "}
+                {Number(saidasPremioTotal || 0).toLocaleString("pt-BR")} saídas
+              </div>
+            </div>
+          </div>
+        ) : (
+          <GraficoBarras
+            titulo="🏆 Ranking de Ticket por Prêmio por Loja"
+            itens={rankingTicketPremioLojas}
+            chaveNome="lojaNome"
+            chaveValor="ticketPorPremio"
+            classeBarra="bg-linear-to-r from-indigo-500 to-violet-700"
+            formatter={formatarMoeda}
+            vazio="Sem dados para ranking de ticket por prêmio no período."
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
