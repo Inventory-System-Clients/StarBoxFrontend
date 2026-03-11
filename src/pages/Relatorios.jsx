@@ -748,10 +748,18 @@ export function Relatorios() {
                         produtosAgregados.reduce((s, p) => s + getPreco(p), 0) /
                         produtosAgregados.length;
                     const custoProdutos = totalSairam * precoMedio;
-                    const custosAdicionais =
-                      typeof relatorio._custos === "number"
-                        ? relatorio._custos
-                        : 0;
+                    const custoFixoPeriodo = Number(
+                      relatorio?.totais?.custoFixoPeriodo ??
+                        relatorio?.totais?.gastoFixoTotalPeriodo ??
+                        0,
+                    );
+                    const custoVariavelPeriodo = Number(
+                      relatorio?.totais?.custoVariavelPeriodo ??
+                        relatorio?.totais?.gastoVariavelTotalPeriodo ??
+                        0,
+                    );
+                    const custosFixosVariaveis =
+                      custoFixoPeriodo + custoVariavelPeriodo;
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="bg-white/80 rounded-xl p-3 text-center border border-purple-200">
@@ -779,7 +787,7 @@ export function Relatorios() {
                         <div className="bg-white/80 rounded-xl p-3 text-center border border-purple-200">
                           <div className="text-lg font-bold text-red-600">
                             − R${" "}
-                            {custosAdicionais.toLocaleString("pt-BR", {
+                            {custosFixosVariaveis.toLocaleString("pt-BR", {
                               minimumFractionDigits: 2,
                             })}
                           </div>
@@ -791,34 +799,7 @@ export function Relatorios() {
                     );
                   })()}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Custos adicionais manuais */}
-                    <div className="card bg-linear-to-br from-gray-100 to-gray-300 text-gray-900 flex flex-col justify-between">
-                      <label className="font-bold mb-2">
-                        Custos Adicionais (R$)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={
-                          typeof relatorio._custos === "number"
-                            ? relatorio._custos
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const valor = parseFloat(e.target.value) || 0;
-                          setRelatorio((prev) => ({ ...prev, _custos: valor }));
-                        }}
-                        className="input-field w-full text-lg font-bold"
-                        placeholder="Ex.: aluguel, luz, etc."
-                      />
-                      <span className="text-xs text-gray-600 mt-1">
-                        Custos extras não incluídos no sistema (subtraídos do
-                        lucro abaixo)
-                      </span>
-                    </div>
-
+                  <div className="grid grid-cols-1 gap-4">
                     {/* Lucro líquido final */}
                     <div className="card bg-linear-to-br from-yellow-500 to-orange-600 text-white flex flex-col justify-between">
                       <div className="text-2xl sm:text-3xl mb-2">💰</div>
@@ -893,12 +874,20 @@ export function Relatorios() {
                               ) / produtosAgregados.length;
 
                           const custoProdutos = totalSairam * precoMedio;
-                          const custosExtra =
-                            typeof relatorio._custos === "number"
-                              ? relatorio._custos
-                              : 0;
+                          const custoFixoPeriodo = Number(
+                            relatorio?.totais?.custoFixoPeriodo ??
+                              relatorio?.totais?.gastoFixoTotalPeriodo ??
+                              0,
+                          );
+                          const custoVariavelPeriodo = Number(
+                            relatorio?.totais?.custoVariavelPeriodo ??
+                              relatorio?.totais?.gastoVariavelTotalPeriodo ??
+                              0,
+                          );
+                          const custosFixosVariaveis =
+                            custoFixoPeriodo + custoVariavelPeriodo;
                           const lucroFinal =
-                            receita - custoProdutos - custosExtra;
+                            receita - custoProdutos - custosFixosVariaveis;
                           return (
                             <>
                               <span>Lucro Líquido: </span>
