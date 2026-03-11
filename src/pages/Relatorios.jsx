@@ -108,6 +108,51 @@ export function Relatorios() {
 
   const toNumber = (valor) => Number(valor || 0);
 
+  const obterTotaisFluxoCaixaRelatorio = (dadosRelatorio) => {
+    const dinheiroFluxo = toNumber(
+      dadosRelatorio?.totais?.valorDinheiroMaquinas ??
+        (Array.isArray(dadosRelatorio?.maquinas)
+          ? dadosRelatorio.maquinas.reduce(
+              (acc, maquina) => acc + toNumber(maquina?.totais?.dinheiro),
+              0,
+            )
+          : 0),
+    );
+
+    const cartaoPixFluxoBruto = toNumber(
+      dadosRelatorio?.totais?.valorCartaoPixMaquinasBruto ??
+        (Array.isArray(dadosRelatorio?.maquinas)
+          ? dadosRelatorio.maquinas.reduce(
+              (acc, maquina) => acc + toNumber(maquina?.totais?.cartaoPix),
+              0,
+            )
+          : 0),
+    );
+
+    const cartaoPixFluxoLiquido = toNumber(
+      dadosRelatorio?.totais?.valorCartaoPixMaquinasLiquido ??
+        (Array.isArray(dadosRelatorio?.maquinas)
+          ? dadosRelatorio.maquinas.reduce(
+              (acc, maquina) =>
+                acc +
+                toNumber(
+                  maquina?.totais?.cartaoPixLiquido ??
+                    maquina?.totais?.cartaoPix,
+                ),
+              0,
+            )
+          : cartaoPixFluxoBruto),
+    );
+
+    return {
+      dinheiroFluxo,
+      cartaoPixFluxoBruto,
+      cartaoPixFluxoLiquido,
+      totalBrutoFluxo: dinheiroFluxo + cartaoPixFluxoBruto,
+      totalLiquidoFluxo: dinheiroFluxo + cartaoPixFluxoLiquido,
+    };
+  };
+
   const calcularValorFichasRelatorio = (dadosRelatorio) => {
     const totalFichas = toNumber(dadosRelatorio?.totais?.fichas);
     const valorFicha = toNumber(dadosRelatorio?.loja?.valorFichaPadrao || 2.5);
@@ -118,19 +163,8 @@ export function Relatorios() {
     if (dadosRelatorio?.totais?.valorBrutoConsolidadoLojaMaquinas != null) {
       return toNumber(dadosRelatorio.totais.valorBrutoConsolidadoLojaMaquinas);
     }
-    const valorTrocadora =
-      toNumber(dadosRelatorio?.totais?.valorDinheiroLoja) +
-      toNumber(dadosRelatorio?.totais?.valorCartaoPixLoja);
-    const valorBrutoMaquinas = Array.isArray(dadosRelatorio?.maquinas)
-      ? dadosRelatorio.maquinas.reduce(
-          (acc, maquina) =>
-            acc +
-            toNumber(maquina?.totais?.dinheiro) +
-            toNumber(maquina?.totais?.cartaoPix),
-          0,
-        )
-      : 0;
-    return valorTrocadora + valorBrutoMaquinas;
+    const { totalBrutoFluxo } = obterTotaisFluxoCaixaRelatorio(dadosRelatorio);
+    return totalBrutoFluxo;
   };
 
   const calcularLucroLiquidoRelatorio = (dadosRelatorio) => {
@@ -139,20 +173,10 @@ export function Relatorios() {
         dadosRelatorio.totais.valorLiquidoConsolidadoLojaMaquinas,
       );
     }
-    const valorTrocadoraLiquido =
-      toNumber(dadosRelatorio?.totais?.valorDinheiroLoja) +
-      toNumber(dadosRelatorio?.totais?.valorCartaoPixLiquidoLoja);
-    const valorLiquidoMaquinas = Array.isArray(dadosRelatorio?.maquinas)
-      ? dadosRelatorio.maquinas.reduce(
-          (acc, maquina) =>
-            acc +
-            toNumber(maquina?.totais?.dinheiro) +
-            toNumber(maquina?.totais?.cartaoPixLiquido),
-          0,
-        )
-      : 0;
+    const { totalLiquidoFluxo } =
+      obterTotaisFluxoCaixaRelatorio(dadosRelatorio);
     const gastoTotal = toNumber(dadosRelatorio?.totais?.gastoTotalPeriodo);
-    return valorTrocadoraLiquido + valorLiquidoMaquinas - gastoTotal;
+    return totalLiquidoFluxo - gastoTotal;
   };
 
   const calcularCustoSaidaProdutosRelatorio = (dadosRelatorio) => {
@@ -595,6 +619,11 @@ export function Relatorios() {
     0,
   );
 
+  const totaisFluxoCaixaRelatorio = obterTotaisFluxoCaixaRelatorio(relatorio);
+  const valorConsolidadoRelatorio =
+    calcularValorConsolidadoRelatorio(relatorio);
+  const lucroLiquidoRelatorio = calcularLucroLiquidoRelatorio(relatorio);
+
   if (loadingLojas) return <PageLoader />;
 
   return (
@@ -771,18 +800,17 @@ export function Relatorios() {
                   </div>
                 </div>
 
-                {/* Valor Vindo da Trocadora */}
+                {/* Fluxo de Caixa (Retiradas) */}
                 <div className="flex flex-col card bg-linear-to-br from-yellow-500 to-orange-600 text-white items-center justify-center">
                   <div className="text-2xl sm:text-3xl mb-2">🏪</div>
                   <div className="text-xl sm:text-2xl font-bold">
                     R${" "}
-                    {(
-                      Number(relatorio.totais?.valorDinheiroLoja || 0) +
-                      Number(relatorio.totais?.valorCartaoPixLoja || 0)
+                    {Number(
+                      totaisFluxoCaixaRelatorio.totalBrutoFluxo || 0,
                     ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
-                    Valor Vindo da Trocadora
+                    Fluxo de Caixa (Retiradas)
                   </div>
                   <div className="flex gap-3 items-end mt-2">
                     <div className="flex flex-col items-center">
@@ -790,11 +818,11 @@ export function Relatorios() {
                       <div className="text-base sm:text-lg font-bold">
                         R${" "}
                         {Number(
-                          relatorio.totais?.valorDinheiroLoja || 0,
+                          totaisFluxoCaixaRelatorio.dinheiroFluxo || 0,
                         ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </div>
                       <div className="text-[10px] sm:text-xs opacity-80">
-                        Dinheiro
+                        Dinheiro (Fluxo)
                       </div>
                     </div>
                     <div className="flex flex-col items-center">
@@ -802,13 +830,16 @@ export function Relatorios() {
                       <div className="text-base sm:text-lg font-bold">
                         R${" "}
                         {Number(
-                          relatorio.totais?.valorCartaoPixLoja || 0,
+                          totaisFluxoCaixaRelatorio.cartaoPixFluxoBruto || 0,
                         ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </div>
                       <div className="text-[10px] sm:text-xs opacity-80">
-                        Cartão / Pix (Bruto)
+                        Cartão / Pix (Fluxo Bruto)
                       </div>
                     </div>
+                  </div>
+                  <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                    Fonte: tabela fluxo_caixa
                   </div>
                 </div>
 
@@ -846,34 +877,13 @@ export function Relatorios() {
                   <div className="text-2xl sm:text-3xl mb-2">💰</div>
                   <div className="text-xl sm:text-2xl font-bold">
                     R${" "}
-                    {(() => {
-                      if (
-                        relatorio.totais?.valorBrutoConsolidadoLojaMaquinas !=
-                        null
-                      ) {
-                        return Number(
-                          relatorio.totais.valorBrutoConsolidadoLojaMaquinas,
-                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-                      }
-                      const valorTrocadora =
-                        Number(relatorio.totais?.valorDinheiroLoja || 0) +
-                        Number(relatorio.totais?.valorCartaoPixLoja || 0);
-                      let brutoMaq = 0;
-                      if (relatorio.maquinas?.length > 0) {
-                        relatorio.maquinas.forEach((m) => {
-                          brutoMaq +=
-                            Number(m.totais?.dinheiro || 0) +
-                            Number(m.totais?.cartaoPix || 0);
-                        });
-                      }
-                      return (valorTrocadora + brutoMaq).toLocaleString(
-                        "pt-BR",
-                        { minimumFractionDigits: 2 },
-                      );
-                    })()}
+                    {Number(valorConsolidadoRelatorio || 0).toLocaleString(
+                      "pt-BR",
+                      { minimumFractionDigits: 2 },
+                    )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
-                    Bruto Consolidado (Loja + Máquinas)
+                    Bruto Consolidado (Fluxo de Caixa)
                   </div>
                 </div>
 
@@ -905,11 +915,11 @@ export function Relatorios() {
                   <div className="text-xl sm:text-2xl font-bold">
                     R${" "}
                     {Number(
-                      relatorio.totais?.valorCartaoPixLiquidoLoja || 0,
+                      totaisFluxoCaixaRelatorio.cartaoPixFluxoLiquido || 0,
                     ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
-                    Cartão / Pix Líquido (Loja)
+                    Cartão / Pix Líquido (Fluxo de Caixa)
                   </div>
                   <div className="text-xl sm:text-2xl font-bold mt-4">
                     R${" "}
@@ -1064,55 +1074,10 @@ export function Relatorios() {
                   <div className="text-2xl sm:text-3xl mb-2">📉</div>
                   <div className="text-xl sm:text-2xl font-bold">
                     R${" "}
-                    {(() => {
-                      if (
-                        relatorio.totais?.valorLiquidoConsolidadoLojaMaquinas !=
-                        null
-                      ) {
-                        const valorTrocadoraLiquido =
-                          Number(relatorio.totais?.valorDinheiroLoja || 0) +
-                          Number(
-                            relatorio.totais?.valorCartaoPixLiquidoLoja || 0,
-                          );
-                        let dinheiroMaq = 0,
-                          cartaoMaqLiq = 0;
-                        if (relatorio.maquinas?.length > 0) {
-                          relatorio.maquinas.forEach((m) => {
-                            dinheiroMaq += Number(m.totais?.dinheiro || 0);
-                            cartaoMaqLiq += Number(
-                              m.totais?.cartaoPixLiquido || 0,
-                            );
-                          });
-                        }
-                        return Number(
-                          relatorio.totais.valorLiquidoConsolidadoLojaMaquinas,
-                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-                      }
-                      const valorTrocadoraLiquido =
-                        Number(relatorio.totais?.valorDinheiroLoja || 0) +
-                        Number(
-                          relatorio.totais?.valorCartaoPixLiquidoLoja || 0,
-                        );
-                      let dinheiroMaq = 0,
-                        cartaoMaqLiq = 0;
-                      if (relatorio.maquinas?.length > 0) {
-                        relatorio.maquinas.forEach((m) => {
-                          dinheiroMaq += Number(m.totais?.dinheiro || 0);
-                          cartaoMaqLiq += Number(
-                            m.totais?.cartaoPixLiquido || 0,
-                          );
-                        });
-                      }
-                      const receitaLiquida =
-                        valorTrocadoraLiquido + dinheiroMaq + cartaoMaqLiq;
-                      const gastoTotal = Number(
-                        relatorio.totais?.gastoTotalPeriodo || 0,
-                      );
-                      return (receitaLiquida - gastoTotal).toLocaleString(
-                        "pt-BR",
-                        { minimumFractionDigits: 2 },
-                      );
-                    })()}
+                    {Number(lucroLiquidoRelatorio || 0).toLocaleString(
+                      "pt-BR",
+                      { minimumFractionDigits: 2 },
+                    )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Lucro Líquido
