@@ -619,7 +619,6 @@ export function Relatorios() {
     0,
   );
 
-  const totaisFluxoCaixaRelatorio = obterTotaisFluxoCaixaRelatorio(relatorio);
   const valorConsolidadoRelatorio =
     calcularValorConsolidadoRelatorio(relatorio);
   const lucroLiquidoRelatorio = calcularLucroLiquidoRelatorio(relatorio);
@@ -767,111 +766,6 @@ export function Relatorios() {
                 Resumo Geral da Loja
               </h3>
               <div className="flex flex-wrap gap-4 sm:gap-4">
-                {/* Quantidade de Fichas + Valor das Fichas */}
-                <div className="card bg-linear-to-br from-blue-400 to-blue-600 text-white">
-                  <div className="text-2xl sm:text-3xl mb-2">🎟️</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    {dashboard?.totais
-                      ? Number(dashboard.totais.fichas || 0).toLocaleString(
-                          "pt-BR",
-                        )
-                      : Number(relatorio.totais?.fichas || 0).toLocaleString(
-                          "pt-BR",
-                        )}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Quantidade de Fichas
-                  </div>
-                  <div className="text-2xl sm:text-3xl mb-2 mt-2">💸</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    R${" "}
-                    {(() => {
-                      const totalFichas = relatorio.totais?.fichas || 0;
-                      const valorFicha =
-                        relatorio.loja?.valorFichaPadrao || 2.5;
-                      return (totalFichas * valorFicha).toLocaleString(
-                        "pt-BR",
-                        { minimumFractionDigits: 2 },
-                      );
-                    })()}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Valor das Fichas
-                  </div>
-                </div>
-
-                {/* Fluxo de Caixa (Retiradas) */}
-                <div className="flex flex-col card bg-linear-to-br from-yellow-500 to-orange-600 text-white items-center justify-center">
-                  <div className="text-2xl sm:text-3xl mb-2">🏪</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    R${" "}
-                    {Number(
-                      totaisFluxoCaixaRelatorio.totalBrutoFluxo || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Fluxo de Caixa (Retiradas)
-                  </div>
-                  <div className="flex gap-3 items-end mt-2">
-                    <div className="flex flex-col items-center">
-                      <div className="text-lg sm:text-xl mb-1">💵</div>
-                      <div className="text-base sm:text-lg font-bold">
-                        R${" "}
-                        {Number(
-                          totaisFluxoCaixaRelatorio.dinheiroFluxo || 0,
-                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </div>
-                      <div className="text-[10px] sm:text-xs opacity-80">
-                        Dinheiro (Fluxo)
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <div className="text-lg sm:text-xl mb-1">🟢</div>
-                      <div className="text-base sm:text-lg font-bold">
-                        R${" "}
-                        {Number(
-                          totaisFluxoCaixaRelatorio.cartaoPixFluxoBruto || 0,
-                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </div>
-                      <div className="text-[10px] sm:text-xs opacity-80">
-                        Cartão / Pix (Fluxo Bruto)
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-[10px] sm:text-xs opacity-80 mt-1">
-                    Fonte: tabela fluxo_caixa
-                  </div>
-                </div>
-
-                {/* Valor Bruto das Máquinas */}
-                <div className="card bg-linear-to-br from-yellow-300 to-yellow-600 text-white">
-                  <div className="text-2xl sm:text-3xl mb-2">📉</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    R${" "}
-                    {(() => {
-                      if (relatorio.totais?.valorBrutoMaquinas != null) {
-                        return Number(
-                          relatorio.totais.valorBrutoMaquinas,
-                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-                      }
-                      let v = 0;
-                      if (relatorio.maquinas?.length > 0) {
-                        relatorio.maquinas.forEach((m) => {
-                          v +=
-                            Number(m.totais?.dinheiro || 0) +
-                            Number(m.totais?.cartaoPix || 0);
-                        });
-                      }
-                      return v.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                      });
-                    })()}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Valor Bruto das Máquinas
-                  </div>
-                </div>
-
                 {/* Bruto Consolidado */}
                 <div className="card bg-linear-to-br from-yellow-500 to-orange-600 text-white">
                   <div className="text-2xl sm:text-3xl mb-2">💰</div>
@@ -884,64 +778,6 @@ export function Relatorios() {
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Bruto Consolidado (Fluxo de Caixa)
-                  </div>
-                </div>
-
-                {/* Taxa Média de Cartão */}
-                <div className="card bg-linear-to-br from-pink-500 to-fuchsia-700 text-white">
-                  <div className="text-2xl sm:text-3xl mb-2">💳</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    {Number(
-                      relatorio.totais?.percentualTaxaCartaoMedia || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    %
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Taxa Média de Cartão
-                  </div>
-                  <div className="text-[10px] sm:text-xs opacity-80 mt-1">
-                    R${" "}
-                    {Number(relatorio.totais?.taxaDeCartao || 0).toLocaleString(
-                      "pt-BR",
-                      { minimumFractionDigits: 2 },
-                    )}{" "}
-                    em taxas de cartão no período
-                  </div>
-                </div>
-
-                {/* Cartão/Pix Líquido */}
-                <div className="card bg-linear-to-br from-cyan-500 to-blue-700 text-white">
-                  <div className="text-2xl sm:text-3xl mb-2">✅</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    R${" "}
-                    {Number(
-                      totaisFluxoCaixaRelatorio.cartaoPixFluxoLiquido || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Cartão / Pix Líquido (Fluxo de Caixa)
-                  </div>
-                  <div className="text-xl sm:text-2xl font-bold mt-4">
-                    R${" "}
-                    {(() => {
-                      if (relatorio.totais?.valorLiquidoMaquinas != null) {
-                        return Number(
-                          relatorio.totais.valorLiquidoMaquinas,
-                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-                      }
-                      let v = 0;
-                      if (relatorio.maquinas?.length > 0) {
-                        relatorio.maquinas.forEach((m) => {
-                          v += Number(m.totais?.cartaoPixLiquido || 0);
-                        });
-                      }
-                      return v.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                      });
-                    })()}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Cartão / Pix Líquido (Máquinas)
                   </div>
                 </div>
 
@@ -1006,20 +842,6 @@ export function Relatorios() {
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Produtos Saíram
-                  </div>
-                </div>
-
-                {/* Gastos Variáveis */}
-                <div className="card bg-linear-to-br from-fuchsia-500 to-purple-700 text-white">
-                  <div className="text-2xl sm:text-3xl mb-2">🧾</div>
-                  <div className="text-xl sm:text-2xl font-bold">
-                    R${" "}
-                    {Number(
-                      relatorio.totais?.gastoVariavelTotalPeriodo || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-xs sm:text-sm opacity-90">
-                    Gastos Variáveis
                   </div>
                 </div>
 
