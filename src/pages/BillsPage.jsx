@@ -126,7 +126,7 @@ export default function BillsPage() {
       return false;
     if (
       filters.search &&
-      !(bill.name || bill.account)
+      !bill.name
         ?.toLowerCase()
         .includes(filters.search.toLowerCase())
     )
@@ -304,6 +304,9 @@ export default function BillsPage() {
                       Conta
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                      🔢 Número
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                       Beneficiário
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
@@ -330,7 +333,7 @@ export default function BillsPage() {
                   {filteredBills.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="8"
+                        colSpan="9"
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Nenhuma conta encontrada
@@ -350,7 +353,7 @@ export default function BillsPage() {
                               className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
                               title="Clique para ver todos os detalhes"
                             >
-                              {bill.name || bill.account}
+                              {bill.name}
                             </button>
                             {bill.recorrente && (
                               <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold" title="Conta recorrente mensal">
@@ -363,6 +366,15 @@ export default function BillsPage() {
                               </p>
                             )}
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {bill.numero ? (
+                            <span className="font-mono text-sm bg-gray-100 px-3 py-1 rounded-md border border-gray-200 text-gray-700 font-semibold">
+                              {bill.numero}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic text-sm">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           {bill.beneficiario ? (
@@ -541,9 +553,21 @@ export default function BillsPage() {
                     Nome da Conta
                   </label>
                   <p className="text-xl font-bold text-gray-800 mt-1">
-                    {detailsModal.bill.name || detailsModal.bill.account}
+                    {detailsModal.bill.name}
                   </p>
                 </div>
+
+                {/* Número */}
+                {detailsModal.bill.numero && (
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                      🔢 Número do Documento/Boleto
+                    </label>
+                    <p className="text-xl font-mono font-bold text-blue-600 mt-2 bg-blue-50 px-4 py-2 rounded-lg border-2 border-blue-200 inline-block">
+                      {detailsModal.bill.numero}
+                    </p>
+                  </div>
+                )}
 
                 {/* Beneficiário */}
                 <div className="md:col-span-2">
@@ -691,31 +715,19 @@ export default function BillsPage() {
                   </p>
                 </div>
 
-                {/* Conta (Número) */}
-                {detailsModal.bill.account && (
-                  <div>
-                    <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
-                      🔢 Conta (Número)
-                    </label>
-                    <p className="text-lg font-semibold text-gray-700 mt-1">
-                      {detailsModal.bill.account}
+                {/* Observacoes */}
+                <div className="md:col-span-2">
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    📝 Observações
+                  </label>
+                  <div className="mt-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {detailsModal.bill.observations || (
+                        <span className="text-gray-400 italic">Nenhuma observação registrada</span>
+                      )}
                     </p>
                   </div>
-                )}
-
-                {/* Observações */}
-                {detailsModal.bill.observations && (
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
-                      📝 Observações
-                    </label>
-                    <div className="mt-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                        {detailsModal.bill.observations}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
 
@@ -734,3 +746,4 @@ export default function BillsPage() {
     </div>
   );
 }
+

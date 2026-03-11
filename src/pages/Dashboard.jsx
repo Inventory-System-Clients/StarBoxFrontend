@@ -147,6 +147,24 @@ export function Dashboard() {
         setMovimentacaoEnviando(false);
         return;
       }
+      
+      // Verificar se há entradas e se não é o depósito principal
+      const lojaSelecionada = lojas?.find(l => l.id === movimentacaoLojaId);
+      const temEntradas = produtosValidos.some(p => p.tipoMovimentacao === "entrada");
+      
+      if (temEntradas && lojaSelecionada && !lojaSelecionada.isDepositoPrincipal) {
+        const confirmar = window.confirm(
+          `📦 Você está adicionando ${produtosValidos.filter(p => p.tipoMovimentacao === "entrada").length} produto(s) em "${lojaSelecionada.nome}".\n\n` +
+          `🏭 Estes produtos serão AUTOMATICAMENTE DESCONTADOS do depósito principal.\n\n` +
+          `Confirma a entrada de estoque?`
+        );
+        
+        if (!confirmar) {
+          setMovimentacaoEnviando(false);
+          return;
+        }
+      }
+      
       const payload = {
         lojaId: movimentacaoLojaId,
         usuarioId: usuario?.id,
@@ -1888,6 +1906,31 @@ export function Dashboard() {
           </div>
         )}
 
+        {/* Card do Depósito Principal - Apenas ADMIN */}
+        {usuario?.role === "ADMIN" && (
+          <div className="card-gradient mb-8 border-l-4 border-orange-500 p-4 sm:p-8 rounded-xl shadow-md sm:flex-row items-center justify-between gap-6">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                <span className="bg-linear-to-br from-orange-500 to-orange-600 p-2 sm:p-3 rounded-xl text-white">
+                  🏭
+                </span>
+                Depósito Principal
+              </h2>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Gerencie o estoque central do sistema. Todo estoque distribuído para lojas e funcionários é descontado automaticamente daqui.
+              </p>
+            </div>
+            <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
+              <button
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
+                onClick={() => navigate("/deposito-principal")}
+              >
+                <span className="text-2xl">🏭</span> Ver Depósito
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Controle de Revisões de Veículos */}
         <div className="card-gradient mb-8 border-l-4 border-gray-700 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
           <div className="flex-1 min-w-0">
@@ -2110,6 +2153,25 @@ export function Dashboard() {
                     <span className="text-3xl">🔄</span>
                     Movimentação de Estoque
                   </h2>
+
+                  {/* Aviso sobre desconto do depósito principal */}
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mb-6">
+                    <div className="flex gap-3">
+                    <div className="shrink-0">
+                        <span className="text-2xl">ℹ️</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                          Atenção
+                        </p>
+                        <p className="text-sm text-blue-800">
+                          Ao adicionar estoque em uma loja (Entrada), os produtos serão{" "}
+                          <strong>automaticamente descontados do Depósito Principal</strong>.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <form
                     className="space-y-6"
                     onSubmit={async (e) => {

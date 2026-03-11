@@ -15,6 +15,7 @@ import { UsuarioForm } from "./pages/UsuarioForm";
 import { Lojas } from "./pages/Lojas";
 import { LojaForm } from "./pages/LojaForm";
 import { LojaDetalhes } from "./pages/LojaDetalhes";
+import EstoqueDepositoPrincipal from "./pages/EstoqueDepositoPrincipal.jsx";
 import { Maquinas } from "./pages/Maquinas";
 import { MaquinaForm } from "./pages/MaquinaForm";
 import { MaquinaDetalhes } from "./pages/MaquinaDetalhes";
@@ -171,6 +172,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <LojaForm />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/deposito-principal"
+        element={
+          <PrivateRoute>
+            <EstoqueDepositoPrincipal />
           </PrivateRoute>
         }
       />

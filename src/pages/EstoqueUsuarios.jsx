@@ -493,6 +493,22 @@ export default function EstoqueUsuarios() {
       return;
     }
 
+    // Verificar se há entradas e avisar sobre desconto do depósito
+    const temEntradas = movimentacoesForm.some(m => m.tipoMovimentacao === "entrada");
+    
+    if (temEntradas) {
+      const totalEntradas = movimentacoesForm.filter(m => m.tipoMovimentacao === "entrada").length;
+      const confirmar = window.confirm(
+        `📦 Você está adicionando ${totalEntradas} produto(s) para "${usuarioSelecionado?.nome}".\n\n` +
+        `🏭 Estes produtos serão AUTOMATICAMENTE DESCONTADOS do depósito principal.\n\n` +
+        `Confirma a entrada de estoque para o funcionário?`
+      );
+      
+      if (!confirmar) {
+        return;
+      }
+    }
+
     const movimentacoesNormalizadas = [];
 
     for (let index = 0; index < movimentacoesForm.length; index += 1) {
@@ -1011,6 +1027,24 @@ export default function EstoqueUsuarios() {
                 className="space-y-4 px-6 py-5"
                 onSubmit={lancarMovimentacao}
               >
+                {/* Aviso sobre desconto do depósito principal */}
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                  <div className="flex gap-3">
+                    <div className="shrink-0">
+                      <span className="text-2xl">ℹ️</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900 mb-1">
+                        Atenção
+                      </p>
+                      <p className="text-sm text-blue-800">
+                        Ao adicionar estoque para este funcionário (Entrada), os produtos serão{" "}
+                        <strong>automaticamente descontados do Depósito Principal</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   {movimentacoesForm.map((linha, index) => {
                     const produtoLinha =

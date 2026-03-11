@@ -75,6 +75,16 @@ export function Lojas() {
           />
         </svg>
       ),
+      render: (loja) => (
+        <div className="flex items-center gap-2">
+          {loja.isDepositoPrincipal && (
+            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-semibold" title="Depósito Principal">
+              🏭
+            </span>
+          )}
+          <span className="font-medium text-gray-900">{loja.nome}</span>
+        </div>
+      ),
     },
     {
       label: "Endereço",

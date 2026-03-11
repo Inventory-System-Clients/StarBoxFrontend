@@ -25,19 +25,28 @@ export default function BillModal({
 }) {
   const [formData, setFormData] = useState({
     name: bill?.name || "",
+    numero: bill?.numero || "",  // ✨ NOVO CAMPO - Número do documento/boleto/conta
     due_date: bill?.due_date || "",
     city: bill?.city || "",
-    account: bill?.account || "",
     category: bill?.category || "",
     observations: bill?.observations || "",
     bill_type: bill?.bill_type || defaultType,
-    amount: bill?.amount || "",
+    amount: bill?.value || bill?.amount || "",  // Backend pode retornar 'value' ou 'amount'
     payment_method: bill?.payment_method || "boleto",
     payment_details: bill?.payment_details || "",
     boleto_em_maos: bill?.boleto_em_maos || false,
     recorrente: bill?.recorrente || false,
     beneficiario: bill?.beneficiario || "",
   });
+  
+  // Debug: verificar estado inicial
+  React.useEffect(() => {
+    console.log('📋 Formulário aberto - Bill recebido:', bill);
+    console.log('📝 Estado inicial do formData:', formData);
+    console.log('📄 Observations no bill:', bill?.observations);
+    console.log('📄 Observations no formData:', formData.observations);
+  }, []);
+  
   const [newCategory, setNewCategory] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -61,8 +70,15 @@ export default function BillModal({
       const billData = {
         ...formData,
         category: categoryToUse,
-        amount: amountValue,
+        value: amountValue,  // Enviar como 'value' para o backend
       };
+      
+      // Remover 'amount' para evitar conflito
+      delete billData.amount;
+
+      // Debug: verificar se observations está sendo enviado
+      console.log('📤 Dados enviados para o backend:', billData);
+      console.log('📝 Campo observations:', billData.observations);
 
       if (bill) {
         await billsAPI.update(bill.id, billData);
@@ -109,6 +125,25 @@ export default function BillModal({
               />
             </div>
             <div>
+              <Label htmlFor="numero">🔢 Número</Label>
+              <Input
+                id="numero"
+                value={formData.numero}
+                onChange={(e) =>
+                  setFormData({ ...formData, numero: e.target.value })
+                }
+                placeholder="Ex: 12345678"
+                className="font-mono font-semibold tracking-wide"
+                data-testid="input-numero"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Número do boleto, conta ou documento
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="due_date">Data de Vencimento *</Label>
               <Input
                 id="due_date"
@@ -121,6 +156,7 @@ export default function BillModal({
                 data-testid="input-due-date"
               />
             </div>
+            <div></div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -171,20 +207,6 @@ export default function BillModal({
             <p className="text-xs text-gray-500 mt-1">
               👤 Nome da pessoa ou empresa que receberá o pagamento
             </p>
-          </div>
-
-          <div>
-            <Label htmlFor="account">Conta (Nome ou Número) *</Label>
-            <Input
-              id="account"
-              value={formData.account}
-              onChange={(e) =>
-                setFormData({ ...formData, account: e.target.value })
-              }
-              placeholder="Conta de Luz - 123456"
-              required
-              data-testid="input-account"
-            />
           </div>
 
           <div>

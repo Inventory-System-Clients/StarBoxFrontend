@@ -163,6 +163,13 @@ export default function Navbar() {
               🗺️ Roteiros
             </MobileNavLink>
             <MobileNavLink
+              to="/lojas"
+              active={isActive("/lojas")}
+              onClick={closeMenu}
+            >
+              🏪 Lojas
+            </MobileNavLink>
+            <MobileNavLink
               to="/estoque-usuarios"
               active={isActive("/estoque-usuarios")}
               onClick={closeMenu}
