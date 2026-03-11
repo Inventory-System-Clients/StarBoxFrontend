@@ -266,6 +266,7 @@ export default function BillModal({
               <option value="boleto">Boleto</option>
               <option value="pix">PIX</option>
               <option value="email">Email</option>
+              <option value="app">App</option>
             </select>
           </div>
 
@@ -298,6 +299,22 @@ export default function BillModal({
                 placeholder="Ex: conta@empresa.com"
                 required={formData.payment_method === "email"}
                 data-testid="input-payment-email"
+              />
+            </div>
+          )}
+
+          {formData.payment_method === "app" && (
+            <div>
+              <Label htmlFor="payment_details">Nome do Aplicativo *</Label>
+              <Input
+                id="payment_details"
+                value={formData.payment_details}
+                onChange={(e) =>
+                  setFormData({ ...formData, payment_details: e.target.value })
+                }
+                placeholder="Ex: PicPay, Mercado Pago, RecargaPay"
+                required={formData.payment_method === "app"}
+                data-testid="input-app-name"
               />
             </div>
           )}

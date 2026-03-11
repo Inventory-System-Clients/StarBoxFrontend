@@ -667,6 +667,7 @@ export default function BillsPage() {
                     {detailsModal.bill.payment_method === "boleto" && "📄 Boleto"}
                     {detailsModal.bill.payment_method === "pix" && "💸 PIX"}
                     {detailsModal.bill.payment_method === "email" && "📧 Email"}
+                    {detailsModal.bill.payment_method === "app" && "📱 App"}
                     {!detailsModal.bill.payment_method && (
                       <span className="text-gray-400 italic">Não informado</span>
                     )}
