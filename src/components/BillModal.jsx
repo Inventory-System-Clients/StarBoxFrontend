@@ -35,6 +35,8 @@ export default function BillModal({
     payment_method: bill?.payment_method || "boleto",
     payment_details: bill?.payment_details || "",
     boleto_em_maos: bill?.boleto_em_maos || false,
+    recorrente: bill?.recorrente || false,
+    beneficiario: bill?.beneficiario || "",
   });
   const [newCategory, setNewCategory] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -153,6 +155,22 @@ export default function BillModal({
               required
               data-testid="input-city"
             />
+          </div>
+
+          <div>
+            <Label htmlFor="beneficiario">Beneficiário</Label>
+            <Input
+              id="beneficiario"
+              value={formData.beneficiario}
+              onChange={(e) =>
+                setFormData({ ...formData, beneficiario: e.target.value })
+              }
+              placeholder="Ex: Imobiliária XYZ Ltda ou João Silva"
+              data-testid="input-beneficiario"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              👤 Nome da pessoa ou empresa que receberá o pagamento
+            </p>
           </div>
 
           <div>
@@ -301,6 +319,29 @@ export default function BillModal({
               </Label>
             </div>
           )}
+
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+              <input
+                type="checkbox"
+                id="recorrente"
+                checked={formData.recorrente}
+                onChange={(e) =>
+                  setFormData({ ...formData, recorrente: e.target.checked })
+                }
+                className="w-4 h-4 rounded cursor-pointer"
+                data-testid="checkbox-recorrente"
+              />
+              <Label htmlFor="recorrente" className="cursor-pointer mb-0">
+                🔁 Conta recorrente (repete todo mês na mesma data)
+              </Label>
+            </div>
+            {formData.recorrente && (
+              <div className="mt-2 p-3 bg-blue-50 border-l-4 border-blue-500 text-sm text-blue-700">
+                ℹ️ Esta conta será automaticamente replicada todos os meses
+              </div>
+            )}
+          </div>
 
           <div>
             <Label htmlFor="observations">Observações</Label>

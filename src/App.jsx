@@ -38,6 +38,7 @@ import SecurityLockPage from "./pages/SecurityLockPage.jsx";
 import GerenciarCarrinhosPage from "./pages/GerenciarCarrinhosPage.jsx";
 import { QuebraOrdemPage } from "./pages/QuebraOrdemPage.jsx";
 import EstoqueUsuarios from "./pages/EstoqueUsuarios.jsx";
+import FluxoCaixa from "./pages/FluxoCaixa.jsx";
 import "./App.css";
 
 function AppRoutes() {
@@ -293,6 +294,14 @@ function AppRoutes() {
         element={
           <PrivateRoute adminOnly>
             <GerenciarCarrinhosPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/fluxo-caixa"
+        element={
+          <PrivateRoute>
+            <FluxoCaixa />
           </PrivateRoute>
         }
       />

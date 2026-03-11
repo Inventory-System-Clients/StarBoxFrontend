@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { buscarRoteiros } from "../services/roteiros";
 import Navbar from "../components/Navbar";
@@ -10,6 +11,7 @@ import { RelatorioTodasLojas } from "../components/RelatorioTodasLojas";
 const TODAS_LOJAS_VALUE = "__TODAS_AS_LOJAS__";
 
 export function Relatorios() {
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [lojas, setLojas] = useState([]);
   const [lojaSelecionada, setLojaSelecionada] = useState("");
@@ -683,7 +685,7 @@ export function Relatorios() {
             </div>
           )}
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
             <button
               onClick={gerarRelatorio}
               disabled={loading}
@@ -697,6 +699,12 @@ export function Relatorios() {
               className="btn-secondary"
             >
               🖨️ Imprimir
+            </button>
+            <button
+              onClick={() => navigate("/graficos")}
+              className="px-6 py-2.5 bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+            >
+              📈 Ver Gráficos
             </button>
           </div>
         </div>

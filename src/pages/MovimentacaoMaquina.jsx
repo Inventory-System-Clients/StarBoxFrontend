@@ -29,6 +29,7 @@ export default function MovimentacaoMaquina() {
     ignoreInOut: false,
     quantidade_notas_entrada: "",
     valor_entrada_maquininha_pix: "",
+    retiradaDinheiro: false,
   });
   const [produtos, setProdutos] = useState([]);
   const [maquina, setMaquina] = useState(null);
@@ -276,6 +277,7 @@ export default function MovimentacaoMaquina() {
         retiradaProduto: parseInt(formData.retiradaProduto) || 0,
         observacoes: formData.observacao || "",
         produtos: produtosParaEnviar,
+        retiradaDinheiro: formData.retiradaDinheiro || false,
       };
 
       const enviarMovimentacao = (confirmarUsoEstoqueLoja = false) =>
@@ -667,6 +669,29 @@ export default function MovimentacaoMaquina() {
                 placeholder="Informações adicionais sobre a movimentação..."
               />
             </div>
+
+            {/* ✨ NOVO: Checkbox Retirada de Dinheiro */}
+            <div className="p-4 bg-linear-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="retiradaDinheiro"
+                  checked={formData.retiradaDinheiro}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-bold text-green-900 flex items-center gap-2">
+                    💰 Retirada de Dinheiro
+                  </span>
+                  <p className="text-xs text-green-700 mt-1">
+                    Marque esta opção se você está retirando dinheiro desta máquina.
+                    Esta movimentação aparecerá na aba "Fluxo de Caixa" para conferência pelo administrador.
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <div className="flex gap-4 justify-end pt-4 border-t border-gray-200">
               <button
                 type="button"

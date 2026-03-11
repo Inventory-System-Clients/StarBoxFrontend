@@ -94,11 +94,11 @@ export default function Navbar() {
 
                 {usuario?.role === "ADMIN" && (
                   <>
-                    <NavLink to="/graficos" active={isActive("/graficos")}>
-                      📈 Gráficos
-                    </NavLink>
                     <NavLink to="/relatorios" active={isActive("/relatorios")}>
                       📄 Relatórios
+                    </NavLink>
+                    <NavLink to="/fluxo-caixa" active={isActive("/fluxo-caixa")}>
+                      💰 Fluxo de Caixa
                     </NavLink>
                     <NavLink to="/usuarios" active={isActive("/usuarios")}>
                       👥 Usuários
@@ -190,6 +190,15 @@ export default function Navbar() {
                 onClick={closeMenu}
               >
                 🛒 Carrinhos
+              </MobileNavLink>
+            )}
+            {usuario?.role === "ADMIN" && (
+              <MobileNavLink
+                to="/fluxo-caixa"
+                active={isActive("/fluxo-caixa")}
+                onClick={closeMenu}
+              >
+                💰 Fluxo de Caixa
               </MobileNavLink>
             )}
             {/* ... Repetir para outros links ... */}

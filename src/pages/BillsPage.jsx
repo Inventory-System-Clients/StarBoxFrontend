@@ -52,6 +52,10 @@ export default function BillsPage() {
     open: false,
     billId: null,
   });
+  const [detailsModal, setDetailsModal] = useState({
+    open: false,
+    bill: null,
+  });
 
   const [filters, setFilters] = useState({
     status: "",
@@ -106,6 +110,10 @@ export default function BillsPage() {
   const handleEdit = (bill) => {
     setEditingBill(bill);
     setShowModal(true);
+  };
+
+  const handleViewDetails = (bill) => {
+    setDetailsModal({ open: true, bill });
   };
 
   const filteredBills = bills.filter((bill) => {
@@ -298,6 +306,9 @@ export default function BillsPage() {
                       Conta
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                      Beneficiário
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                       Vencimento
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
@@ -321,7 +332,7 @@ export default function BillsPage() {
                   {filteredBills.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="7"
+                        colSpan="8"
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Nenhuma conta encontrada
@@ -336,15 +347,33 @@ export default function BillsPage() {
                       >
                         <td className="px-6 py-4">
                           <div>
-                            <p className="font-medium text-gray-800">
+                            <button
+                              onClick={() => handleViewDetails(bill)}
+                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                              title="Clique para ver todos os detalhes"
+                            >
                               {bill.name || bill.account}
-                            </p>
+                            </button>
+                            {bill.recorrente && (
+                              <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold" title="Conta recorrente mensal">
+                                🔁 Mensal
+                              </span>
+                            )}
                             {bill.observations && (
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-gray-500 mt-1">
                                 {bill.observations}
                               </p>
                             )}
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {bill.beneficiario ? (
+                            <span className="text-gray-700 font-medium" title={bill.beneficiario}>
+                              👤 {bill.beneficiario}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-gray-700">
                           {new Date(bill.due_date).toLocaleDateString("pt-BR")}
@@ -483,6 +512,229 @@ export default function BillsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de Detalhes da Conta */}
+      {detailsModal.open && detailsModal.bill && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"
+          onClick={() => setDetailsModal({ open: false, bill: null })}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 flex justify-between items-center rounded-t-xl">
+              <h2 className="text-2xl font-bold flex items-center">
+                📋 Detalhes da Conta
+              </h2>
+              <button
+                onClick={() => setDetailsModal({ open: false, bill: null })}
+                className="text-white hover:text-gray-200 text-3xl font-bold leading-none"
+                title="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Nome da Conta */}
+                <div className="md:col-span-2">
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    Nome da Conta
+                  </label>
+                  <p className="text-xl font-bold text-gray-800 mt-1">
+                    {detailsModal.bill.name || detailsModal.bill.account}
+                  </p>
+                </div>
+
+                {/* Beneficiário */}
+                <div className="md:col-span-2">
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    👤 Beneficiário
+                  </label>
+                  <p className="text-lg font-semibold text-blue-600 mt-1">
+                    {detailsModal.bill.beneficiario || (
+                      <span className="text-gray-400 italic">Não informado</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Valor */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    💰 Valor
+                  </label>
+                  <p className="text-3xl font-bold text-green-600 mt-1">
+                    R$ {(detailsModal.bill.value !== undefined && detailsModal.bill.value !== null && !isNaN(Number(detailsModal.bill.value)) && isFinite(Number(detailsModal.bill.value)))
+                      ? Number(detailsModal.bill.value).toFixed(2)
+                      : (detailsModal.bill.amount !== undefined && detailsModal.bill.amount !== null && !isNaN(Number(detailsModal.bill.amount)) && isFinite(Number(detailsModal.bill.amount)))
+                      ? Number(detailsModal.bill.amount).toFixed(2)
+                      : "0.00"}
+                  </p>
+                </div>
+
+                {/* Data de Vencimento */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    📅 Data de Vencimento
+                  </label>
+                  <p className="text-lg font-semibold text-gray-700 mt-1">
+                    {new Date(detailsModal.bill.due_date).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+
+                {/* Recorrente */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    🔁 Recorrente
+                  </label>
+                  <div className="mt-1">
+                    {detailsModal.bill.recorrente ? (
+                      <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                        ✅ Sim - Repete todo mês no dia {new Date(detailsModal.bill.due_date).getDate()}
+                      </span>
+                    ) : (
+                      <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+                        ❌ Não
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Categoria */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    📂 Categoria
+                  </label>
+                  <p className="text-lg font-semibold text-gray-700 mt-1">
+                    {detailsModal.bill.category || (
+                      <span className="text-gray-400 italic">Sem categoria</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Cidade */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    🏙️ Cidade
+                  </label>
+                  <p className="text-lg font-semibold text-gray-700 mt-1">
+                    {detailsModal.bill.city || (
+                      <span className="text-gray-400 italic">Não informada</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    📊 Status
+                  </label>
+                  <div className="mt-1">
+                    <span
+                      className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                        detailsModal.bill.status === "paid"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}
+                    >
+                      {detailsModal.bill.status === "paid" ? "✅ Pago" : "⏳ Pendente"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tipo */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    🏢 Tipo
+                  </label>
+                  <p className="text-lg font-semibold text-gray-700 mt-1">
+                    {detailsModal.bill.bill_type === "company"
+                      ? "🏢 Empresarial"
+                      : "👤 Pessoal"}
+                  </p>
+                </div>
+
+                {/* Método de Pagamento */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    💳 Método de Pagamento
+                  </label>
+                  <p className="text-lg font-semibold text-gray-700 mt-1">
+                    {detailsModal.bill.payment_method === "boleto" && "📄 Boleto"}
+                    {detailsModal.bill.payment_method === "pix" && "💸 PIX"}
+                    {detailsModal.bill.payment_method === "email" && "📧 Email"}
+                    {!detailsModal.bill.payment_method && (
+                      <span className="text-gray-400 italic">Não informado</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Detalhes de Pagamento */}
+                {detailsModal.bill.payment_details && (
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                      📝 Detalhes de Pagamento
+                    </label>
+                    <p className="text-lg font-semibold text-gray-700 mt-1">
+                      {detailsModal.bill.payment_details}
+                    </p>
+                  </div>
+                )}
+
+                {/* Boleto em Mãos */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                    📋 Boleto em Mãos
+                  </label>
+                  <p className="text-lg font-semibold text-gray-700 mt-1">
+                    {detailsModal.bill.boleto_em_maos ? "✅ Sim" : "❌ Não"}
+                  </p>
+                </div>
+
+                {/* Conta (Número) */}
+                {detailsModal.bill.account && (
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                      🔢 Conta (Número)
+                    </label>
+                    <p className="text-lg font-semibold text-gray-700 mt-1">
+                      {detailsModal.bill.account}
+                    </p>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {detailsModal.bill.observations && (
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                      📝 Observações
+                    </label>
+                    <div className="mt-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {detailsModal.bill.observations}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end border-t rounded-b-xl">
+              <Button
+                onClick={() => setDetailsModal({ open: false, bill: null })}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
