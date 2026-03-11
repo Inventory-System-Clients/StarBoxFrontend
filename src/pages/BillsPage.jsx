@@ -498,6 +498,7 @@ export default function BillsPage() {
               desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="btn-cancel-delete">
               Cancelar
