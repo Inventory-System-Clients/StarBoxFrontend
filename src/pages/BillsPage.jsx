@@ -181,19 +181,17 @@ export default function BillsPage() {
                 {type === "company" ? "empresariais" : "particulares"}
               </p>
             </div>
-            {isAdmin && (
-              <Button
-                onClick={() => {
-                  setEditingBill(null);
-                  setShowModal(true);
-                }}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg btn-primary"
-                data-testid="btn-add-bill"
-              >
-                <Plus size={20} className="mr-2" />
-                Nova Conta
-              </Button>
-            )}
+            <Button
+              onClick={() => {
+                setEditingBill(null);
+                setShowModal(true);
+              }}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg btn-primary"
+              data-testid="btn-add-bill"
+            >
+              <Plus size={20} className="mr-2" />
+              Nova Conta
+            </Button>
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-purple-100">
@@ -427,33 +425,29 @@ export default function BillsPage() {
                                 <CheckCircle size={18} />
                               )}
                             </Button>
-                            {isAdmin && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEdit(bill)}
-                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                  data-testid={`btn-edit-${bill.id}`}
-                                >
-                                  <Edit size={18} />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() =>
-                                    setDeleteDialog({
-                                      open: true,
-                                      billId: bill.id,
-                                    })
-                                  }
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  data-testid={`btn-delete-${bill.id}`}
-                                >
-                                  <Trash2 size={18} />
-                                </Button>
-                              </>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEdit(bill)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              data-testid={`btn-edit-${bill.id}`}
+                            >
+                              <Edit size={18} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setDeleteDialog({
+                                  open: true,
+                                  billId: bill.id,
+                                })
+                              }
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              data-testid={`btn-delete-${bill.id}`}
+                            >
+                              <Trash2 size={18} />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -498,7 +492,7 @@ export default function BillsPage() {
               desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="btn-cancel-delete">
               Cancelar
