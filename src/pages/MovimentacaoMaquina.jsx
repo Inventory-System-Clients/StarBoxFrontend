@@ -27,6 +27,7 @@ export default function MovimentacaoMaquina() {
     retiradaProdutoDevolverEstoque: false,
     origemEstoque: "usuario",
     ignoreInOut: false,
+    usarContadorManual: false,
     quantidade_notas_entrada: "",
     valor_entrada_maquininha_pix: "",
     retiradaDinheiro: false,
@@ -43,12 +44,21 @@ export default function MovimentacaoMaquina() {
     async function fetchData() {
       setLoading(true);
       try {
-        const [maqRes, prodRes] = await Promise.all([
+        const [maqRes, prodRes, ultimoProdRes] = await Promise.all([
           api.get(`/maquinas/${maquinaId}`),
           api.get("/produtos"),
+          api
+            .get(`/maquinas/${maquinaId}/ultimo-produto`)
+            .catch(() => ({ data: { produtoId: null } })),
         ]);
         setMaquina(maqRes.data);
         setProdutos(prodRes.data);
+        if (ultimoProdRes.data?.produtoId) {
+          setFormData((prev) => ({
+            ...prev,
+            produto_id: ultimoProdRes.data.produtoId,
+          }));
+        }
       } catch {
         setError("Erro ao carregar dados da máquina ou produtos.");
       } finally {
@@ -394,43 +404,62 @@ export default function MovimentacaoMaquina() {
                       Número do contador OUT Digital da máquina
                     </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📥 Contador IN Manual
-                    </label>
-                    <input
-                      type="number"
-                      name="contadorInManual"
-                      value={formData.contadorInManual}
-                      onChange={handleChange}
-                      className="input-field"
-                      placeholder="0"
-                      min="0"
-                      disabled={formData.ignoreInOut}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Número do contador IN manual (opcional)
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📤 Contador OUT Manual
-                    </label>
-                    <input
-                      type="number"
-                      name="contadorOutManual"
-                      value={formData.contadorOutManual}
-                      onChange={handleChange}
-                      className="input-field"
-                      placeholder="0"
-                      min="0"
-                      disabled={formData.ignoreInOut}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Número do contador OUT manual (opcional)
-                    </p>
-                  </div>
                 </div>
+                <div className="flex items-center mt-2">
+                  <input
+                    type="checkbox"
+                    id="usarContadorManual"
+                    name="usarContadorManual"
+                    checked={formData.usarContadorManual || false}
+                    onChange={handleChange}
+                    className="mr-2"
+                    disabled={formData.ignoreInOut}
+                  />
+                  <label
+                    htmlFor="usarContadorManual"
+                    className="text-sm text-gray-700"
+                  >
+                    Usar contador IN/OUT manual
+                  </label>
+                </div>
+                {formData.usarContadorManual && !formData.ignoreInOut && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📥 Contador IN Manual
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorInManual"
+                        value={formData.contadorInManual}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número do contador IN manual (opcional)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📤 Contador OUT Manual
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorOutManual"
+                        value={formData.contadorOutManual}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número do contador OUT manual (opcional)
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center mt-2 mb-4">
                   <input
                     type="checkbox"
@@ -685,8 +714,9 @@ export default function MovimentacaoMaquina() {
                     💰 Retirada de Dinheiro
                   </span>
                   <p className="text-xs text-green-700 mt-1">
-                    Marque esta opção se você está retirando dinheiro desta máquina.
-                    Esta movimentação aparecerá na aba "Fluxo de Caixa" para conferência pelo administrador.
+                    Marque esta opção se você está retirando dinheiro desta
+                    máquina. Esta movimentação aparecerá na aba "Fluxo de Caixa"
+                    para conferência pelo administrador.
                   </p>
                 </div>
               </label>
