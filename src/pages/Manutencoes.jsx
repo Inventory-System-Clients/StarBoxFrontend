@@ -30,12 +30,15 @@ function Manutencoes() {
     lojaId: "",
     maquinaId: "",
     funcionarioId: "",
+    destinatarioWhatsAppId: "",
     descricao: "",
   });
 
   const [lojas, setLojas] = useState([]);
   const [maquinas, setMaquinas] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
+  const [destinatariosWhatsApp, setDestinatariosWhatsApp] = useState([]);
+  const [origemDestinatarioPadrao, setOrigemDestinatarioPadrao] = useState("");
 
   const [detalhe, setDetalhe] = useState(null);
   const [editando, setEditando] = useState(false);
@@ -75,6 +78,58 @@ function Manutencoes() {
         err?.response?.data || err,
       );
       setError("Erro ao carregar lojas, máquinas e funcionários.");
+    }
+  };
+
+  const carregarDestinatariosWhatsApp = async (lojaId) => {
+    if (!lojaId) {
+      setDestinatariosWhatsApp([]);
+      setOrigemDestinatarioPadrao("");
+      setNovaManutencao((d) => ({
+        ...d,
+        destinatarioWhatsAppId: "",
+      }));
+      return;
+    }
+
+    try {
+      const res = await api.get("/manutencao-whatsapp-prompts/destinatarios", {
+        params: { lojaId },
+      });
+
+      const lista = Array.isArray(res.data?.funcionarios)
+        ? res.data.funcionarios
+        : [];
+
+      setDestinatariosWhatsApp(lista);
+      setOrigemDestinatarioPadrao(res.data?.origemPadrao || "");
+
+      const defaultId = res.data?.defaultFuncionarioId
+        ? String(res.data.defaultFuncionarioId)
+        : "";
+
+      setNovaManutencao((d) => ({
+        ...d,
+        destinatarioWhatsAppId: defaultId,
+      }));
+    } catch (err) {
+      console.error(
+        "Erro ao carregar destinatarios de WhatsApp:",
+        err?.response?.data || err,
+      );
+
+      const fallback = (funcionarios || []).map((f) => ({
+        id: f.id,
+        nome: f.nome,
+        telefone: f.telefone || null,
+      }));
+
+      setDestinatariosWhatsApp(fallback);
+      setOrigemDestinatarioPadrao("");
+      setNovaManutencao((d) => ({
+        ...d,
+        destinatarioWhatsAppId: "",
+      }));
     }
   };
 
@@ -209,6 +264,32 @@ function Manutencoes() {
     return new Date(valor).toLocaleString("pt-BR");
   };
 
+  const resetFormularioNovaManutencao = () => {
+    setShowNovaManutencao(false);
+    setNovaManutencao({
+      lojaId: "",
+      maquinaId: "",
+      funcionarioId: "",
+      destinatarioWhatsAppId: "",
+      descricao: "",
+    });
+    setDestinatariosWhatsApp([]);
+    setOrigemDestinatarioPadrao("");
+  };
+
+  const abrirFormularioNovaManutencao = () => {
+    setNovaManutencao({
+      lojaId: "",
+      maquinaId: "",
+      funcionarioId: "",
+      destinatarioWhatsAppId: "",
+      descricao: "",
+    });
+    setDestinatariosWhatsApp([]);
+    setOrigemDestinatarioPadrao("");
+    setShowNovaManutencao(true);
+  };
+
   const handleNovaManutencao = async (event) => {
     event.preventDefault();
 
@@ -224,16 +305,46 @@ function Manutencoes() {
         funcionarioId: novaManutencao.funcionarioId || null,
       };
 
-      await api.post("/manutencoes", payload);
+      const manutencaoRes = await api.post("/manutencoes", payload);
 
-      setShowNovaManutencao(false);
-      setNovaManutencao({
-        lojaId: "",
-        maquinaId: "",
-        funcionarioId: "",
-        descricao: "",
-      });
-      setSuccess("Manutenção criada com sucesso!");
+      let mensagemPosCadastro = "Manutenção criada com sucesso!";
+
+      try {
+        const promptRes = await api.post("/manutencao-whatsapp-prompts/gerar", {
+          lojaId: novaManutencao.lojaId,
+          maquinaId: novaManutencao.maquinaId,
+          manutencaoId: manutencaoRes?.data?.id || null,
+          descricao: novaManutencao.descricao,
+          funcionarioId: novaManutencao.destinatarioWhatsAppId || null,
+        });
+
+        const whatsappUrl = promptRes?.data?.whatsappUrl;
+        if (whatsappUrl) {
+          const popup = window.open(
+            whatsappUrl,
+            "_blank",
+            "noopener,noreferrer",
+          );
+
+          if (!popup) {
+            window.location.href = whatsappUrl;
+          }
+        }
+
+        if (promptRes?.data?.aviso) {
+          mensagemPosCadastro = `Manutenção criada com sucesso. ${promptRes.data.aviso}`;
+        }
+      } catch (promptErr) {
+        console.error(
+          "Erro ao gerar prompt de WhatsApp da manutenção:",
+          promptErr?.response?.data || promptErr,
+        );
+        mensagemPosCadastro =
+          "Manutenção criada com sucesso, mas não foi possível preparar o WhatsApp.";
+      }
+
+      resetFormularioNovaManutencao();
+      setSuccess(mensagemPosCadastro);
       await carregarManutencoes();
     } catch (err) {
       setError(err?.response?.data?.error || "Erro ao criar manutenção.");
@@ -348,7 +459,7 @@ function Manutencoes() {
           <div className="mb-4">
             <button
               className="btn-primary"
-              onClick={() => setShowNovaManutencao(true)}
+              onClick={abrirFormularioNovaManutencao}
             >
               Nova Manutenção
             </button>
@@ -434,7 +545,7 @@ function Manutencoes() {
               <button
                 className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
                 type="button"
-                onClick={() => setShowNovaManutencao(false)}
+                onClick={resetFormularioNovaManutencao}
               >
                 <svg
                   className="w-6 h-6"
@@ -459,13 +570,15 @@ function Manutencoes() {
                   <select
                     className="input-field w-full"
                     value={novaManutencao.lojaId}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const lojaId = e.target.value;
                       setNovaManutencao((d) => ({
                         ...d,
-                        lojaId: e.target.value,
+                        lojaId,
                         maquinaId: "",
-                      }))
-                    }
+                      }));
+                      carregarDestinatariosWhatsApp(lojaId);
+                    }}
                     required
                   >
                     <option value="">Selecione</option>
@@ -521,6 +634,37 @@ function Manutencoes() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium">
+                    Enviar WhatsApp para
+                  </label>
+                  <select
+                    className="input-field w-full"
+                    value={novaManutencao.destinatarioWhatsAppId}
+                    onChange={(e) =>
+                      setNovaManutencao((d) => ({
+                        ...d,
+                        destinatarioWhatsAppId: e.target.value,
+                      }))
+                    }
+                    disabled={!novaManutencao.lojaId}
+                  >
+                    <option value="">Selecione</option>
+                    {destinatariosWhatsApp.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.nome}
+                        {f.telefone ? ` - ${f.telefone}` : " - sem telefone"}
+                      </option>
+                    ))}
+                  </select>
+                  {origemDestinatarioPadrao === "roteiro_da_loja" && (
+                    <p className="text-xs text-green-700 mt-1">
+                      Padrão automático: funcionário responsável pelo roteiro da
+                      loja.
+                    </p>
+                  )}
                 </div>
 
                 <div>
