@@ -198,7 +198,7 @@ export function MaquinaForm() {
 
       const data = {
         codigo: formData.codigo.trim(),
-        nome: formData.nome.trim(),
+        nome: formData.nome.trim() || null,
         lojaId: formData.loja_id,
         tipo: formData.tipo?.trim() || null,
         capacidadePadrao: parseInt(formData.capacidadePadrao, 10) || 0,
@@ -295,7 +295,7 @@ export function MaquinaForm() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Nome *
+                    Nome
                   </label>
                   <input
                     type="text"
@@ -304,7 +304,6 @@ export function MaquinaForm() {
                     onChange={handleChange}
                     className="input-field"
                     placeholder="Ex: Máquina Principal"
-                    required
                   />
                 </div>
 

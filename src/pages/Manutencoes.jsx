@@ -244,7 +244,7 @@ function Manutencoes() {
 
         return {
           maquinaId: ordenadas[0].maquinaId,
-          maquinaNome: ordenadas[0].maquina?.nome || "Máquina sem nome",
+          maquinaNome: ordenadas[0].maquina?.codigo || "Máquina sem código",
           lojaNome: ordenadas[0].loja?.nome || "Loja não informada",
           dataAtual: ordenadas[0].concluidoEm || ordenadas[0].createdAt,
           dataUltima: ordenadas[1].concluidoEm || ordenadas[1].createdAt,
@@ -607,7 +607,7 @@ function Manutencoes() {
                     <option value="">Selecione</option>
                     {maquinasFiltradas.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.nome}
+                        {m.codigo}{m.nome ? ` - ${m.nome}` : ''}
                       </option>
                     ))}
                   </select>
@@ -742,7 +742,7 @@ function Manutencoes() {
                       {new Date(m.createdAt).toLocaleString("pt-BR")}
                     </td>
                     <td className="px-4 py-2">{m.loja?.nome || "-"}</td>
-                    <td className="px-4 py-2">{m.maquina?.nome || "-"}</td>
+                    <td className="px-4 py-2">{m.maquina?.codigo || "-"}{m.maquina?.nome ? ` - ${m.maquina.nome}` : ''}</td>
                     <td className="px-4 py-2 font-bold">
                       {m.status === "feito" || m.status === "concluida" ? (
                         <span className="text-green-700">{m.status}</span>
@@ -865,7 +865,7 @@ function Manutencoes() {
                   <strong>Loja:</strong> {detalhe.loja?.nome || "-"}
                 </div>
                 <div>
-                  <strong>Máquina:</strong> {detalhe.maquina?.nome || "-"}
+                  <strong>Máquina:</strong> {detalhe.maquina?.codigo || "-"}{detalhe.maquina?.nome ? ` - ${detalhe.maquina.nome}` : ''}
                 </div>
 
                 {/* Explicações dos funcionários */}
