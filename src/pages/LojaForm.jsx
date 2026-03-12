@@ -7,7 +7,49 @@ import { PageHeader, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
 
 export function LojaForm() {
-  const criarGastoFixoVazio = () => ({ nome: "", valor: "" });
+  const GASTOS_FIXOS_PREDEFINIDOS = ["Aluguel", "machine pay", "data tem"];
+
+  const normalizarNomeGasto = (nome) =>
+    String(nome || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+
+  const ALIASES_GASTOS_FIXOS = new Map([["chipdatatem", "datatem"]]);
+
+  const resolverChaveGastoFixo = (nome) => {
+    const chaveNormalizada = normalizarNomeGasto(nome);
+    return ALIASES_GASTOS_FIXOS.get(chaveNormalizada) || chaveNormalizada;
+  };
+
+  const VALORES_BASE_GASTOS_FIXOS = new Map([
+    ["aluguel", "1300"],
+    ["machinepay", "40"],
+    ["datatem", "40"],
+  ]);
+
+  const NOMES_GASTOS_FIXOS_PADRAO = new Set([
+    ...GASTOS_FIXOS_PREDEFINIDOS.map(resolverChaveGastoFixo),
+    ...Array.from(ALIASES_GASTOS_FIXOS.keys()),
+  ]);
+
+  const criarGastosFixosPadrao = (valoresPorNome = new Map()) =>
+    GASTOS_FIXOS_PREDEFINIDOS.map((nome) => ({
+      nome,
+      valor:
+        valoresPorNome.get(resolverChaveGastoFixo(nome)) ||
+        VALORES_BASE_GASTOS_FIXOS.get(resolverChaveGastoFixo(nome)) ||
+        "",
+      isPadrao: true,
+    }));
+
+  const criarGastoFixoExtraVazio = () => ({
+    nome: "",
+    valor: "",
+    isPadrao: false,
+  });
 
   const parseValorMonetario = (valor) => {
     const texto = String(valor ?? "").trim();
@@ -46,7 +88,7 @@ export function LojaForm() {
   const [success, setSuccess] = useState("");
   const [loadingGastosFixos, setLoadingGastosFixos] = useState(false);
 
-  const [gastosFixos, setGastosFixos] = useState([criarGastoFixoVazio()]);
+  const [gastosFixos, setGastosFixos] = useState(criarGastosFixosPadrao());
 
   // Estados para gerenciar estoque do depósito
   const [produtos, setProdutos] = useState([]);
@@ -123,63 +165,83 @@ export function LojaForm() {
           ? response.data.gastos
           : [];
 
-      const gastosNormalizados = listaRecebida
-        .map((item) => ({
-          nome: String(item?.nome || ""),
-          valor:
-            item?.valor !== null && item?.valor !== undefined
-              ? String(item.valor)
-              : "",
-        }))
-        .filter((item) => item.nome.trim() || item.valor.trim());
+      const valoresPorNome = new Map();
+      const gastosExtras = [];
 
-      setGastosFixos(
-        gastosNormalizados.length
-          ? gastosNormalizados
-          : [criarGastoFixoVazio()],
-      );
+      listaRecebida.forEach((item) => {
+        const nome = String(item?.nome || "").trim();
+        const chave = resolverChaveGastoFixo(nome);
+
+        const valorTexto =
+          item?.valor !== null && item?.valor !== undefined
+            ? String(item.valor)
+            : "";
+
+        if (!nome && !valorTexto) {
+          return;
+        }
+
+        if (NOMES_GASTOS_FIXOS_PADRAO.has(chave)) {
+          valoresPorNome.set(chave, valorTexto);
+          return;
+        }
+
+        gastosExtras.push({
+          nome,
+          valor: valorTexto,
+          isPadrao: false,
+        });
+      });
+
+      setGastosFixos([
+        ...criarGastosFixosPadrao(valoresPorNome),
+        ...gastosExtras,
+      ]);
     } catch (error) {
       console.error("Erro ao carregar gastos fixos:", error);
-      setGastosFixos([criarGastoFixoVazio()]);
+      setGastosFixos(criarGastosFixosPadrao());
     } finally {
       setLoadingGastosFixos(false);
     }
   };
 
   const adicionarGastoFixo = () => {
-    setGastosFixos((prev) => [...prev, criarGastoFixoVazio()]);
+    setGastosFixos((prev) => [...prev, criarGastoFixoExtraVazio()]);
   };
 
   const removerGastoFixo = (index) => {
     setGastosFixos((prev) => {
-      if (prev.length === 1) return [criarGastoFixoVazio()];
+      if (prev[index]?.isPadrao) return prev;
       return prev.filter((_, idx) => idx !== index);
     });
   };
 
   const alterarGastoFixo = (index, campo, valor) => {
     setGastosFixos((prev) =>
-      prev.map((gasto, idx) =>
-        idx === index
-          ? {
-              ...gasto,
-              [campo]:
-                campo === "valor" ? valor.replace(/[^0-9.,]/g, "") : valor,
-            }
-          : gasto,
-      ),
+      prev.map((gasto, idx) => {
+        if (idx !== index) return gasto;
+        if (campo === "nome" && gasto.isPadrao) return gasto;
+
+        return {
+          ...gasto,
+          [campo]: campo === "valor" ? valor.replace(/[^0-9.,]/g, "") : valor,
+        };
+      }),
     );
   };
 
   const salvarGastosFixosDaLoja = async (lojaId) => {
     const gastosComDados = gastosFixos.filter(
-      (item) => item.nome.trim() || item.valor.trim(),
+      (item) => item.isPadrao || item.nome.trim() || item.valor.trim(),
     );
 
-    const gastoInvalido = gastosComDados.find((item) => !item.nome.trim());
-    if (gastoInvalido) {
+    const gastoExtraSemNome = gastosComDados.find(
+      (item) => !item.isPadrao && !item.nome.trim(),
+    );
+
+    if (gastoExtraSemNome) {
       throw new Error(
-        "Preencha o nome de todos os gastos fixos antes de salvar",
+        "Preencha o nome de todos os gastos extras antes de salvar",
       );
     }
 
@@ -397,14 +459,14 @@ export function LojaForm() {
                   >
                     <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 4a1 1 0 10-2 0v3H6a1 1 0 100 2h3v3a1 1 0 102 0v-3h3a1 1 0 100-2h-3V6z" />
                   </svg>
-                  Gastos Fixos
+                  Gastos Fixos (padrao para todas as maquinas)
                 </h3>
                 <button
                   type="button"
                   onClick={adicionarGastoFixo}
                   className="btn-secondary"
                 >
-                  + Adicionar gasto
+                  + Adicionar gasto extra
                 </button>
               </div>
 
@@ -427,9 +489,15 @@ export function LojaForm() {
                         </label>
                         <input
                           type="text"
-                          className="input-field"
-                          placeholder="Ex: Aluguel"
+                          className={
+                            gasto.isPadrao
+                              ? "input-field bg-gray-100 text-gray-600 cursor-not-allowed"
+                              : "input-field"
+                          }
                           value={gasto.nome}
+                          placeholder={gasto.isPadrao ? "" : "Ex: Limpeza"}
+                          readOnly={gasto.isPadrao}
+                          disabled={gasto.isPadrao}
                           onChange={(e) =>
                             alterarGastoFixo(index, "nome", e.target.value)
                           }
@@ -454,13 +522,15 @@ export function LojaForm() {
                       </div>
 
                       <div className="md:col-span-2">
-                        <button
-                          type="button"
-                          onClick={() => removerGastoFixo(index)}
-                          className="w-full px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          Remover
-                        </button>
+                        {!gasto.isPadrao && (
+                          <button
+                            type="button"
+                            onClick={() => removerGastoFixo(index)}
+                            className="w-full px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            Remover
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
