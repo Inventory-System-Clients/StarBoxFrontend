@@ -9,6 +9,12 @@ import { Modal, AlertBox } from "../components/UIComponents";
 export function Roteiros() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const STATUS_ROTEIRO_FINALIZADO = new Set([
+    "finalizado",
+    "finalizada",
+    "concluido",
+    "concluida",
+  ]);
 
   // --- ESTADOS DE DADOS ---
   const [roteiros, setRoteiros] = useState([]);
@@ -34,15 +40,17 @@ export function Roteiros() {
   const [salvandoDias, setSalvandoDias] = useState({});
 
   const getDiasRoteiro = (roteiro) => {
-    if (diasPendentes[roteiro.id] !== undefined) return diasPendentes[roteiro.id];
+    if (diasPendentes[roteiro.id] !== undefined)
+      return diasPendentes[roteiro.id];
     return roteiro.diasSemana || [];
   };
 
   const toggleDia = (roteiroId, dia) => {
     setDiasPendentes((prev) => {
-      const atual = prev[roteiroId] !== undefined
-        ? prev[roteiroId]
-        : (roteiros.find((r) => r.id === roteiroId)?.diasSemana || []);
+      const atual =
+        prev[roteiroId] !== undefined
+          ? prev[roteiroId]
+          : roteiros.find((r) => r.id === roteiroId)?.diasSemana || [];
       const novo = atual.includes(dia)
         ? atual.filter((d) => d !== dia)
         : [...atual, dia];
@@ -87,6 +95,16 @@ export function Roteiros() {
   const [draggedFromRoteiro, setDraggedFromRoteiro] = useState(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState(null);
 
+  const isRoteiroFinalizado = (roteiro) =>
+    STATUS_ROTEIRO_FINALIZADO.has(
+      String(roteiro?.status || "")
+        .trim()
+        .toLowerCase(),
+    );
+
+  const getRoteiroById = (roteiroId) =>
+    roteiros.find((item) => String(item.id) === String(roteiroId));
+
   // Depende de usuario?.role para esperar o AuthContext hidratar do localStorage
   useEffect(() => {
     if (usuario === undefined) return; // ainda inicializando
@@ -99,11 +117,12 @@ export function Roteiros() {
       const promises = [
         api.get("/roteiros/com-status"),
         api.get("/lojas"),
-          usuario?.role === "ADMIN"
-            ? api.get("/usuarios/funcionarios")
-            : Promise.resolve({ data: [] }),
+        usuario?.role === "ADMIN"
+          ? api.get("/usuarios/funcionarios")
+          : Promise.resolve({ data: [] }),
       ];
-      const [resRoteiros, resLojas, resFuncionarios] = await Promise.all(promises);
+      const [resRoteiros, resLojas, resFuncionarios] =
+        await Promise.all(promises);
       setRoteiros(resRoteiros.data || []);
       setTodasLojas(resLojas.data || []);
       setFuncionarios(resFuncionarios.data || []);
@@ -117,7 +136,10 @@ export function Roteiros() {
   // --- AÇÕES ---
   const handleCriarRoteiro = async () => {
     try {
-      await api.post("/roteiros", { nome: novoNomeRoteiro, diasSemana: novosDiasRoteiro });
+      await api.post("/roteiros", {
+        nome: novoNomeRoteiro,
+        diasSemana: novosDiasRoteiro,
+      });
       setNovoNomeRoteiro("");
       setNovosDiasRoteiro([]);
       setShowModalCriarRoteiro(false);
@@ -129,6 +151,19 @@ export function Roteiros() {
   };
 
   const handleMoverLoja = async (lojaId, origemId, destinoId) => {
+    const roteiroOrigem = origemId ? getRoteiroById(origemId) : null;
+    const roteiroDestino = getRoteiroById(destinoId);
+
+    if (
+      isRoteiroFinalizado(roteiroOrigem) ||
+      isRoteiroFinalizado(roteiroDestino)
+    ) {
+      setError(
+        "Roteiro finalizado não permite adicionar, remover ou mover lojas.",
+      );
+      return;
+    }
+
     try {
       await api.post("/roteiros/mover-loja", {
         lojaId,
@@ -142,6 +177,12 @@ export function Roteiros() {
   };
 
   const handleReordenarLoja = async (roteiroId, lojaId, novaOrdem) => {
+    const roteiro = getRoteiroById(roteiroId);
+    if (isRoteiroFinalizado(roteiro)) {
+      setError("Roteiro finalizado não permite reordenar lojas.");
+      return;
+    }
+
     try {
       await api.patch(`/roteiros/${roteiroId}/reordenar-loja`, {
         lojaId,
@@ -218,11 +259,26 @@ export function Roteiros() {
   // --- DRAG AND DROP HANDLERS ---
   const onDragStart = (loja, roteiroId) => {
     if (usuario?.role !== "ADMIN") return;
+    const roteiroOrigem = getRoteiroById(roteiroId);
+    if (isRoteiroFinalizado(roteiroOrigem)) return;
+
     setDraggedLoja(loja);
     setDraggedFromRoteiro(roteiroId);
   };
 
-  const onDragOver = (e, index) => {
+  const onDragOver = (e, index, roteiroDestinoId) => {
+    const roteiroOrigem = getRoteiroById(draggedFromRoteiro);
+    const roteiroDestino = getRoteiroById(roteiroDestinoId);
+
+    if (
+      usuario?.role !== "ADMIN" ||
+      !draggedLoja ||
+      isRoteiroFinalizado(roteiroOrigem) ||
+      isRoteiroFinalizado(roteiroDestino)
+    ) {
+      return;
+    }
+
     e.preventDefault();
     setDraggedOverIndex(index);
   };
@@ -234,18 +290,35 @@ export function Roteiros() {
   const onDrop = (e, roteiroDestinoId, dropIndex = null) => {
     e.preventDefault();
     setDraggedOverIndex(null);
-    
+
+    if (usuario?.role !== "ADMIN") return;
+
     if (!draggedLoja) return;
+
+    const roteiroOrigem = getRoteiroById(draggedFromRoteiro);
+    const roteiroDestino = getRoteiroById(roteiroDestinoId);
+
+    if (
+      isRoteiroFinalizado(roteiroOrigem) ||
+      isRoteiroFinalizado(roteiroDestino)
+    ) {
+      setError(
+        "Roteiro finalizado não permite adicionar, remover ou mover lojas.",
+      );
+      setDraggedLoja(null);
+      setDraggedFromRoteiro(null);
+      return;
+    }
 
     // Se é o mesmo roteiro, reordenar
     if (draggedFromRoteiro === roteiroDestinoId && dropIndex !== null) {
       handleReordenarLoja(roteiroDestinoId, draggedLoja.id, dropIndex);
-    } 
+    }
     // Se é roteiro diferente, mover
     else if (draggedFromRoteiro !== roteiroDestinoId) {
       handleMoverLoja(draggedLoja.id, draggedFromRoteiro, roteiroDestinoId);
     }
-    
+
     setDraggedLoja(null);
     setDraggedFromRoteiro(null);
   };
@@ -284,24 +357,37 @@ export function Roteiros() {
         )}
 
         {/* Funcionários veem só os roteiros atribuídos a eles */}
-        {usuario?.role !== "ADMIN" && roteiros.filter(r => String(r.funcionarioId) === String(usuario?.id)).length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
-            Nenhum roteiro atribuído a você no momento.
-          </div>
-        )}
+        {usuario?.role !== "ADMIN" &&
+          roteiros.filter(
+            (r) => String(r.funcionarioId) === String(usuario?.id),
+          ).length === 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
+              Nenhum roteiro atribuído a você no momento.
+            </div>
+          )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(usuario?.role === "ADMIN"
             ? roteiros
-            : roteiros.filter(r => String(r.funcionarioId) === String(usuario?.id))
+            : roteiros.filter(
+                (r) => String(r.funcionarioId) === String(usuario?.id),
+              )
           ).map((roteiro) => (
             <div
               key={roteiro.id}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => onDrop(e, roteiro.id)}
+              onDragOver={(e) => {
+                if (usuario?.role !== "ADMIN" || isRoteiroFinalizado(roteiro))
+                  return;
+                e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (usuario?.role !== "ADMIN" || isRoteiroFinalizado(roteiro))
+                  return;
+                onDrop(e, roteiro.id);
+              }}
               className={`rounded-xl shadow-lg p-6 border-2 transition-all 
                 ${roteiro.status === "finalizado" ? "bg-green-50 border-green-600" : "bg-white border-transparent"}
-                ${draggedLoja && draggedFromRoteiro !== roteiro.id ? "border-blue-400 border-dashed bg-blue-50" : ""}
+                ${draggedLoja && draggedFromRoteiro !== roteiro.id && !isRoteiroFinalizado(roteiro) ? "border-blue-400 border-dashed bg-blue-50" : ""}
               `}
             >
               <div className="flex justify-between items-center mb-4">
@@ -333,7 +419,9 @@ export function Roteiros() {
                       const rawId = e.target.value;
                       // IDs são UUID — não converter para número
                       const funcionarioId = rawId || null;
-                      const f = funcionarios.find((x) => String(x.id) === rawId);
+                      const f = funcionarios.find(
+                        (x) => String(x.id) === rawId,
+                      );
                       const funcionarioNome = f?.nome || "";
 
                       // Atualização optimista para não flickar o select
@@ -341,8 +429,8 @@ export function Roteiros() {
                         prev.map((r) =>
                           r.id === roteiro.id
                             ? { ...r, funcionarioId, funcionarioNome }
-                            : r
-                        )
+                            : r,
+                        ),
                       );
 
                       try {
@@ -350,7 +438,9 @@ export function Roteiros() {
                           funcionarioId,
                           funcionarioNome,
                         });
-                        setSuccess(`Funcionário ${funcionarioNome || "removido"} atribuído com sucesso.`);
+                        setSuccess(
+                          `Funcionário ${funcionarioNome || "removido"} atribuído com sucesso.`,
+                        );
                         // Recarregar dados do backend para garantir persistência
                         carregarDadosIniciais();
                       } catch (err) {
@@ -359,9 +449,13 @@ export function Roteiros() {
                         setRoteiros((prev) =>
                           prev.map((r) =>
                             r.id === roteiro.id
-                              ? { ...r, funcionarioId: roteiro.funcionarioId, funcionarioNome: roteiro.funcionarioNome }
-                              : r
-                          )
+                              ? {
+                                  ...r,
+                                  funcionarioId: roteiro.funcionarioId,
+                                  funcionarioNome: roteiro.funcionarioNome,
+                                }
+                              : r,
+                          ),
                         );
                       }
                     }}
@@ -395,9 +489,11 @@ export function Roteiros() {
                         disabled={usuario?.role !== "ADMIN"}
                         onClick={() => toggleDia(roteiro.id, label)}
                         className={`px-2 py-1 rounded-md text-[11px] font-bold transition-colors border
-                          ${selecionado
-                            ? "bg-[#24094E] text-white border-[#24094E]"
-                            : "bg-gray-100 text-gray-400 border-gray-200 hover:border-[#24094E] hover:text-[#24094E]"}
+                          ${
+                            selecionado
+                              ? "bg-[#24094E] text-white border-[#24094E]"
+                              : "bg-gray-100 text-gray-400 border-gray-200 hover:border-[#24094E] hover:text-[#24094E]"
+                          }
                           ${usuario?.role !== "ADMIN" ? "cursor-default opacity-70" : "cursor-pointer"}`}
                       >
                         {label}
@@ -405,15 +501,16 @@ export function Roteiros() {
                     );
                   })}
                 </div>
-                {usuario?.role === "ADMIN" && diasPendentes[roteiro.id] !== undefined && (
-                  <button
-                    onClick={() => salvarDias(roteiro.id)}
-                    disabled={salvandoDias[roteiro.id]}
-                    className="mt-2 w-full py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
-                  >
-                    {salvandoDias[roteiro.id] ? "Salvando..." : "Salvar dias"}
-                  </button>
-                )}
+                {usuario?.role === "ADMIN" &&
+                  diasPendentes[roteiro.id] !== undefined && (
+                    <button
+                      onClick={() => salvarDias(roteiro.id)}
+                      disabled={salvandoDias[roteiro.id]}
+                      className="mt-2 w-full py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                    >
+                      {salvandoDias[roteiro.id] ? "Salvando..." : "Salvar dias"}
+                    </button>
+                  )}
               </div>
 
               {/* Lista de Lojas */}
@@ -422,17 +519,18 @@ export function Roteiros() {
                   <span className="text-xs font-bold text-gray-400">
                     LOJAS NO DIA
                   </span>
-                  {usuario?.role === "ADMIN" && (
-                    <button
-                      onClick={() => {
-                        setRoteiroParaAdicionar(roteiro);
-                        setShowModalAdicionarLoja(true);
-                      }}
-                      className="text-blue-600 text-xs font-bold hover:underline"
-                    >
-                      + Adicionar
-                    </button>
-                  )}
+                  {usuario?.role === "ADMIN" &&
+                    !isRoteiroFinalizado(roteiro) && (
+                      <button
+                        onClick={() => {
+                          setRoteiroParaAdicionar(roteiro);
+                          setShowModalAdicionarLoja(true);
+                        }}
+                        className="text-blue-600 text-xs font-bold hover:underline"
+                      >
+                        + Adicionar
+                      </button>
+                    )}
                 </div>
                 <div className="min-h-[120px] bg-gray-50 rounded-lg p-3 border border-gray-100">
                   {roteiro.lojas?.length > 0 ? (
@@ -441,13 +539,16 @@ export function Roteiros() {
                       .map((loja, index) => (
                         <div
                           key={loja.id}
-                          draggable={usuario?.role === "ADMIN"}
+                          draggable={
+                            usuario?.role === "ADMIN" &&
+                            !isRoteiroFinalizado(roteiro)
+                          }
                           onDragStart={() => onDragStart(loja, roteiro.id)}
-                          onDragOver={(e) => onDragOver(e, index)}
+                          onDragOver={(e) => onDragOver(e, index, roteiro.id)}
                           onDragLeave={onDragLeave}
                           onDrop={(e) => onDrop(e, roteiro.id, index)}
                           className={`bg-white p-3 rounded-md border shadow-sm mb-2 text-sm flex items-center gap-2 transition-colors
-                            ${usuario?.role === "ADMIN" ? "cursor-move hover:border-blue-300" : ""}
+                            ${usuario?.role === "ADMIN" && !isRoteiroFinalizado(roteiro) ? "cursor-move hover:border-blue-300" : ""}
                             ${draggedOverIndex === index && draggedFromRoteiro === roteiro.id ? "border-blue-500 border-2 bg-blue-50" : "border-gray-200"}
                           `}
                         >
@@ -529,13 +630,15 @@ export function Roteiros() {
                       setNovosDiasRoteiro((prev) =>
                         prev.includes(label)
                           ? prev.filter((d) => d !== label)
-                          : [...prev, label]
+                          : [...prev, label],
                       )
                     }
                     className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors
-                      ${selecionado
-                        ? "bg-[#24094E] text-white border-[#24094E]"
-                        : "bg-gray-100 text-gray-500 border-gray-200 hover:border-[#24094E] hover:text-[#24094E]"}`}
+                      ${
+                        selecionado
+                          ? "bg-[#24094E] text-white border-[#24094E]"
+                          : "bg-gray-100 text-gray-500 border-gray-200 hover:border-[#24094E] hover:text-[#24094E]"
+                      }`}
                   >
                     {label}
                   </button>
@@ -544,7 +647,10 @@ export function Roteiros() {
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => { setShowModalCriarRoteiro(false); setNovosDiasRoteiro([]); }}
+                onClick={() => {
+                  setShowModalCriarRoteiro(false);
+                  setNovosDiasRoteiro([]);
+                }}
                 className="flex-1 py-3 text-gray-500 font-bold"
               >
                 Voltar
@@ -567,6 +673,11 @@ export function Roteiros() {
             <h2 className="text-xl font-bold mb-4">
               Adicionar Loja a {roteiroParaAdicionar.nome}
             </h2>
+            {isRoteiroFinalizado(roteiroParaAdicionar) && (
+              <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                Este roteiro está finalizado. Não é permitido adicionar lojas.
+              </div>
+            )}
             <div className="overflow-y-auto space-y-2 mb-4">
               {todasLojas.map((loja) => (
                 <button
@@ -575,7 +686,8 @@ export function Roteiros() {
                     handleMoverLoja(loja.id, null, roteiroParaAdicionar.id);
                     setShowModalAdicionarLoja(false);
                   }}
-                  className="w-full text-left p-3 hover:bg-gray-50 rounded-xl border flex justify-between items-center group"
+                  disabled={isRoteiroFinalizado(roteiroParaAdicionar)}
+                  className="w-full text-left p-3 hover:bg-gray-50 rounded-xl border flex justify-between items-center group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="font-medium text-sm">🏪 {loja.nome}</span>
                   <span className="text-blue-500 opacity-0 group-hover:opacity-100 font-bold text-xs">
