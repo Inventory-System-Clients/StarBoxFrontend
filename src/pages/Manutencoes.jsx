@@ -11,6 +11,23 @@ const STATUS_CONCLUIDOS = ["feito", "concluida"];
 const statusEhConcluido = (status) =>
   STATUS_CONCLUIDOS.includes(String(status || "").toLowerCase());
 
+const abrirWhatsAppComFallback = ({ whatsappUrl, popupReservado }) => {
+  if (!whatsappUrl) {
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.close();
+    }
+    return false;
+  }
+
+  if (popupReservado && !popupReservado.closed) {
+    popupReservado.location.href = whatsappUrl;
+    return true;
+  }
+
+  window.location.assign(whatsappUrl);
+  return true;
+};
+
 function Manutencoes() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === "ADMIN";
@@ -293,6 +310,9 @@ function Manutencoes() {
   const handleNovaManutencao = async (event) => {
     event.preventDefault();
 
+    // Reserva a aba dentro do clique do usuario para evitar bloqueio do popup.
+    const popupReservado = window.open("", "_blank", "noopener,noreferrer");
+
     try {
       setLoading(true);
       setError("");
@@ -319,17 +339,7 @@ function Manutencoes() {
         });
 
         const whatsappUrl = promptRes?.data?.whatsappUrl;
-        if (whatsappUrl) {
-          const popup = window.open(
-            whatsappUrl,
-            "_blank",
-            "noopener,noreferrer",
-          );
-
-          if (!popup) {
-            window.location.href = whatsappUrl;
-          }
-        }
+        abrirWhatsAppComFallback({ whatsappUrl, popupReservado });
 
         if (promptRes?.data?.aviso) {
           mensagemPosCadastro = `Manutenção criada com sucesso. ${promptRes.data.aviso}`;
@@ -339,6 +349,9 @@ function Manutencoes() {
           "Erro ao gerar prompt de WhatsApp da manutenção:",
           promptErr?.response?.data || promptErr,
         );
+        if (popupReservado && !popupReservado.closed) {
+          popupReservado.close();
+        }
         mensagemPosCadastro =
           "Manutenção criada com sucesso, mas não foi possível preparar o WhatsApp.";
       }
@@ -607,7 +620,8 @@ function Manutencoes() {
                     <option value="">Selecione</option>
                     {maquinasFiltradas.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.codigo}{m.nome ? ` - ${m.nome}` : ''}
+                        {m.codigo}
+                        {m.nome ? ` - ${m.nome}` : ""}
                       </option>
                     ))}
                   </select>
@@ -742,7 +756,10 @@ function Manutencoes() {
                       {new Date(m.createdAt).toLocaleString("pt-BR")}
                     </td>
                     <td className="px-4 py-2">{m.loja?.nome || "-"}</td>
-                    <td className="px-4 py-2">{m.maquina?.codigo || "-"}{m.maquina?.nome ? ` - ${m.maquina.nome}` : ''}</td>
+                    <td className="px-4 py-2">
+                      {m.maquina?.codigo || "-"}
+                      {m.maquina?.nome ? ` - ${m.maquina.nome}` : ""}
+                    </td>
                     <td className="px-4 py-2 font-bold">
                       {m.status === "feito" || m.status === "concluida" ? (
                         <span className="text-green-700">{m.status}</span>
@@ -865,7 +882,8 @@ function Manutencoes() {
                   <strong>Loja:</strong> {detalhe.loja?.nome || "-"}
                 </div>
                 <div>
-                  <strong>Máquina:</strong> {detalhe.maquina?.codigo || "-"}{detalhe.maquina?.nome ? ` - ${detalhe.maquina.nome}` : ''}
+                  <strong>Máquina:</strong> {detalhe.maquina?.codigo || "-"}
+                  {detalhe.maquina?.nome ? ` - ${detalhe.maquina.nome}` : ""}
                 </div>
 
                 {/* Explicações dos funcionários */}
