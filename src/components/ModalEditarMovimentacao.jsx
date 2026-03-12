@@ -1,0 +1,394 @@
+import { useState, useEffect } from "react";
+import { Modal } from "./UIComponents";
+import api from "../services/api";
+
+/**
+ * Modal para editar movimentações de máquinas
+ * Permite editar campos como fichas, contadores, valores monetários, etc.
+ * 
+ * @param {Object} movimentacao - Dados da movimentação a ser editada
+ * @param {Function} onClose - Callback para fechar o modal
+ * @param {Function} onSucesso - Callback chamado após edição bem-sucedida
+ */
+export default function ModalEditarMovimentacao({ movimentacao, onClose, onSucesso }) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    totalPre: "",
+    sairam: "",
+    abastecidas: "",
+    fichas: "",
+    contadorIn: "",
+    contadorOut: "",
+    contadorMaquina: "",
+    quantidade_notas_entrada: "",
+    valor_entrada_maquininha_pix: "",
+    observacoes: "",
+    tipoOcorrencia: "Normal",
+    dataColeta: "",
+  });
+
+  // Preencher formulário com dados da movimentação ao abrir
+  useEffect(() => {
+    if (movimentacao) {
+      // Formatar data para input datetime-local
+      const dataFormatada = movimentacao.dataColeta
+        ? new Date(movimentacao.dataColeta).toISOString().slice(0, 16)
+        : "";
+
+      setFormData({
+        totalPre: movimentacao.totalPre || "",
+        sairam: movimentacao.sairam || "",
+        abastecidas: movimentacao.abastecidas || "",
+        fichas: movimentacao.fichas || "",
+        contadorIn: movimentacao.contadorIn || "",
+        contadorOut: movimentacao.contadorOut || "",
+        contadorMaquina: movimentacao.contadorMaquina || "",
+        quantidade_notas_entrada: movimentacao.quantidade_notas_entrada || "",
+        valor_entrada_maquininha_pix: movimentacao.valor_entrada_maquininha_pix || "",
+        observacoes: movimentacao.observacoes || "",
+        tipoOcorrencia: movimentacao.tipoOcorrencia || "Normal",
+        dataColeta: dataFormatada,
+      });
+    }
+  }, [movimentacao]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Confirmação antes de salvar
+    if (!window.confirm("Deseja realmente atualizar esta movimentação?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Preparar dados para envio
+      const dadosParaEnviar = {
+        totalPre: formData.totalPre ? parseInt(formData.totalPre) : null,
+        sairam: formData.sairam ? parseInt(formData.sairam) : null,
+        abastecidas: formData.abastecidas ? parseInt(formData.abastecidas) : null,
+        fichas: formData.fichas ? parseInt(formData.fichas) : null,
+        contadorIn: formData.contadorIn ? parseInt(formData.contadorIn) : null,
+        contadorOut: formData.contadorOut ? parseInt(formData.contadorOut) : null,
+        contadorMaquina: formData.contadorMaquina ? parseInt(formData.contadorMaquina) : null,
+        quantidade_notas_entrada: formData.quantidade_notas_entrada 
+          ? parseFloat(formData.quantidade_notas_entrada) 
+          : null,
+        valor_entrada_maquininha_pix: formData.valor_entrada_maquininha_pix 
+          ? parseFloat(formData.valor_entrada_maquininha_pix) 
+          : null,
+        observacoes: formData.observacoes || null,
+        tipoOcorrencia: formData.tipoOcorrencia || "Normal",
+        dataColeta: formData.dataColeta ? new Date(formData.dataColeta).toISOString() : null,
+      };
+
+      // Enviar requisição PUT
+      const response = await api.put(`/movimentacoes/${movimentacao.id}`, dadosParaEnviar);
+
+      // Sucesso
+      alert("Movimentação atualizada com sucesso!");
+      
+      // Chamar callback de sucesso com dados atualizados
+      if (onSucesso) {
+        onSucesso(response.data);
+      }
+
+      // Fechar modal
+      onClose();
+    } catch (error) {
+      console.error("Erro ao atualizar movimentação:", error);
+      
+      // Tratar erros específicos
+      if (error.response?.status === 403) {
+        alert("Você não tem permissão para editar esta movimentação.");
+      } else if (error.response?.status === 404) {
+        alert("Movimentação não encontrada.");
+      } else {
+        alert(
+          error.response?.data?.error || 
+          "Erro ao atualizar movimentação. Tente novamente."
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calcular valores automáticos (apenas para exibição)
+  const totalPosCalculado = formData.totalPre && formData.abastecidas
+    ? parseInt(formData.totalPre) + parseInt(formData.abastecidas) - (parseInt(formData.sairam) || 0)
+    : null;
+
+  const valorFaturadoCalculado = (() => {
+    const fichasValor = (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
+    const notasValor = parseFloat(formData.quantidade_notas_entrada) || 0;
+    const pixValor = parseFloat(formData.valor_entrada_maquininha_pix) || 0;
+    return fichasValor + notasValor + pixValor;
+  })();
+
+  return (
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={`Editar Movimentação - ${movimentacao?.maquina?.nome || movimentacao?.maquina?.codigo || "Máquina"}`}
+      size="lg"
+    >
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-6">
+          {/* Data da Coleta */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📅 Data da Coleta
+            </label>
+            <input
+              type="datetime-local"
+              name="dataColeta"
+              value={formData.dataColeta}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          {/* QUANTIDADES */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              📦 Quantidades
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Total Pré
+                </label>
+                <input
+                  type="number"
+                  name="totalPre"
+                  value={formData.totalPre}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Saíram
+                </label>
+                <input
+                  type="number"
+                  name="sairam"
+                  value={formData.sairam}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Abastecidas
+                </label>
+                <input
+                  type="number"
+                  name="abastecidas"
+                  value={formData.abastecidas}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                />
+              </div>
+            </div>
+            {totalPosCalculado !== null && (
+              <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                <span className="text-sm text-gray-600">
+                  Total Pós (calculado): <strong>{totalPosCalculado}</strong>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* FICHAS E CONTADORES */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              🎰 Fichas e Contadores
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fichas
+                </label>
+                <input
+                  type="number"
+                  name="fichas"
+                  value={formData.fichas}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contador Máquina
+                </label>
+                <input
+                  type="number"
+                  name="contadorMaquina"
+                  value={formData.contadorMaquina}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                  placeholder="Opcional"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contador IN
+                </label>
+                <input
+                  type="number"
+                  name="contadorIn"
+                  value={formData.contadorIn}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                  placeholder="Digital + Analógico"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contador OUT
+                </label>
+                <input
+                  type="number"
+                  name="contadorOut"
+                  value={formData.contadorOut}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                  placeholder="Digital + Analógico"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* VALORES */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              💰 Valores
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notas Entrada (R$)
+                </label>
+                <input
+                  type="number"
+                  name="quantidade_notas_entrada"
+                  value={formData.quantidade_notas_entrada}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maquininha/PIX (R$)
+                </label>
+                <input
+                  type="number"
+                  name="valor_entrada_maquininha_pix"
+                  value={formData.valor_entrada_maquininha_pix}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  min="0"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+              <span className="text-sm text-gray-600">
+                Valor Faturado (calculado): <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* OBSERVAÇÕES */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              📝 Observações
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Ocorrência
+                </label>
+                <select
+                  name="tipoOcorrencia"
+                  value={formData.tipoOcorrencia}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="Manutenção">Manutenção</option>
+                  <option value="Troca de Máquina">Troca de Máquina</option>
+                  <option value="Problema">Problema</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações
+                </label>
+                <textarea
+                  name="observacoes"
+                  value={formData.observacoes}
+                  onChange={handleChange}
+                  rows="3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Observações adicionais..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Informações adicionais */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+            <p className="font-medium mb-1">ℹ️ Informações:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Registrado por: {movimentacao?.usuario?.nome || "Usuário desconhecido"}</li>
+              <li>Data original: {movimentacao?.dataColeta ? new Date(movimentacao.dataColeta).toLocaleString("pt-BR") : "-"}</li>
+              <li>Os campos Total Pós e Valor Faturado são calculados automaticamente</li>
+            </ul>
+          </div>
+
+          {/* Botões */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Salvando..." : "Salvar Alterações"}
+            </button>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
+}

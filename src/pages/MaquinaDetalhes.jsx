@@ -5,9 +5,12 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { PageHeader, Badge, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
+import { useAuth } from "../contexts/AuthContext.jsx";
+import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 
 export function MaquinaDetalhes() {
   const { id } = useParams();
+  const { usuario } = useAuth();
   // const location = useLocation(); // Removido pois não é utilizado
   const [maquina, setMaquina] = useState(null);
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -18,6 +21,10 @@ export function MaquinaDetalhes() {
   const [alertaAbastecimento, setAlertaAbastecimento] = useState(null);
   const [produtoUltimaMov, setProdutoUltimaMov] = useState(null);
   const [concluidaHoje, setConcluidaHoje] = useState(false);
+  
+  // Estados para modal de edição
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [movimentacaoSelecionada, setMovimentacaoSelecionada] = useState(null);
 
   useEffect(() => {
     carregarDados();
@@ -110,6 +117,27 @@ export function MaquinaDetalhes() {
       verificarStatus();
     }
   }, [maquina]);
+
+  // Função para verificar se usuário pode editar uma movimentação
+  const podeEditar = (movimentacao) => {
+    if (!usuario) return false;
+    return usuario.role === "ADMIN" || movimentacao.usuarioId === usuario.id;
+  };
+
+  // Função para abrir modal de edição
+  const abrirModalEdicao = (movimentacao) => {
+    setMovimentacaoSelecionada(movimentacao);
+    setModalEdicaoAberto(true);
+  };
+
+  // Função para atualizar movimentação na lista após edição
+  const atualizarMovimentacao = (movimentacaoAtualizada) => {
+    setMovimentacoes((prev) =>
+      prev.map((mov) =>
+        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov
+      )
+    );
+  };
 
   if (loading) return <PageLoader />;
 
@@ -243,48 +271,91 @@ export function MaquinaDetalhes() {
           {movimentacoes.length === 0 ? (
             <p className="text-gray-500">Nenhuma movimentação encontrada.</p>
           ) : (
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left py-2">Data</th>
-                  <th className="text-left py-2">Entrada</th>
-                  <th className="text-left py-2">Saída</th>
-                  <th className="text-left py-2">Fichas</th>
-                  <th className="text-left py-2">Quebra de Ordem</th>
-                  <th className="text-left py-2">Observação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimentacoes.map((mov) => (
-                  <tr key={mov.id} className="border-b">
-                    <td>
-                      {new Date(mov.dataColeta || mov.createdAt).toLocaleString(
-                        "pt-BR",
-                      )}
-                    </td>
-                    <td className="text-green-600">
-                      {mov.abastecidas > 0 ? `+${mov.abastecidas}` : "-"}
-                    </td>
-                    <td className="text-red-600">
-                      {mov.sairam > 0 ? `-${mov.sairam}` : "-"}
-                    </td>
-                    <td>{mov.fichas || 0}</td>
-                    <td>
-                      {mov.justificativa_ordem ? (
-                        <div className="max-w-xs">
-                          <span className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-900">
-                            ⚠️ {mov.justificativa_ordem}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td>{mov.observacoes || "-"}</td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left py-2 px-2">Data</th>
+                    <th className="text-left py-2 px-2">Entrada</th>
+                    <th className="text-left py-2 px-2">Saída</th>
+                    <th className="text-left py-2 px-2">Fichas</th>
+                    <th className="text-left py-2 px-2">IN</th>
+                    <th className="text-left py-2 px-2">OUT</th>
+                    <th className="text-left py-2 px-2">Valor</th>
+                    <th className="text-left py-2 px-2">Quebra de Ordem</th>
+                    <th className="text-left py-2 px-2">Observação</th>
+                    <th className="text-left py-2 px-2">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {movimentacoes.map((mov) => (
+                    <tr key={mov.id} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        {new Date(mov.dataColeta || mov.createdAt).toLocaleString(
+                          "pt-BR",
+                        )}
+                      </td>
+                      <td className="text-green-600 py-2 px-2">
+                        {mov.abastecidas > 0 ? `+${mov.abastecidas}` : "-"}
+                      </td>
+                      <td className="text-red-600 py-2 px-2">
+                        {mov.sairam > 0 ? `-${mov.sairam}` : "-"}
+                      </td>
+                      <td className="py-2 px-2">{mov.fichas || 0}</td>
+                      <td className="py-2 px-2 font-medium text-blue-600">
+                        {mov.contadorIn?.toLocaleString("pt-BR") || "-"}
+                      </td>
+                      <td className="py-2 px-2 font-medium text-purple-600">
+                        {mov.contadorOut?.toLocaleString("pt-BR") || "-"}
+                      </td>
+                      <td className="py-2 px-2">
+                        {mov.valorFaturado
+                          ? `R$ ${mov.valorFaturado.toFixed(2)}`
+                          : "-"}
+                      </td>
+                      <td className="py-2 px-2">
+                        {mov.justificativa_ordem ? (
+                          <div className="max-w-xs">
+                            <span className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-900">
+                              ⚠️ {mov.justificativa_ordem}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2 max-w-xs truncate">
+                        {mov.observacoes || "-"}
+                      </td>
+                      <td className="py-2 px-2">
+                        {podeEditar(mov) && (
+                          <button
+                            onClick={() => abrirModalEdicao(mov)}
+                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                            title="Editar movimentação"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                            Editar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
@@ -303,6 +374,16 @@ export function MaquinaDetalhes() {
             : "Registrar movimentação"}
         </button>
       </div>
+      
+      {/* Modal de edição de movimentação */}
+      {modalEdicaoAberto && movimentacaoSelecionada && (
+        <ModalEditarMovimentacao
+          movimentacao={movimentacaoSelecionada}
+          onClose={() => setModalEdicaoAberto(false)}
+          onSucesso={atualizarMovimentacao}
+        />
+      )}
+      
       <Footer />
     </div>
   );

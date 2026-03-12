@@ -14,6 +14,7 @@ import { PageLoader, EmptyState } from "../components/Loading";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import AvisosMaquinasFaltam from "../components/AvisosMaquinasFaltam";
 import TabelaMovimentacoesEstoqueDeLoja from "../components/TabelaMovimentacoesEstoqueDeLoja";
+import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 
 export function Movimentacoes() {
   const [modalRegistrarDinheiro, setModalRegistrarDinheiro] = useState(false);
@@ -49,7 +50,11 @@ export function Movimentacoes() {
   const [filtroLojaForm, setFiltroLojaForm] = useState("");
   const [filtroLojaListagem, setFiltroLojaListagem] = useState("");
 
-  // Edição
+  // Estados para modal de edição
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [movimentacaoSelecionada, setMovimentacaoSelecionada] = useState(null);
+
+  // Edição antiga (DEPRECADO - manter por compatibilidade)
   const [editandoMovimentacao, setEditandoMovimentacao] = useState(null);
   const [formEdicao, setFormEdicao] = useState({
     fichas: "",
@@ -479,15 +484,31 @@ export function Movimentacoes() {
     }
   };
 
+  // Função para verificar se usuário pode editar uma movimentação
+  const podeEditar = (movimentacao) => {
+    if (!usuario) return false;
+    return usuario.role === "ADMIN" || movimentacao.usuarioId === usuario.id;
+  };
+
+  // Função para abrir modal de edição
+  const abrirModalEdicao = (movimentacao) => {
+    setMovimentacaoSelecionada(movimentacao);
+    setModalEdicaoAberto(true);
+  };
+
+  // Função para atualizar movimentação na lista após edição
+  const atualizarMovimentacao = (movimentacaoAtualizada) => {
+    setMovimentacoes((prev) =>
+      prev.map((mov) =>
+        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov
+      )
+    );
+  };
+
+  // DEPRECADO: Manter por compatibilidade com código antigo
   const iniciarEdicao = (movimentacao) => {
-    setEditandoMovimentacao(movimentacao);
-    setFormEdicao({
-      fichas: movimentacao.fichas || 0,
-      abastecidas: movimentacao.abastecidas || 0,
-      quantidade_notas_entrada: movimentacao.quantidade_notas_entrada || "",
-      valor_entrada_maquininha_pix:
-        movimentacao.valor_entrada_maquininha_pix || "",
-    });
+    // Usar o novo modal em vez da edição inline
+    abrirModalEdicao(movimentacao);
   };
 
   const cancelarEdicao = () => {
@@ -728,6 +749,30 @@ export function Movimentacoes() {
       ),
     },
     {
+      key: "contadorIn",
+      label: "IN",
+      render: (mov) => (
+        <div className="flex items-center gap-1">
+          <span className="text-lg">⬆️</span>
+          <span className="font-semibold text-blue-600">
+            {mov.contadorIn?.toLocaleString("pt-BR") || "-"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "contadorOut",
+      label: "OUT",
+      render: (mov) => (
+        <div className="flex items-center gap-1">
+          <span className="text-lg">⬇️</span>
+          <span className="font-semibold text-purple-600">
+            {mov.contadorOut?.toLocaleString("pt-BR") || "-"}
+          </span>
+        </div>
+      ),
+    },
+    {
       key: "justificativa",
       label: "Quebra de Ordem",
       render: (mov) => {
@@ -760,27 +805,72 @@ export function Movimentacoes() {
     columns.push({
       key: "acoes",
       label: "Ações",
-      render: (mov) => (
-        <button
-          onClick={() => iniciarEdicao(mov)}
-          className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      render: (mov) => {
+        // Verificar se o usuário pode editar (ADMIN ou criador)
+        const podeEditarMov = podeEditar(mov);
+        
+        return (
+          <button
+            onClick={() => abrirModalEdicao(mov)}
+            disabled={!podeEditarMov}
+            className={`px-3 py-1 ${
+              podeEditarMov
+                ? "bg-blue-500 hover:bg-blue-600"
+                : "bg-gray-300 cursor-not-allowed"
+            } text-white text-sm rounded-lg transition-colors flex items-center gap-1`}
+            title={podeEditarMov ? "Editar movimentação" : "Sem permissão para editar"}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-            />
-          </svg>
-          Editar
-        </button>
-      ),
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+            Editar
+          </button>
+        );
+      },
+    });
+  } else {
+    // Para não-ADMIN, permitir editar apenas suas próprias movimentações
+    columns.push({
+      key: "acoes",
+      label: "Ações",
+      render: (mov) => {
+        const podeEditarMov = podeEditar(mov);
+        
+        if (!podeEditarMov) return null;
+        
+        return (
+          <button
+            onClick={() => abrirModalEdicao(mov)}
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+            title="Editar movimentação"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+            Editar
+          </button>
+        );
+      },
     });
   }
 
@@ -1759,6 +1849,16 @@ export function Movimentacoes() {
           </div>
         </div>
       )}
+      
+      {/* Modal de edição de movimentação */}
+      {modalEdicaoAberto && movimentacaoSelecionada && (
+        <ModalEditarMovimentacao
+          movimentacao={movimentacaoSelecionada}
+          onClose={() => setModalEdicaoAberto(false)}
+          onSucesso={atualizarMovimentacao}
+        />
+      )}
+      
       <Footer />
     </div>
   );
