@@ -834,7 +834,7 @@ export default function MovimentacaoMaquina() {
               </label>
             </div>
 
-            <div className="flex gap-4 justify-end pt-4 border-t border-gray-200">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:justify-end pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={() =>
@@ -842,18 +842,21 @@ export default function MovimentacaoMaquina() {
                     state: { lojaId: lojaId },
                   })
                 }
-                className="btn-secondary"
+                className="btn-secondary w-full md:w-auto"
               >
                 Voltar
               </button>
               <button
                 type="button"
                 onClick={handleEnviarResumoWhatsApp}
-                className="px-4 py-2 rounded-lg font-bold text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
+                className="w-full md:w-auto px-4 py-2 rounded-lg font-bold text-sm bg-green-600 text-white hover:bg-green-700 transition-colors text-center"
               >
-                Enviar informações para o WhatsApp
+                <span className="md:hidden">Enviar para o WhatsApp</span>
+                <span className="hidden md:inline">
+                  Enviar informações para o WhatsApp
+                </span>
               </button>
-              <button type="submit" className="btn-primary">
+              <button type="submit" className="btn-primary w-full md:w-auto">
                 Registrar Movimentação
               </button>
             </div>
