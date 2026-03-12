@@ -25,6 +25,7 @@ export function Maquinas() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [filtroLoja, setFiltroLoja] = useState("");
+  const [filtroCodigo, setFiltroCodigo] = useState("");
   const [mostrarInativas, setMostrarInativas] = useState(false);
 
   useEffect(() => {
@@ -87,10 +88,16 @@ export function Maquinas() {
     setMaquinaParaDeletar(maquina);
   };
 
-  // Filtro por loja (backend já filtra por ativo/inativo)
-  const maquinasFiltradas = filtroLoja
-    ? maquinas.filter((m) => m.lojaId === filtroLoja)
-    : maquinas;
+  // Filtros locais por loja e código (backend já filtra por ativo/inativo)
+  const termoCodigo = filtroCodigo.trim().toLowerCase();
+  const maquinasFiltradas = maquinas.filter((maquina) => {
+    const correspondeLoja = filtroLoja ? maquina.lojaId === filtroLoja : true;
+    const correspondeCodigo = termoCodigo
+      ? String(maquina.codigo || "").toLowerCase().includes(termoCodigo)
+      : true;
+
+    return correspondeLoja && correspondeCodigo;
+  });
 
   const stats = [
     {
@@ -244,7 +251,7 @@ export function Maquinas() {
 
         <div className="card-gradient">
           {/* Filtros */}
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Filtrar por Loja
@@ -261,6 +268,19 @@ export function Maquinas() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Buscar por Código
+              </label>
+              <input
+                type="text"
+                value={filtroCodigo}
+                onChange={(e) => setFiltroCodigo(e.target.value)}
+                placeholder="Digite o código da máquina"
+                className="input-field"
+              />
             </div>
 
             <div className="flex items-end">
@@ -285,8 +305,8 @@ export function Maquinas() {
               icon="🎰"
               title="Nenhuma máquina encontrada"
               message={
-                filtroLoja
-                  ? "Não há máquinas cadastradas nesta loja. Experimente selecionar outra loja."
+                filtroLoja || filtroCodigo
+                  ? "Nenhuma máquina corresponde aos filtros informados. Ajuste a loja ou o código pesquisado."
                   : "Cadastre sua primeira máquina para começar!"
               }
               action={{
