@@ -211,6 +211,106 @@ export default function MovimentacaoMaquina() {
     calcularSugestao();
   }, [isFuncionarioNormal, resumoCalculo]);
 
+  const parseNumeroOpcional = (valor) => {
+    if (valor === "" || valor === null || valor === undefined) return null;
+    const numero = Number(valor);
+    return Number.isNaN(numero) ? null : numero;
+  };
+
+  const formatarInteiro = (valor) => {
+    const numero = Number(valor || 0);
+    return Math.round(numero).toLocaleString("pt-BR");
+  };
+
+  const formatarMoeda = (valor) => {
+    const numero = Number(valor || 0);
+    return numero.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const obterResumoContadores = () => {
+    const inAnterior = Number(resumoCalculo?.contadorInSugerido || 0);
+    const outAnterior = Number(
+      resumoCalculo?.contadorOutUltimaMovimentacao ??
+        resumoCalculo?.contadorOutSugerido ??
+        0,
+    );
+
+    const inManual = parseNumeroOpcional(formData.contadorInManual);
+    const outManual = parseNumeroOpcional(formData.contadorOutManual);
+    const inDigital = parseNumeroOpcional(formData.contadorInDigital);
+    const outDigital = parseNumeroOpcional(formData.contadorOutDigital);
+
+    const inAtualPreferencial = formData.usarContadorManual
+      ? inManual
+      : inDigital;
+    const outAtualPreferencial = formData.usarContadorManual
+      ? outManual
+      : outDigital;
+
+    const inAtual = inAtualPreferencial ?? inDigital ?? inManual ?? inAnterior;
+    const outAtual =
+      outAtualPreferencial ?? outDigital ?? outManual ?? outAnterior;
+
+    return { inAnterior, inAtual, outAnterior, outAtual };
+  };
+
+  const handleEnviarResumoWhatsApp = () => {
+    const { inAnterior, inAtual, outAnterior, outAtual } =
+      obterResumoContadores();
+
+    const diferencaIn = Math.max(0, inAtual - inAnterior);
+    const quantidadeSaiu = Math.max(0, outAtual - outAnterior);
+    const saldo = diferencaIn;
+    const valorJogada = Number(maquina?.valorFicha || 0);
+    const jogado = valorJogada > 0 ? diferencaIn / valorJogada : 0;
+    const mediaBicho = diferencaIn > 0 ? quantidadeSaiu / diferencaIn : 0;
+
+    const lojaCodigo = String(maquina?.loja?.id || lojaId || "")
+      .slice(0, 8)
+      .toUpperCase();
+    const lojaNome = maquina?.loja?.nome || "Loja sem nome";
+    const dataMovimentacao = new Date().toLocaleString("pt-BR");
+    const nomeUsuario = usuario?.nome || "Usuário";
+    const codigoMaquina = maquina?.codigo || "-";
+    const nomeMaquina = maquina?.nome || "Máquina";
+
+    const mensagem = [
+      "STAR TOYS",
+      `*${lojaCodigo} | ${lojaNome}*`,
+      `Data: ${dataMovimentacao}`,
+      `Lançado por: ${nomeUsuario}`,
+      "___________________________________",
+      `${codigoMaquina} | ${nomeMaquina}`,
+      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
+      `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
+      `Saldo: R$${formatarMoeda(saldo)}`,
+      `Media Bicho: ${formatarMoeda(mediaBicho)}`,
+      "___________________________________",
+      "Qtde Maqs....: 01",
+      `Entradas.....: ${formatarInteiro(diferencaIn)}`,
+      `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
+      `Jogado.......: ${formatarMoeda(jogado)}`,
+      "Cliente....: 0,00",
+      `Liquido.....: ${formatarMoeda(saldo)}`,
+      `Especie.....: ${formatarMoeda(saldo)}`,
+    ].join("\n");
+
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+    const popup = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+
+    if (!popup) {
+      setError(
+        "Não foi possível abrir o WhatsApp. Verifique se o bloqueador de pop-up está ativo.",
+      );
+      return;
+    }
+
+    setSuccess("Resumo pronto! Escolha o contato no WhatsApp e envie.");
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -733,6 +833,13 @@ export default function MovimentacaoMaquina() {
                 className="btn-secondary"
               >
                 Voltar
+              </button>
+              <button
+                type="button"
+                onClick={handleEnviarResumoWhatsApp}
+                className="px-4 py-2 rounded-lg font-bold text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
+              >
+                Enviar informações para o WhatsApp
               </button>
               <button type="submit" className="btn-primary">
                 Registrar Movimentação
