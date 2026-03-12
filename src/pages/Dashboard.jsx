@@ -10,6 +10,7 @@ import { PageLoader } from "../components/Loading";
 import { Badge } from "../components/UIComponents";
 import AlertAdmin from "../components/AlertAdmin";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 
 import Swal from "sweetalert2";
 
@@ -344,6 +345,10 @@ export function Dashboard() {
   // Estados para busca e navegação
 
   const [movimentacoes, setMovimentacoes] = useState([]);
+  
+  // Estados para modal de edição de movimentações
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [movimentacaoParaEditar, setMovimentacaoParaEditar] = useState(null);
   const [lojaSelecionada, setLojaSelecionada] = useState(null);
   const [maquinaSelecionada, setMaquinaSelecionada] = useState(null);
   const [loadingMaquina, setLoadingMaquina] = useState(false);
@@ -351,6 +356,28 @@ export function Dashboard() {
   const [vendasPorProduto, setVendasPorProduto] = useState([]);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+
+  // Função para verificar se usuário pode editar uma movimentação
+  const podeEditar = (movimentacao) => {
+    if (!usuario) return false;
+    return usuario.role === "ADMIN" || movimentacao.usuarioId === usuario.id;
+  };
+
+  // Função para abrir modal de edição
+  const abrirModalEdicao = (movimentacao) => {
+    setMovimentacaoParaEditar(movimentacao);
+    setModalEdicaoAberto(true);
+  };
+
+  // Função para atualizar movimentação na lista após edição
+  const atualizarMovimentacao = (movimentacaoAtualizada) => {
+    setMovimentacoes((prev) =>
+      prev.map((mov) =>
+        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov
+      )
+    );
+  };
+
   const [alertasEstoqueLoja, setAlertasEstoqueLoja] = useState([]);
   const [alertasEstoqueUsuario, setAlertasEstoqueUsuario] = useState([]);
   const [revisoesPendentes, setRevisoesPendentes] = useState([]);
@@ -3063,15 +3090,39 @@ export function Dashboard() {
                                   ? "📥 Entrada"
                                   : "📤 Saída"}
                               </Badge>
-                              <span className="text-sm text-gray-600">
-                                {new Date(mov.createdAt).toLocaleDateString(
-                                  "pt-BR",
-                                )}{" "}
-                                às{" "}
-                                {new Date(mov.createdAt).toLocaleTimeString(
-                                  "pt-BR",
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">
+                                  {new Date(mov.createdAt).toLocaleDateString(
+                                    "pt-BR",
+                                  )}{" "}
+                                  às{" "}
+                                  {new Date(mov.createdAt).toLocaleTimeString(
+                                    "pt-BR",
+                                  )}
+                                </span>
+                                {podeEditar(mov) && (
+                                  <button
+                                    onClick={() => abrirModalEdicao(mov)}
+                                    className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                                    title="Editar movimentação"
+                                  >
+                                    <svg
+                                      className="w-3 h-3"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
+                                    </svg>
+                                    Editar
+                                  </button>
                                 )}
-                              </span>
+                              </div>
                             </div>
                             <div className="grid grid-cols-5 gap-4 mt-3 text-sm">
                               <div>
@@ -3914,6 +3965,15 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de edição de movimentação */}
+      {modalEdicaoAberto && movimentacaoParaEditar && (
+        <ModalEditarMovimentacao
+          movimentacao={movimentacaoParaEditar}
+          onClose={() => setModalEdicaoAberto(false)}
+          onSucesso={atualizarMovimentacao}
+        />
       )}
 
       <Footer />

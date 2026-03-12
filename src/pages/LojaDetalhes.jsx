@@ -5,10 +5,13 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { PageHeader, Badge, AlertBox } from "../components/UIComponents";
 import { PageLoader, EmptyState } from "../components/Loading";
+import { useAuth } from "../contexts/AuthContext.jsx";
+import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 
 export function LojaDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [loja, setLoja] = useState(null);
   const [maquinas, setMaquinas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,11 +21,36 @@ export function LojaDetalhes() {
   const [loadingMovimentacoes, setLoadingMovimentacoes] = useState(false);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  
+  // Estados para modal de edição
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [movimentacaoSelecionada, setMovimentacaoSelecionada] = useState(null);
 
   useEffect(() => {
     carregarDados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Função para verificar se usuário pode editar uma movimentação
+  const podeEditar = (movimentacao) => {
+    if (!usuario) return false;
+    return usuario.role === "ADMIN" || movimentacao.usuarioId === usuario.id;
+  };
+
+  // Função para abrir modal de edição
+  const abrirModalEdicao = (movimentacao) => {
+    setMovimentacaoSelecionada(movimentacao);
+    setModalEdicaoAberto(true);
+  };
+
+  // Função para atualizar movimentação na lista após edição
+  const atualizarMovimentacao = (movimentacaoAtualizada) => {
+    setMovimentacoes((prev) =>
+      prev.map((mov) =>
+        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov
+      )
+    );
+  };
 
   const carregarDados = async () => {
     try {
@@ -497,6 +525,28 @@ export function LojaDetalhes() {
                                   "pt-BR",
                                 )}
                               </span>
+                              {podeEditar(mov) && (
+                                <button
+                                  onClick={() => abrirModalEdicao(mov)}
+                                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                                  title="Editar movimentação"
+                                >
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                  </svg>
+                                  Editar
+                                </button>
+                              )}
                             </div>
                             <div className="grid grid-cols-5 gap-4 mt-3 text-sm">
                               <div>
@@ -536,6 +586,34 @@ export function LojaDetalhes() {
                                 </p>
                               </div>
                             </div>
+                            
+                            {/* Contadores da Máquina */}
+                            {(mov.contadorIn || mov.contadorOut) && (
+                              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">⬆️</span>
+                                  <div>
+                                    <p className="text-xs text-gray-600">
+                                      Contador IN
+                                    </p>
+                                    <p className="font-bold text-blue-600">
+                                      {mov.contadorIn?.toLocaleString("pt-BR") || "-"}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">⬇️</span>
+                                  <div>
+                                    <p className="text-xs text-gray-600">
+                                      Contador OUT
+                                    </p>
+                                    <p className="font-bold text-purple-600">
+                                      {mov.contadorOut?.toLocaleString("pt-BR") || "-"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             
                             {/* Justificativa de Quebra de Ordem */}
                             {mov.justificativa_ordem && (
@@ -581,6 +659,15 @@ export function LojaDetalhes() {
           )}
         </div>
       </div>
+
+      {/* Modal de edição de movimentação */}
+      {modalEdicaoAberto && movimentacaoSelecionada && (
+        <ModalEditarMovimentacao
+          movimentacao={movimentacaoSelecionada}
+          onClose={() => setModalEdicaoAberto(false)}
+          onSucesso={atualizarMovimentacao}
+        />
+      )}
 
       <Footer />
     </div>
