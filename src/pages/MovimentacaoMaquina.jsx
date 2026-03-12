@@ -230,6 +230,26 @@ export default function MovimentacaoMaquina() {
     });
   };
 
+  const abrirWhatsAppComMensagem = (mensagem) => {
+    const textoCodificado = encodeURIComponent(mensagem);
+    const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+
+    // No desktop, usar WhatsApp Web evita abrir automaticamente no app Business.
+    const whatsappUrl = isMobile
+      ? `https://wa.me/?text=${textoCodificado}`
+      : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+
+    const link = document.createElement("a");
+    link.href = whatsappUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const obterResumoContadores = () => {
     const inAnterior = Number(resumoCalculo?.contadorInSugerido || 0);
     const outAnterior = Number(
@@ -298,15 +318,7 @@ export default function MovimentacaoMaquina() {
       `Especie.....: ${formatarMoeda(saldo)}`,
     ].join("\n");
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
-    const popup = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-
-    if (!popup) {
-      setError(
-        "Não foi possível abrir o WhatsApp. Verifique se o bloqueador de pop-up está ativo.",
-      );
-      return;
-    }
+    abrirWhatsAppComMensagem(mensagem);
 
     setSuccess("Resumo pronto! Escolha o contato no WhatsApp e envie.");
   };
