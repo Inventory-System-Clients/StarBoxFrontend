@@ -18,6 +18,7 @@ export function Lojas() {
   const [lojas, setLojas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filtroNome, setFiltroNome] = useState("");
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     lojaId: null,
@@ -57,6 +58,11 @@ export function Lojas() {
       );
     }
   };
+
+  const termoBusca = filtroNome.trim().toLowerCase();
+  const lojasFiltradas = lojas.filter((loja) =>
+    termoBusca ? loja.nome?.toLowerCase().includes(termoBusca) : true,
+  );
 
   const headers = [
     {
@@ -184,7 +190,7 @@ export function Lojas() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
+    <div className="min-h-screen bg-linear-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -222,7 +228,7 @@ export function Lojas() {
         )}
 
         <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="card bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+          <div className="card bg-linear-to-br from-purple-500 to-purple-600 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Total de Lojas</p>
@@ -242,7 +248,7 @@ export function Lojas() {
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
+          <div className="card bg-linear-to-br from-green-500 to-green-600 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Lojas Ativas</p>
@@ -264,7 +270,7 @@ export function Lojas() {
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+          <div className="card bg-linear-to-br from-blue-500 to-blue-600 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Total de Máquinas</p>
@@ -286,10 +292,27 @@ export function Lojas() {
           </div>
         </div>
 
+        <div className="card mb-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Buscar loja por nome
+          </label>
+          <input
+            type="text"
+            value={filtroNome}
+            onChange={(e) => setFiltroNome(e.target.value)}
+            placeholder="Digite o nome da loja"
+            className="input-field"
+          />
+        </div>
+
         <DataTable
           headers={headers}
-          data={lojas}
-          emptyMessage="Nenhuma loja cadastrada. Clique em 'Nova Loja' para começar."
+          data={lojasFiltradas}
+          emptyMessage={
+            filtroNome
+              ? "Nenhuma loja encontrada para o nome pesquisado."
+              : "Nenhuma loja cadastrada. Clique em 'Nova Loja' para começar."
+          }
         />
       </div>
 
