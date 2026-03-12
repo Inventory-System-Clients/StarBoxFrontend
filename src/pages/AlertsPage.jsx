@@ -144,7 +144,8 @@ export default function AlertsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {alerts.map((alert) => {
+              {/* Renderiza os alertas na ordem: vermelho (urgente) -> laranja (atenção) -> verde/normal (em dia) */}
+              {[...redAlerts, ...yellowAlerts, ...greenAlerts].map((alert) => {
                 const config = getUrgencyConfig(alert.urgency);
                 const Icon = config.icon;
 

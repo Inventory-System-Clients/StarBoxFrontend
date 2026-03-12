@@ -257,9 +257,10 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Contas a pagar HOJE */}
             <div 
-              className="bg-linear-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white card-hover" 
+              className="bg-linear-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer" 
               data-testid="card-due-today"
               title="Contas com vencimento na data de hoje (status: Em Aberto)"
+              onClick={() => navigate('/financeiro/avisos')}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-white/20 rounded-lg">
@@ -278,9 +279,10 @@ export default function DashboardPage() {
 
             {/* Contas a pagar em 3 dias */}
             <div 
-              className="bg-linear-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md p-6 text-white card-hover" 
+              className="bg-linear-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer" 
               data-testid="card-due-3-days"
               title="Contas que vencem nos próximos 3 dias (status: Em Aberto)"
+              onClick={() => navigate('/financeiro/avisos')}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-white/20 rounded-lg">
