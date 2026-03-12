@@ -11,7 +11,7 @@ const STATUS_CONCLUIDOS = ["feito", "concluida"];
 const statusEhConcluido = (status) =>
   STATUS_CONCLUIDOS.includes(String(status || "").toLowerCase());
 
-const abrirWhatsAppComFallback = ({ whatsappUrl, popupReservado }) => {
+const abrirWhatsAppEmNovaAba = ({ whatsappUrl, popupReservado }) => {
   if (!whatsappUrl) {
     if (popupReservado && !popupReservado.closed) {
       popupReservado.close();
@@ -21,11 +21,17 @@ const abrirWhatsAppComFallback = ({ whatsappUrl, popupReservado }) => {
 
   if (popupReservado && !popupReservado.closed) {
     popupReservado.location.href = whatsappUrl;
+    popupReservado.focus?.();
     return true;
   }
 
-  window.location.assign(whatsappUrl);
-  return true;
+  const novaAba = window.open(whatsappUrl, "_blank");
+  if (novaAba && !novaAba.closed) {
+    novaAba.focus?.();
+    return true;
+  }
+
+  return false;
 };
 
 function Manutencoes() {
@@ -310,8 +316,8 @@ function Manutencoes() {
   const handleNovaManutencao = async (event) => {
     event.preventDefault();
 
-    // Reserva a aba dentro do clique do usuario para evitar bloqueio do popup.
-    const popupReservado = window.open("", "_blank", "noopener,noreferrer");
+    // Reserva a aba durante o clique para evitar bloqueio e nao trocar a aba atual.
+    const popupReservado = window.open("about:blank", "_blank");
 
     try {
       setLoading(true);
@@ -339,10 +345,20 @@ function Manutencoes() {
         });
 
         const whatsappUrl = promptRes?.data?.whatsappUrl;
-        abrirWhatsAppComFallback({ whatsappUrl, popupReservado });
+        const abriuWhatsApp = abrirWhatsAppEmNovaAba({
+          whatsappUrl,
+          popupReservado,
+        });
+
+        if (!abriuWhatsApp) {
+          mensagemPosCadastro =
+            "Manutenção criada com sucesso, mas o navegador bloqueou a nova aba do WhatsApp. Libere pop-up para o StarBox.";
+        }
 
         if (promptRes?.data?.aviso) {
-          mensagemPosCadastro = `Manutenção criada com sucesso. ${promptRes.data.aviso}`;
+          mensagemPosCadastro = !abriuWhatsApp
+            ? `${mensagemPosCadastro} ${promptRes.data.aviso}`
+            : `Manutenção criada com sucesso. ${promptRes.data.aviso}`;
         }
       } catch (promptErr) {
         console.error(
