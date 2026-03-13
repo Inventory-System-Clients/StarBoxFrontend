@@ -13,7 +13,7 @@ export function QuebraOrdemPage() {
   const [error, setError] = useState("");
   const [filtroLoja, setFiltroLoja] = useState("");
   const [filtroRoteiro, setFiltroRoteiro] = useState("");
-    // Controle de ocultação agora é feito pelo campo status_justificativa no banco
+  // Controle de ocultação agora é feito pelo campo status_justificativa no banco
 
   useEffect(() => {
     carregarQuebrasOrdem();
@@ -23,26 +23,26 @@ export function QuebraOrdemPage() {
     try {
       setLoading(true);
       const [movRes, lojasRes, roteirosRes] = await Promise.all([
-        api.get("/movimentacoes"),
+        api.get("/movimentacoes?apenasJustificativasNovas=true&limite=1000"),
         api.get("/lojas"),
         api.get("/roteiros"),
       ]);
 
       // Filtrar apenas justificativas de quebra de ordem com status 'nova'
       const movimentacoesComQuebra = movRes.data.filter(
-        (mov) => mov.justificativa_ordem && mov.status_justificativa === 'nova'
+        (mov) => mov.justificativa_ordem && mov.status_justificativa === "nova",
       );
 
       // Enriquecer dados com informações de loja e roteiro
       const quebrasEnriquecidas = movimentacoesComQuebra.map((mov) => {
         const loja = lojasRes.data.find((l) => l.id === mov.lojaId);
-        const lojaEsperada = mov.lojaIdEsperada 
+        const lojaEsperada = mov.lojaIdEsperada
           ? lojasRes.data.find((l) => l.id === mov.lojaIdEsperada)
           : null;
-        
+
         // Encontrar o roteiro que contém esta loja
-        const roteiro = roteirosRes.data.find((rot) => 
-          rot.lojas?.some((l) => l.id === mov.lojaId)
+        const roteiro = roteirosRes.data.find((rot) =>
+          rot.lojas?.some((l) => l.id === mov.lojaId),
         );
 
         return {
@@ -56,7 +56,7 @@ export function QuebraOrdemPage() {
 
       // Ordenar por data mais recente primeiro
       quebrasEnriquecidas.sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
       );
 
       setQuebrasOrdem(quebrasEnriquecidas);
@@ -64,7 +64,7 @@ export function QuebraOrdemPage() {
       console.error("Erro ao carregar quebras de ordem:", error);
       setError(
         "Erro ao carregar dados: " +
-          (error.response?.data?.error || error.message)
+          (error.response?.data?.error || error.message),
       );
     } finally {
       setLoading(false);
@@ -72,11 +72,15 @@ export function QuebraOrdemPage() {
   };
 
   // Filtrar quebras
-  const quebrasFiltradas = quebrasOrdem
-    .filter((quebra) =>
-      (!filtroLoja || quebra.lojaNome?.toLowerCase().includes(filtroLoja.toLowerCase())) &&
-      (!filtroRoteiro || quebra.roteiroNome?.toLowerCase().includes(filtroRoteiro.toLowerCase()))
-    );
+  const quebrasFiltradas = quebrasOrdem.filter(
+    (quebra) =>
+      (!filtroLoja ||
+        quebra.lojaNome?.toLowerCase().includes(filtroLoja.toLowerCase())) &&
+      (!filtroRoteiro ||
+        quebra.roteiroNome
+          ?.toLowerCase()
+          .includes(filtroRoteiro.toLowerCase())),
+  );
 
   if (loading) return <PageLoader />;
 
@@ -122,8 +126,10 @@ export function QuebraOrdemPage() {
           <div className="stat-card bg-linear-to-br from-purple-500/10 to-purple-500/5">
             <div className="text-3xl mb-2">🗺️</div>
             <div className="text-2xl font-bold text-gray-900">
-              {new Set(quebrasOrdem.map((q) => q.roteiroId).filter(Boolean))
-                .size}
+              {
+                new Set(quebrasOrdem.map((q) => q.roteiroId).filter(Boolean))
+                  .size
+              }
             </div>
             <div className="text-sm text-gray-600">Roteiros Afetados</div>
           </div>
@@ -198,13 +204,11 @@ export function QuebraOrdemPage() {
                       </div>
                       <p className="text-sm text-gray-600">
                         📅{" "}
-                        {new Date(quebra.createdAt).toLocaleDateString(
-                          "pt-BR"
-                        )}{" "}
+                        {new Date(quebra.createdAt).toLocaleDateString("pt-BR")}{" "}
                         às{" "}
                         {new Date(quebra.createdAt).toLocaleTimeString(
                           "pt-BR",
-                          { hour: "2-digit", minute: "2-digit" }
+                          { hour: "2-digit", minute: "2-digit" },
                         )}
                       </p>
                     </div>
@@ -227,7 +231,9 @@ export function QuebraOrdemPage() {
                       <div className="flex items-start gap-2">
                         <span className="text-lg">❌</span>
                         <div>
-                          <p className="text-xs font-semibold text-gray-600">Loja Pulada (Esperada):</p>
+                          <p className="text-xs font-semibold text-gray-600">
+                            Loja Pulada (Esperada):
+                          </p>
                           <p className="text-sm font-bold text-red-700">
                             {quebra.lojaEsperadaNome || "Não registrada"}
                           </p>
@@ -236,7 +242,9 @@ export function QuebraOrdemPage() {
                       <div className="flex items-start gap-2">
                         <span className="text-lg">✅</span>
                         <div>
-                          <p className="text-xs font-semibold text-gray-600">Loja Visitada:</p>
+                          <p className="text-xs font-semibold text-gray-600">
+                            Loja Visitada:
+                          </p>
                           <p className="text-sm font-bold text-green-700">
                             {quebra.lojaNome}
                           </p>
@@ -259,10 +267,15 @@ export function QuebraOrdemPage() {
                       className="ml-4 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
                       onClick={async () => {
                         try {
-                          await api.patch(`/movimentacoes/${quebra.id}/ocultar-justificativa`);
+                          await api.patch(
+                            `/movimentacoes/${quebra.id}/ocultar-justificativa`,
+                          );
                           carregarQuebrasOrdem();
                         } catch (err) {
-                          alert('Erro ao ocultar justificativa: ' + (err.response?.data?.error || err.message));
+                          alert(
+                            "Erro ao ocultar justificativa: " +
+                              (err.response?.data?.error || err.message),
+                          );
                         }
                       }}
                     >

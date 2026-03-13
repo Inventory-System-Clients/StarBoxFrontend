@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
@@ -13,23 +14,102 @@ export function LojaDetalhes() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const [loja, setLoja] = useState(null);
+  const [produtos, setProdutos] = useState([]);
   const [maquinas, setMaquinas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [maquinaSelecionada, setMaquinaSelecionada] = useState(null);
   const [movimentacoes, setMovimentacoes] = useState([]);
+  const [movimentacoesLoja, setMovimentacoesLoja] = useState([]);
   const [loadingMovimentacoes, setLoadingMovimentacoes] = useState(false);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  
+  const [relatorioGerado, setRelatorioGerado] = useState(null);
+  const [erroRelatorio, setErroRelatorio] = useState("");
+
   // Estados para modal de edição
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [movimentacaoSelecionada, setMovimentacaoSelecionada] = useState(null);
+
+  const possuiNumero = (valor) =>
+    valor !== null &&
+    valor !== undefined &&
+    valor !== "" &&
+    !Number.isNaN(Number(valor));
+
+  const inteiroSeguro = (valor, fallback = 0) => {
+    if (!possuiNumero(valor)) return fallback;
+    return parseInt(valor, 10);
+  };
+
+  const formatarInteiro = (valor) =>
+    Math.round(Number(valor || 0)).toLocaleString("pt-BR");
+
+  const formatarMoeda = (valor) =>
+    Number(valor || 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const obterDataMovimentacao = (movimentacao) =>
+    new Date(movimentacao.dataColeta || movimentacao.createdAt);
+
+  const formatarDataHora = (valor) => new Date(valor).toLocaleString("pt-BR");
+
+  const abrirWhatsAppComMensagem = (mensagem) => {
+    const textoCodificado = encodeURIComponent(mensagem);
+    const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+
+    const whatsappUrl = isMobile
+      ? `https://wa.me/?text=${textoCodificado}`
+      : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+
+    const link = document.createElement("a");
+    link.href = whatsappUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const formatarPeriodoSelecionado = () => {
+    if (dataInicio && dataFim) {
+      const inicio = new Date(`${dataInicio}T00:00:00`).toLocaleDateString(
+        "pt-BR",
+      );
+      const fim = new Date(`${dataFim}T00:00:00`).toLocaleDateString("pt-BR");
+      return `${inicio} a ${fim}`;
+    }
+
+    if (dataInicio) {
+      return `A partir de ${new Date(`${dataInicio}T00:00:00`).toLocaleDateString("pt-BR")}`;
+    }
+
+    if (dataFim) {
+      return `Até ${new Date(`${dataFim}T00:00:00`).toLocaleDateString("pt-BR")}`;
+    }
+
+    return "Todas as datas";
+  };
 
   useEffect(() => {
     carregarDados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (!maquinaSelecionada) return;
+    carregarMovimentacoes(maquinaSelecionada.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimentacoesLoja]);
+
+  useEffect(() => {
+    setRelatorioGerado(null);
+    setErroRelatorio("");
+  }, [dataInicio, dataFim, maquinaSelecionada]);
 
   // Função para verificar se usuário pode editar uma movimentação
   const podeEditar = (movimentacao) => {
@@ -45,11 +125,15 @@ export function LojaDetalhes() {
 
   // Função para atualizar movimentação na lista após edição
   const atualizarMovimentacao = (movimentacaoAtualizada) => {
-    setMovimentacoes((prev) =>
-      prev.map((mov) =>
-        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov
-      )
-    );
+    const atualizarLista = (lista) =>
+      lista
+        .map((mov) =>
+          mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov,
+        )
+        .sort((a, b) => obterDataMovimentacao(b) - obterDataMovimentacao(a));
+
+    setMovimentacoes((prev) => atualizarLista(prev));
+    setMovimentacoesLoja((prev) => atualizarLista(prev));
   };
 
   const carregarDados = async () => {
@@ -59,13 +143,17 @@ export function LojaDetalhes() {
         await Promise.all([
           api.get(`/lojas/${id}`),
           api.get(`/maquinas`),
-          api.get(`/movimentacoes`),
+          api.get(`/movimentacoes?lojaId=${id}&limite=5000`),
           api.get(`/produtos`),
         ]);
 
-      const maquinasDaLoja = maquinasRes.data.filter((m) => m.lojaId === id);
-      const todasMovimentacoes = movimentacoesRes.data;
-      const produtos = produtosRes.data;
+      const maquinasDaLoja = maquinasRes.data.filter(
+        (m) => String(m.lojaId) === String(id),
+      );
+      const todasMovimentacoes = (movimentacoesRes.data || []).filter(
+        (mov) => String(mov.lojaId || mov.maquina?.lojaId) === String(id),
+      );
+      const produtosCarregados = produtosRes.data || [];
 
       // Enriquecer cada máquina com estoque atual e último produto
       const maquinasEnriquecidas = await Promise.all(
@@ -88,7 +176,9 @@ export function LojaDetalhes() {
             if (movsDaMaquina.length > 0) {
               const ultimaMov = movsDaMaquina[0];
               const produtoId = ultimaMov.detalhesProdutos?.[0]?.produtoId;
-              ultimoProduto = produtos.find((p) => p.id === produtoId);
+              ultimoProduto = produtosCarregados.find(
+                (p) => String(p.id) === String(produtoId),
+              );
             }
 
             return {
@@ -111,7 +201,13 @@ export function LojaDetalhes() {
       );
 
       setLoja(lojaRes.data);
+      setProdutos(produtosCarregados);
       setMaquinas(maquinasEnriquecidas);
+      setMovimentacoesLoja(
+        [...todasMovimentacoes].sort(
+          (a, b) => obterDataMovimentacao(b) - obterDataMovimentacao(a),
+        ),
+      );
     } catch (error) {
       setError(
         "Erro ao carregar dados: " +
@@ -122,12 +218,13 @@ export function LojaDetalhes() {
     }
   };
 
-  const carregarMovimentacoes = async (maquinaId) => {
+  const carregarMovimentacoes = (maquinaId) => {
     try {
       setLoadingMovimentacoes(true);
-      const movRes = await api.get(`/movimentacoes?maquinaId=${maquinaId}`);
-      setMovimentacoes(movRes.data || []);
-      console.log("Movimentações recebidas:", movRes.data);
+      const listaDaMaquina = [...movimentacoesLoja]
+        .filter((mov) => String(mov.maquinaId) === String(maquinaId))
+        .sort((a, b) => obterDataMovimentacao(b) - obterDataMovimentacao(a));
+      setMovimentacoes(listaDaMaquina);
     } catch (error) {
       console.error("Erro ao carregar movimentações:", error);
       setMovimentacoes([]);
@@ -144,6 +241,299 @@ export function LojaDetalhes() {
       setMaquinaSelecionada(maquina);
       carregarMovimentacoes(maquina.id);
     }
+  };
+
+  const filtrarMovimentacoesPorPeriodo = (lista) => {
+    const inicio = dataInicio ? new Date(`${dataInicio}T00:00:00`) : null;
+    const fim = dataFim ? new Date(`${dataFim}T23:59:59`) : null;
+
+    return lista.filter((mov) => {
+      const dataMovimentacao = obterDataMovimentacao(mov);
+      if (inicio && dataMovimentacao < inicio) return false;
+      if (fim && dataMovimentacao > fim) return false;
+      return true;
+    });
+  };
+
+  const construirRelatorioMovimentacoes = (escopo) => {
+    if (escopo === "selecionada" && !maquinaSelecionada) {
+      return {
+        error: "Selecione uma máquina para gerar o relatório individual.",
+      };
+    }
+
+    const maquinasNoEscopo =
+      escopo === "selecionada"
+        ? maquinas.filter(
+            (maquina) => String(maquina.id) === String(maquinaSelecionada?.id),
+          )
+        : maquinas;
+
+    const movimentacoesBase = movimentacoesLoja.filter((mov) =>
+      escopo === "selecionada"
+        ? String(mov.maquinaId) === String(maquinaSelecionada?.id)
+        : true,
+    );
+
+    if (movimentacoesBase.length === 0) {
+      return {
+        error:
+          escopo === "selecionada"
+            ? "Nenhuma movimentação encontrada para a máquina selecionada."
+            : "Nenhuma movimentação encontrada para esta loja.",
+      };
+    }
+
+    const maquinaPorId = new Map(
+      maquinas.map((maquina) => [String(maquina.id), maquina]),
+    );
+    const produtoPorId = new Map(
+      produtos.map((produto) => [String(produto.id), produto]),
+    );
+    const inicio = dataInicio ? new Date(`${dataInicio}T00:00:00`) : null;
+    const fim = dataFim ? new Date(`${dataFim}T23:59:59`) : null;
+    const movimentacoesPorMaquina = new Map();
+
+    movimentacoesBase.forEach((mov) => {
+      const chave = String(mov.maquinaId);
+      if (!movimentacoesPorMaquina.has(chave)) {
+        movimentacoesPorMaquina.set(chave, []);
+      }
+      movimentacoesPorMaquina.get(chave).push(mov);
+    });
+
+    const totais = {
+      entradas: 0,
+      saidas: 0,
+      jogado: 0,
+      liquido: 0,
+      especie: 0,
+      notas: 0,
+      digital: 0,
+      movimentacoes: 0,
+    };
+    const blocos = [];
+    const chavesOrdenadas = Array.from(movimentacoesPorMaquina.keys()).sort(
+      (a, b) => {
+        const nomeA = maquinaPorId.get(a)?.nome || "";
+        const nomeB = maquinaPorId.get(b)?.nome || "";
+        return nomeA.localeCompare(nomeB, "pt-BR", {
+          sensitivity: "base",
+        });
+      },
+    );
+
+    chavesOrdenadas.forEach((maquinaIdAtual) => {
+      const maquinaAtual = maquinaPorId.get(maquinaIdAtual);
+      const valorJogada = Number(maquinaAtual?.valorFicha || 0);
+      const movimentacoesOrdenadas = [
+        ...movimentacoesPorMaquina.get(maquinaIdAtual),
+      ].sort((a, b) => obterDataMovimentacao(a) - obterDataMovimentacao(b));
+
+      let contadorInAnterior = 0;
+      let contadorOutAnterior = 0;
+
+      movimentacoesOrdenadas.forEach((mov) => {
+        const dataMovimentacao = obterDataMovimentacao(mov);
+        const fichas = inteiroSeguro(mov.fichas, 0);
+        const sairam = inteiroSeguro(mov.sairam, 0);
+        const contadorInAtual = possuiNumero(mov.contadorIn)
+          ? inteiroSeguro(mov.contadorIn, contadorInAnterior)
+          : contadorInAnterior + fichas;
+        const contadorOutAtual = possuiNumero(mov.contadorOut)
+          ? inteiroSeguro(mov.contadorOut, contadorOutAnterior)
+          : contadorOutAnterior + sairam;
+        const diferencaIn = Math.max(0, contadorInAtual - contadorInAnterior);
+        const quantidadeSaiu = Math.max(
+          0,
+          contadorOutAtual - contadorOutAnterior,
+        );
+        const dentroDoPeriodo =
+          (!inicio || dataMovimentacao >= inicio) &&
+          (!fim || dataMovimentacao <= fim);
+
+        if (dentroDoPeriodo) {
+          const produtoDetalhe = mov.detalhesProdutos?.[0];
+          const produtoId =
+            produtoDetalhe?.produtoId || produtoDetalhe?.produto?.id;
+          const produtoCadastro = produtoId
+            ? produtoPorId.get(String(produtoId))
+            : null;
+          const precoProduto = Number(produtoCadastro?.preco || 0);
+          const nomeProduto =
+            produtoDetalhe?.produto?.nome ||
+            produtoCadastro?.nome ||
+            "Produto não identificado";
+          const saldo = diferencaIn;
+          const jogado = valorJogada > 0 ? diferencaIn / valorJogada : 0;
+          const valorMedioSaidaPorPelucia =
+            quantidadeSaiu > 0
+              ? diferencaIn / quantidadeSaiu - precoProduto
+              : 0;
+          const jogadasMediasPorPelucia =
+            quantidadeSaiu > 0 ? diferencaIn / 2 / quantidadeSaiu : 0;
+          const valorNotas = Number(mov.quantidade_notas_entrada || 0);
+          const valorDigital = Number(mov.valor_entrada_maquininha_pix || 0);
+
+          totais.entradas += diferencaIn;
+          totais.saidas += quantidadeSaiu;
+          totais.jogado += jogado;
+          totais.liquido += saldo;
+          totais.especie += saldo;
+          totais.notas += valorNotas;
+          totais.digital += valorDigital;
+          totais.movimentacoes += 1;
+
+          blocos.push(
+            [
+              "___________________________________",
+              `${maquinaAtual?.codigo || mov.maquina?.codigo || "-"} | ${maquinaAtual?.nome || mov.maquina?.nome || "Máquina"}`,
+              `Produto: ${nomeProduto}`,
+              `Data: ${formatarDataHora(dataMovimentacao)}`,
+              `Lançado por: ${mov.usuario?.nome || "Usuário"}`,
+              `E  ${formatarInteiro(contadorInAnterior)}  ${formatarInteiro(contadorInAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
+              `S  ${formatarInteiro(contadorOutAnterior)}  ${formatarInteiro(contadorOutAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
+              `Saldo: R$${formatarMoeda(saldo)}`,
+              `Valor medio de saida por pelucia: ${formatarMoeda(valorMedioSaidaPorPelucia)}`,
+              `Jogadas medias por pelucia: ${formatarMoeda(jogadasMediasPorPelucia)}`,
+              "___________________________________",
+              "Qtde Maqs....: 01",
+              `Entradas.....: ${formatarInteiro(diferencaIn)}`,
+              `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
+              `Jogado.......: ${formatarMoeda(jogado)}`,
+              "Cliente....: 0,00",
+              `Liquido.....: ${formatarMoeda(saldo)}`,
+              `Especie.....: ${formatarMoeda(saldo)}`,
+              `Notas........: R$${formatarMoeda(valorNotas)}`,
+              `Digital......: R$${formatarMoeda(valorDigital)}`,
+              mov.observacoes ? `Observacao...: ${mov.observacoes}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          );
+        }
+
+        contadorInAnterior = contadorInAtual;
+        contadorOutAnterior = contadorOutAtual;
+      });
+    });
+
+    if (blocos.length === 0) {
+      return {
+        error: "Nenhuma movimentação encontrada no período selecionado.",
+      };
+    }
+
+    const escopoLabel =
+      escopo === "selecionada"
+        ? `Máquina selecionada: ${maquinaSelecionada?.nome || maquinaSelecionada?.codigo || "-"}`
+        : "Todas as máquinas da loja";
+    const lojaCodigo = String(loja?.id || id || "")
+      .slice(0, 8)
+      .toUpperCase();
+    const texto = [
+      "STAR TOYS",
+      `*${lojaCodigo} | ${loja?.nome || "Loja"}*`,
+      `Periodo: ${formatarPeriodoSelecionado()}`,
+      `Escopo: ${escopoLabel}`,
+      "___________________________________",
+      `Qtde Maqs....: ${formatarInteiro(escopo === "selecionada" ? 1 : maquinasNoEscopo.length)}`,
+      `Movimentacoes: ${formatarInteiro(totais.movimentacoes)}`,
+      `Entradas.....: R$${formatarMoeda(totais.entradas)}`,
+      `Saidas.......: ${formatarInteiro(totais.saidas)}`,
+      `Jogado.......: ${formatarMoeda(totais.jogado)}`,
+      `Notas........: R$${formatarMoeda(totais.notas)}`,
+      `Digital......: R$${formatarMoeda(totais.digital)}`,
+      `Liquido......: ${formatarMoeda(totais.liquido)}`,
+      `Especie......: ${formatarMoeda(totais.especie)}`,
+      ...blocos,
+    ].join("\n");
+
+    const nomeEscopo =
+      escopo === "selecionada"
+        ? `maquina-${String(maquinaSelecionada?.codigo || maquinaSelecionada?.id || "selecionada")}`
+        : "todas-as-maquinas";
+    const nomeLoja = String(loja?.nome || "loja")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase();
+
+    return {
+      titulo: `Relatório de Movimentações - ${loja?.nome || "Loja"}`,
+      subtitulo: [escopoLabel, `Período: ${formatarPeriodoSelecionado()}`],
+      texto,
+      nomeArquivo: `relatorio-${nomeLoja || "loja"}-${nomeEscopo}.pdf`,
+    };
+  };
+
+  const handleGerarRelatorio = (escopo) => {
+    const resultado = construirRelatorioMovimentacoes(escopo);
+
+    if (resultado?.error) {
+      setErroRelatorio(resultado.error);
+      setRelatorioGerado(null);
+      return;
+    }
+
+    setErroRelatorio("");
+    setRelatorioGerado(resultado);
+  };
+
+  const handleEnviarRelatorioWhatsApp = () => {
+    if (!relatorioGerado?.texto) return;
+    abrirWhatsAppComMensagem(relatorioGerado.texto);
+  };
+
+  const handleGerarPdfRelatorio = () => {
+    if (!relatorioGerado?.texto) return;
+
+    const documento = new jsPDF({ unit: "pt", format: "a4" });
+    const larguraPagina = documento.internal.pageSize.getWidth();
+    const alturaPagina = documento.internal.pageSize.getHeight();
+    const margem = 40;
+    const larguraTexto = larguraPagina - margem * 2;
+    let posicaoY = margem;
+
+    documento.setFont("helvetica", "bold");
+    documento.setFontSize(16);
+    documento.text(relatorioGerado.titulo, margem, posicaoY);
+    posicaoY += 20;
+
+    documento.setFont("helvetica", "normal");
+    documento.setFontSize(10);
+    relatorioGerado.subtitulo.forEach((linha) => {
+      documento.text(linha, margem, posicaoY);
+      posicaoY += 14;
+    });
+
+    posicaoY += 8;
+    documento.setDrawColor(220, 220, 220);
+    documento.line(margem, posicaoY, larguraPagina - margem, posicaoY);
+    posicaoY += 18;
+
+    documento.setFont("courier", "normal");
+    documento.setFontSize(9);
+
+    relatorioGerado.texto.split("\n").forEach((linhaOriginal) => {
+      const linha = linhaOriginal || " ";
+      const linhasQuebradas = documento.splitTextToSize(linha, larguraTexto);
+
+      linhasQuebradas.forEach((linhaQuebrada) => {
+        if (posicaoY > alturaPagina - margem) {
+          documento.addPage();
+          posicaoY = margem;
+          documento.setFont("courier", "normal");
+          documento.setFontSize(9);
+        }
+
+        documento.text(linhaQuebrada, margem, posicaoY);
+        posicaoY += 12;
+      });
+    });
+
+    documento.save(relatorioGerado.nomeArquivo);
   };
 
   if (loading) return <PageLoader />;
@@ -172,6 +562,7 @@ export function LojaDetalhes() {
     capacidadeTotal > 0
       ? Math.round((estoqueTotal / capacidadeTotal) * 100)
       : 0;
+  const movimentacoesFiltradas = filtrarMovimentacoesPorPeriodo(movimentacoes);
 
   return (
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
@@ -234,8 +625,12 @@ export function LojaDetalhes() {
                     loja.endereco,
                     loja.numero && `nº ${loja.numero}`,
                     loja.bairro,
-                    loja.cidade && loja.estado && `${loja.cidade}/${loja.estado}`,
-                  ].filter(Boolean).join(', ')}
+                    loja.cidade &&
+                      loja.estado &&
+                      `${loja.cidade}/${loja.estado}`,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
                   {loja.cep && (
                     <span className="text-gray-600"> - CEP: {loja.cep}</span>
                   )}
@@ -440,6 +835,121 @@ export function LojaDetalhes() {
                 })}
               </div>
 
+              <div className="card mt-6">
+                <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <span className="text-2xl">📄</span>
+                    Relatório do Período
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {maquinaSelecionada
+                      ? `Máquina selecionada: ${maquinaSelecionada.nome}`
+                      : "Sem máquina selecionada. Você ainda pode gerar o consolidado de toda a loja."}
+                  </p>
+                </div>
+
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        📅 Data Inicial
+                      </label>
+                      <input
+                        type="date"
+                        value={dataInicio}
+                        onChange={(e) => setDataInicio(e.target.value)}
+                        className="input-field w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        📅 Data Final
+                      </label>
+                      <input
+                        type="date"
+                        value={dataFim}
+                        onChange={(e) => setDataFim(e.target.value)}
+                        className="input-field w-full"
+                      />
+                    </div>
+                  </div>
+                  {(dataInicio || dataFim) && (
+                    <button
+                      onClick={() => {
+                        setDataInicio("");
+                        setDataFim("");
+                      }}
+                      className="mt-2 text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                    >
+                      ✕ Limpar filtros
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col lg:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleGerarRelatorio("selecionada")}
+                    disabled={!maquinaSelecionada}
+                    className={
+                      maquinaSelecionada
+                        ? "btn-secondary w-full lg:w-auto"
+                        : "w-full lg:w-auto px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-500 cursor-not-allowed"
+                    }
+                  >
+                    Gerar relatório da máquina selecionada
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGerarRelatorio("todas")}
+                    className="btn-primary w-full lg:w-auto"
+                  >
+                    Gerar relatório de todas as máquinas
+                  </button>
+                </div>
+
+                {erroRelatorio && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    {erroRelatorio}
+                  </div>
+                )}
+
+                {relatorioGerado && (
+                  <div className="mt-4 space-y-4">
+                    <div className="flex flex-col lg:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={handleEnviarRelatorioWhatsApp}
+                        className="w-full lg:w-auto px-4 py-2 rounded-lg font-bold text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
+                      >
+                        Enviar relatório via WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGerarPdfRelatorio}
+                        className="w-full lg:w-auto px-4 py-2 rounded-lg font-bold text-sm bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                      >
+                        Gerar PDF do relatório
+                      </button>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <p className="font-semibold text-gray-900">
+                          {relatorioGerado.titulo}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {relatorioGerado.subtitulo.join(" • ")}
+                        </p>
+                      </div>
+                      <pre className="p-4 text-xs md:text-sm whitespace-pre-wrap font-mono text-gray-800 max-h-105 overflow-auto bg-white">
+                        {relatorioGerado.texto}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Histórico de Movimentações */}
               {maquinaSelecionada && (
                 <div className="card mt-6">
@@ -448,45 +958,6 @@ export function LojaDetalhes() {
                     Histórico de Movimentações - {maquinaSelecionada.nome}
                   </h3>
 
-                  {/* Filtros de Data */}
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          📅 Data Inicial
-                        </label>
-                        <input
-                          type="date"
-                          value={dataInicio}
-                          onChange={(e) => setDataInicio(e.target.value)}
-                          className="input-field w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          📅 Data Final
-                        </label>
-                        <input
-                          type="date"
-                          value={dataFim}
-                          onChange={(e) => setDataFim(e.target.value)}
-                          className="input-field w-full"
-                        />
-                      </div>
-                    </div>
-                    {(dataInicio || dataFim) && (
-                      <button
-                        onClick={() => {
-                          setDataInicio("");
-                          setDataFim("");
-                        }}
-                        className="mt-2 text-sm text-primary hover:text-primary-dark flex items-center gap-1"
-                      >
-                        ✕ Limpar filtros
-                      </button>
-                    )}
-                  </div>
-
                   {loadingMovimentacoes ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -494,152 +965,143 @@ export function LojaDetalhes() {
                         Carregando movimentações...
                       </p>
                     </div>
-                  ) : movimentacoes.length > 0 ? (
+                  ) : movimentacoesFiltradas.length > 0 ? (
                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {movimentacoes
-                        .filter((mov) => {
-                          const movData = new Date(mov.createdAt);
-                          const inicio = dataInicio
-                            ? new Date(dataInicio)
-                            : null;
-                          const fim = dataFim
-                            ? new Date(dataFim + "T23:59:59")
-                            : null;
-
-                          if (inicio && movData < inicio) return false;
-                          if (fim && movData > fim) return false;
-                          return true;
-                        })
-                        .map((mov) => (
-                          <div
-                            key={mov.id}
-                            className="p-4 border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-gray-600">
-                                {new Date(mov.createdAt).toLocaleDateString(
-                                  "pt-BR",
-                                )}{" "}
-                                às{" "}
-                                {new Date(mov.createdAt).toLocaleTimeString(
-                                  "pt-BR",
-                                )}
-                              </span>
-                              {podeEditar(mov) && (
-                                <button
-                                  onClick={() => abrirModalEdicao(mov)}
-                                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
-                                  title="Editar movimentação"
-                                >
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                  </svg>
-                                  Editar
-                                </button>
+                      {movimentacoesFiltradas.map((mov) => (
+                        <div
+                          key={mov.id}
+                          className="p-4 border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-gray-600">
+                              {new Date(mov.createdAt).toLocaleDateString(
+                                "pt-BR",
+                              )}{" "}
+                              às{" "}
+                              {new Date(mov.createdAt).toLocaleTimeString(
+                                "pt-BR",
                               )}
-                            </div>
-                            <div className="grid grid-cols-5 gap-4 mt-3 text-sm">
-                              <div>
-                                <p className="text-gray-600">Total Pré</p>
-                                <p className="font-semibold">
-                                  {mov.totalPre || 0}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Saíram</p>
-                                <p className="font-semibold text-red-600">
-                                  {mov.sairam || 0}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Abastecidas</p>
-                                <p className="font-semibold text-green-600">
-                                  {mov.abastecidas || 0}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600 flex items-center gap-1">
-                                  <span>📦</span> Total Atual
-                                </p>
-                                <p className="font-semibold text-purple-600">
-                                  {(mov.totalPre || 0) +
-                                    (mov.abastecidas || 0) -
-                                    (mov.sairam || 0)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600 flex items-center gap-1">
-                                  <span>🎫</span> Fichas
-                                </p>
-                                <p className="font-semibold text-blue-600">
-                                  {mov.fichas || 0}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            {/* Contadores da Máquina */}
-                            {(mov.contadorIn || mov.contadorOut) && (
-                              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">⬆️</span>
-                                  <div>
-                                    <p className="text-xs text-gray-600">
-                                      Contador IN
-                                    </p>
-                                    <p className="font-bold text-blue-600">
-                                      {mov.contadorIn?.toLocaleString("pt-BR") || "-"}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">⬇️</span>
-                                  <div>
-                                    <p className="text-xs text-gray-600">
-                                      Contador OUT
-                                    </p>
-                                    <p className="font-bold text-purple-600">
-                                      {mov.contadorOut?.toLocaleString("pt-BR") || "-"}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Justificativa de Quebra de Ordem */}
-                            {mov.justificativa_ordem && (
-                              <div className="mt-3 pt-3 border-t border-orange-200 bg-orange-50 p-3 rounded-lg">
-                                <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1">
-                                  ⚠️ ORDEM DO ROTEIRO ALTERADA
-                                </p>
-                                <p className="text-sm text-orange-900">
-                                  <strong>Justificativa:</strong> {mov.justificativa_ordem}
-                                </p>
-                              </div>
-                            )}
-
-                            {mov.observacoes && (
-                              <p className="text-sm text-gray-600 mt-3 italic">
-                                💬 {mov.observacoes}
-                              </p>
+                            </span>
+                            {podeEditar(mov) && (
+                              <button
+                                onClick={() => abrirModalEdicao(mov)}
+                                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                                title="Editar movimentação"
+                              >
+                                <svg
+                                  className="w-3 h-3"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                                Editar
+                              </button>
                             )}
                           </div>
-                        ))}
+                          <div className="grid grid-cols-5 gap-4 mt-3 text-sm">
+                            <div>
+                              <p className="text-gray-600">Total Pré</p>
+                              <p className="font-semibold">
+                                {mov.totalPre || 0}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Saíram</p>
+                              <p className="font-semibold text-red-600">
+                                {mov.sairam || 0}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Abastecidas</p>
+                              <p className="font-semibold text-green-600">
+                                {mov.abastecidas || 0}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 flex items-center gap-1">
+                                <span>📦</span> Total Atual
+                              </p>
+                              <p className="font-semibold text-purple-600">
+                                {(mov.totalPre || 0) +
+                                  (mov.abastecidas || 0) -
+                                  (mov.sairam || 0)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 flex items-center gap-1">
+                                <span>🎫</span> Fichas
+                              </p>
+                              <p className="font-semibold text-blue-600">
+                                {mov.fichas || 0}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Contadores da Máquina */}
+                          {(mov.contadorIn || mov.contadorOut) && (
+                            <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">⬆️</span>
+                                <div>
+                                  <p className="text-xs text-gray-600">
+                                    Contador IN
+                                  </p>
+                                  <p className="font-bold text-blue-600">
+                                    {mov.contadorIn?.toLocaleString("pt-BR") ||
+                                      "-"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">⬇️</span>
+                                <div>
+                                  <p className="text-xs text-gray-600">
+                                    Contador OUT
+                                  </p>
+                                  <p className="font-bold text-purple-600">
+                                    {mov.contadorOut?.toLocaleString("pt-BR") ||
+                                      "-"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Justificativa de Quebra de Ordem */}
+                          {mov.justificativa_ordem && (
+                            <div className="mt-3 pt-3 border-t border-orange-200 bg-orange-50 p-3 rounded-lg">
+                              <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1">
+                                ⚠️ ORDEM DO ROTEIRO ALTERADA
+                              </p>
+                              <p className="text-sm text-orange-900">
+                                <strong>Justificativa:</strong>{" "}
+                                {mov.justificativa_ordem}
+                              </p>
+                            </div>
+                          )}
+
+                          {mov.observacoes && (
+                            <p className="text-sm text-gray-600 mt-3 italic">
+                              💬 {mov.observacoes}
+                            </p>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-12">
                       <p className="text-6xl mb-4">📭</p>
                       <p className="text-gray-600">
-                        Nenhuma movimentação registrada para esta máquina
+                        {movimentacoes.length > 0
+                          ? "Nenhuma movimentação encontrada para esta máquina no período selecionado"
+                          : "Nenhuma movimentação registrada para esta máquina"}
                       </p>
                     </div>
                   )}
