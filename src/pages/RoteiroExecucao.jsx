@@ -47,6 +47,7 @@ export default function RoteiroExecucao() {
   const [gastoForm, setGastoForm] = useState({
     categoria: "transporte",
     valor: "",
+    quilometragem: "",
     observacao: "",
   });
   const [lancandoGasto, setLancandoGasto] = useState(false);
@@ -234,6 +235,18 @@ export default function RoteiroExecucao() {
       return;
     }
 
+    let quilometragemNumerica = null;
+    if (gastoForm.categoria === "abastecimento") {
+      const kmDigitado = Number.parseInt(gastoForm.quilometragem, 10);
+      if (!Number.isInteger(kmDigitado) || kmDigitado < 0) {
+        setError(
+          "Informe o KM do abastecimento (número inteiro maior ou igual a zero).",
+        );
+        return;
+      }
+      quilometragemNumerica = kmDigitado;
+    }
+
     const saldoAtual = Number(roteiro?.saldoGastoHoje ?? 0);
     if (Number.isFinite(saldoAtual) && valorNumerico > saldoAtual) {
       setError(
@@ -250,6 +263,7 @@ export default function RoteiroExecucao() {
       const payload = {
         categoria: gastoForm.categoria,
         valor: valorNumerico,
+        quilometragem: quilometragemNumerica,
         observacao: gastoForm.observacao?.trim() || null,
       };
 
@@ -258,6 +272,7 @@ export default function RoteiroExecucao() {
       setGastoForm((prev) => ({
         ...prev,
         valor: "",
+        quilometragem: "",
         observacao: "",
       }));
       await carregarRoteiro();
@@ -348,7 +363,10 @@ export default function RoteiroExecucao() {
     : orcamentoDiario - totalGastoHoje;
   const percentualSaldo =
     orcamentoDiario > 0 ? saldoGastoHoje / orcamentoDiario : 0;
-  const percentualSaldoBarra = Math.max(0, Math.min(100, percentualSaldo * 100));
+  const percentualSaldoBarra = Math.max(
+    0,
+    Math.min(100, percentualSaldo * 100),
+  );
   const saldoClassName =
     saldoGastoHoje <= 0
       ? "text-red-600"
@@ -406,19 +424,25 @@ export default function RoteiroExecucao() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <p className="text-xs font-bold text-blue-700">Orçamento Diário</p>
+              <p className="text-xs font-bold text-blue-700">
+                Orçamento Diário
+              </p>
               <p className="text-xl font-extrabold text-blue-800">
                 {formatarMoedaBRL(orcamentoDiario)}
               </p>
             </div>
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-              <p className="text-xs font-bold text-orange-700">Total Gasto Hoje</p>
+              <p className="text-xs font-bold text-orange-700">
+                Total Gasto Hoje
+              </p>
               <p className="text-xl font-extrabold text-orange-800">
                 {formatarMoedaBRL(totalGastoHoje)}
               </p>
             </div>
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-bold text-gray-600">Saldo Disponível</p>
+              <p className="text-xs font-bold text-gray-600">
+                Saldo Disponível
+              </p>
               <p className={`text-xl font-extrabold ${saldoClassName}`}>
                 {formatarMoedaBRL(saldoGastoHoje)}
               </p>
@@ -450,6 +474,10 @@ export default function RoteiroExecucao() {
                   setGastoForm((prev) => ({
                     ...prev,
                     categoria: e.target.value,
+                    quilometragem:
+                      e.target.value === "abastecimento"
+                        ? prev.quilometragem
+                        : "",
                   }))
                 }
                 disabled={lancandoGasto || roteiro.status === "finalizado"}
@@ -484,6 +512,30 @@ export default function RoteiroExecucao() {
               />
             </div>
           </div>
+
+          {gastoForm.categoria === "abastecimento" && (
+            <div className="mb-3">
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                KM do abastecimento
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                className="w-full p-3 border rounded-lg bg-white"
+                placeholder="Ex: 105430"
+                value={gastoForm.quilometragem}
+                onChange={(e) =>
+                  setGastoForm((prev) => ({
+                    ...prev,
+                    quilometragem: e.target.value,
+                  }))
+                }
+                disabled={lancandoGasto || roteiro.status === "finalizado"}
+              />
+            </div>
+          )}
 
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-1">
@@ -520,6 +572,7 @@ export default function RoteiroExecucao() {
                 <tr>
                   <th className="px-3 py-2 text-left font-bold">Categoria</th>
                   <th className="px-3 py-2 text-left font-bold">Valor</th>
+                  <th className="px-3 py-2 text-left font-bold">KM</th>
                   <th className="px-3 py-2 text-left font-bold">Observação</th>
                   <th className="px-3 py-2 text-left font-bold">Funcionário</th>
                   <th className="px-3 py-2 text-left font-bold">Data</th>
@@ -539,6 +592,9 @@ export default function RoteiroExecucao() {
                           {formatarMoedaBRL(gasto.valor)}
                         </td>
                         <td className="px-3 py-2 text-gray-600">
+                          {gasto.quilometragem ?? "-"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
                           {gasto.observacao?.trim() || "-"}
                         </td>
                         <td className="px-3 py-2 text-gray-600">
@@ -556,7 +612,7 @@ export default function RoteiroExecucao() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-3 py-4 text-center text-gray-500 italic"
                     >
                       Nenhum gasto lançado hoje para este roteiro.
