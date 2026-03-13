@@ -83,6 +83,7 @@ export function Roteiros() {
   const [novoNomeRoteiro, setNovoNomeRoteiro] = useState("");
   const [novosDiasRoteiro, setNovosDiasRoteiro] = useState([]);
   const [roteiroParaAdicionar, setRoteiroParaAdicionar] = useState(null);
+  const [filtroLojaAdicionar, setFiltroLojaAdicionar] = useState("");
   const [modalFinalizar, setModalFinalizar] = useState({
     aberto: false,
     etapa: 1,
@@ -104,6 +105,36 @@ export function Roteiros() {
 
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
+
+  const normalizarTextoFiltro = (texto = "") =>
+    String(texto)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+  const termoBuscaLoja = normalizarTextoFiltro(filtroLojaAdicionar);
+  const idsLojasNoRoteiro = new Set(
+    (roteiroParaAdicionar?.lojas || []).map((l) => String(l.id)),
+  );
+  const lojasFiltradasParaAdicionar = todasLojas.filter((loja) => {
+    // Excluir lojas já presentes no roteiro
+    if (idsLojasNoRoteiro.has(String(loja.id))) return false;
+
+    if (!termoBuscaLoja) return true;
+
+    const textoBuscaLoja = [
+      loja?.nome,
+      loja?.codigo,
+      loja?.cidade,
+      loja?.bairro,
+      loja?.id,
+    ]
+      .filter(Boolean)
+      .map((campo) => normalizarTextoFiltro(campo))
+      .join(" ");
+
+    return textoBuscaLoja.includes(termoBuscaLoja);
+  });
 
   // Depende de usuario?.role para esperar o AuthContext hidratar do localStorage
   useEffect(() => {
@@ -524,6 +555,7 @@ export function Roteiros() {
                       <button
                         onClick={() => {
                           setRoteiroParaAdicionar(roteiro);
+                          setFiltroLojaAdicionar("");
                           setShowModalAdicionarLoja(true);
                         }}
                         className="text-blue-600 text-xs font-bold hover:underline"
@@ -673,31 +705,61 @@ export function Roteiros() {
             <h2 className="text-xl font-bold mb-4">
               Adicionar Loja a {roteiroParaAdicionar.nome}
             </h2>
+            <div className="mb-3">
+              <input
+                autoFocus
+                type="text"
+                value={filtroLojaAdicionar}
+                onChange={(e) => setFiltroLojaAdicionar(e.target.value)}
+                placeholder="Buscar loja por nome, cidade, bairro ou código..."
+                className="w-full p-3 border rounded-xl text-sm focus:ring-2 focus:ring-[#24094E] outline-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {lojasFiltradasParaAdicionar.length} loja
+                {lojasFiltradasParaAdicionar.length === 1 ? "" : "s"} disponível
+                {lojasFiltradasParaAdicionar.length === 1 ? "" : "is"} para
+                adicionar
+              </p>
+            </div>
             {isRoteiroFinalizado(roteiroParaAdicionar) && (
               <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
                 Este roteiro está finalizado. Não é permitido adicionar lojas.
               </div>
             )}
             <div className="overflow-y-auto space-y-2 mb-4">
-              {todasLojas.map((loja) => (
-                <button
-                  key={loja.id}
-                  onClick={() => {
-                    handleMoverLoja(loja.id, null, roteiroParaAdicionar.id);
-                    setShowModalAdicionarLoja(false);
-                  }}
-                  disabled={isRoteiroFinalizado(roteiroParaAdicionar)}
-                  className="w-full text-left p-3 hover:bg-gray-50 rounded-xl border flex justify-between items-center group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="font-medium text-sm">🏪 {loja.nome}</span>
-                  <span className="text-blue-500 opacity-0 group-hover:opacity-100 font-bold text-xs">
-                    + ADICIONAR
-                  </span>
-                </button>
-              ))}
+              {lojasFiltradasParaAdicionar.length > 0 ? (
+                lojasFiltradasParaAdicionar.map((loja) => (
+                  <button
+                    key={loja.id}
+                    onClick={() => {
+                      handleMoverLoja(loja.id, null, roteiroParaAdicionar.id);
+                      setFiltroLojaAdicionar("");
+                      setRoteiroParaAdicionar(null);
+                      setShowModalAdicionarLoja(false);
+                    }}
+                    disabled={isRoteiroFinalizado(roteiroParaAdicionar)}
+                    className="w-full text-left p-3 hover:bg-gray-50 rounded-xl border flex justify-between items-center group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="font-medium text-sm">🏪 {loja.nome}</span>
+                    <span className="text-blue-500 opacity-0 group-hover:opacity-100 font-bold text-xs">
+                      + ADICIONAR
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
+                  {filtroLojaAdicionar
+                    ? "Nenhuma loja encontrada para este filtro."
+                    : "Todas as lojas já foram adicionadas a este roteiro."}
+                </div>
+              )}
             </div>
             <button
-              onClick={() => setShowModalAdicionarLoja(false)}
+              onClick={() => {
+                setFiltroLojaAdicionar("");
+                setRoteiroParaAdicionar(null);
+                setShowModalAdicionarLoja(false);
+              }}
               className="w-full py-3 bg-gray-100 rounded-xl font-bold text-gray-500"
             >
               Fechar

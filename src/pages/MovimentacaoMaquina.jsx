@@ -286,7 +286,14 @@ export default function MovimentacaoMaquina() {
     const saldo = diferencaIn;
     const valorJogada = Number(maquina?.valorFicha || 0);
     const jogado = valorJogada > 0 ? diferencaIn / valorJogada : 0;
-    const mediaBicho = diferencaIn > 0 ? quantidadeSaiu / diferencaIn : 0;
+
+    const produtoSelecionado = produtos.find(
+      (p) => String(p.id) === String(formData.produto_id),
+    );
+    const precoProduto = Number(produtoSelecionado?.preco || 0);
+    // Média Bicho = (preço do produto × qtd saiu) / dinheiro que entrou (diferencaIn)
+    const mediaBicho =
+      diferencaIn > 0 ? (precoProduto * quantidadeSaiu) / diferencaIn : 0;
 
     const lojaCodigo = String(maquina?.loja?.id || lojaId || "")
       .slice(0, 8)
