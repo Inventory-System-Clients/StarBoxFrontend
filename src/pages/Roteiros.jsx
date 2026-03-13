@@ -10,6 +10,7 @@ export function Roteiros() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
+  const ORCAMENTO_DIARIO_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
     "finalizado",
     "finalizada",
@@ -89,6 +90,8 @@ export function Roteiros() {
   const [filtroLojaAdicionar, setFiltroLojaAdicionar] = useState("");
   const [observacoesPendentes, setObservacoesPendentes] = useState({});
   const [salvandoObservacao, setSalvandoObservacao] = useState({});
+  const [orcamentosPendentes, setOrcamentosPendentes] = useState({});
+  const [salvandoOrcamento, setSalvandoOrcamento] = useState({});
   const [modalFinalizar, setModalFinalizar] = useState({
     aberto: false,
     etapa: 1,
@@ -110,6 +113,90 @@ export function Roteiros() {
 
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
+
+  const formatarMoedaBRL = (valor) =>
+    Number(valor || 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+  const getOrcamentoNumericoRoteiro = (roteiro) => {
+    const valor = Number(roteiro?.orcamentoDiario);
+    return Number.isFinite(valor) ? valor : ORCAMENTO_DIARIO_PADRAO;
+  };
+
+  const getOrcamentoRoteiro = (roteiro) => {
+    if (orcamentosPendentes[roteiro.id] !== undefined) {
+      return orcamentosPendentes[roteiro.id];
+    }
+    return getOrcamentoNumericoRoteiro(roteiro).toFixed(2);
+  };
+
+  const handleOrcamentoChange = (roteiroId, valor) => {
+    setOrcamentosPendentes((prev) => ({
+      ...prev,
+      [roteiroId]: valor,
+    }));
+  };
+
+  const salvarOrcamentoDiario = async (roteiroId) => {
+    const orcamentoDigitado = orcamentosPendentes[roteiroId];
+    if (orcamentoDigitado === undefined) return;
+
+    const orcamentoNormalizado = String(orcamentoDigitado)
+      .trim()
+      .replace(",", ".");
+    const valorInformado =
+      orcamentoNormalizado === ""
+        ? ORCAMENTO_DIARIO_PADRAO
+        : Number(orcamentoNormalizado);
+
+    if (!Number.isFinite(valorInformado) || valorInformado < 0) {
+      setError("Informe um orçamento diário válido.");
+      return;
+    }
+
+    const valorOrcamento = Number(valorInformado.toFixed(2));
+    const roteiroAtual = getRoteiroById(roteiroId);
+    const orcamentoAtual = Number(
+      getOrcamentoNumericoRoteiro(roteiroAtual).toFixed(2),
+    );
+
+    if (valorOrcamento === orcamentoAtual) {
+      setOrcamentosPendentes((prev) => {
+        const copia = { ...prev };
+        delete copia[roteiroId];
+        return copia;
+      });
+      return;
+    }
+
+    try {
+      setSalvandoOrcamento((prev) => ({ ...prev, [roteiroId]: true }));
+      await api.patch(`/roteiros/${roteiroId}/orcamento-diario`, {
+        orcamentoDiario: valorOrcamento,
+      });
+
+      setRoteiros((prev) =>
+        prev.map((item) =>
+          item.id === roteiroId
+            ? { ...item, orcamentoDiario: valorOrcamento }
+            : item,
+        ),
+      );
+
+      setOrcamentosPendentes((prev) => {
+        const copia = { ...prev };
+        delete copia[roteiroId];
+        return copia;
+      });
+      setSuccess("Orçamento diário salvo com sucesso!");
+    } catch {
+      setError("Erro ao salvar orçamento diário do roteiro.");
+    } finally {
+      setSalvandoOrcamento((prev) => ({ ...prev, [roteiroId]: false }));
+    }
+  };
 
   const getObservacaoRoteiro = (roteiro) => {
     if (observacoesPendentes[roteiro.id] !== undefined) {
@@ -634,6 +721,47 @@ export function Roteiros() {
                       {salvandoDias[roteiro.id] ? "Salvando..." : "Salvar dias"}
                     </button>
                   )}
+              </div>
+
+              {/* Seção Orçamento Diário */}
+              <div className="mb-4">
+                <label className="text-xs font-bold text-gray-400 block mb-2">
+                  ORÇAMENTO DIÁRIO
+                </label>
+                {usuario?.role === "ADMIN" ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-full p-2 text-sm border rounded bg-gray-50"
+                        value={getOrcamentoRoteiro(roteiro)}
+                        onChange={(e) =>
+                          handleOrcamentoChange(roteiro.id, e.target.value)
+                        }
+                      />
+                      {orcamentosPendentes[roteiro.id] !== undefined && (
+                        <button
+                          onClick={() => salvarOrcamentoDiario(roteiro.id)}
+                          disabled={salvandoOrcamento[roteiro.id]}
+                          className="whitespace-nowrap py-2 px-3 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                        >
+                          {salvandoOrcamento[roteiro.id]
+                            ? "Salvando..."
+                            : "Salvar orçamento"}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Valor padrão: {formatarMoedaBRL(ORCAMENTO_DIARIO_PADRAO)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm font-semibold text-green-700">
+                    {formatarMoedaBRL(getOrcamentoNumericoRoteiro(roteiro))}
+                  </p>
+                )}
               </div>
 
               {/* Seção de Observação */}

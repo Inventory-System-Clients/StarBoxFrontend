@@ -11,6 +11,7 @@ import { Badge } from "../components/UIComponents";
 import AlertAdmin from "../components/AlertAdmin";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
+import DashboardGastosRoteirosTab from "../components/DashboardGastosRoteirosTab";
 
 import Swal from "sweetalert2";
 
@@ -2144,6 +2145,8 @@ export function Dashboard() {
             </div>
           </div>
         )}
+
+        {usuario?.role === "ADMIN" && <DashboardGastosRoteirosTab />}
 
         {/* Estatísticas de Produtos Totais - Apenas para ADMIN */}
         {usuario?.role === "ADMIN" &&

@@ -12,6 +12,13 @@ export default function RoteiroExecucao() {
   const navigate = useNavigate();
   const location = useLocation();
   const { usuario } = useAuth();
+  const CATEGORIAS_GASTO = [
+    { value: "transporte", label: "Transporte" },
+    { value: "estadia", label: "Estadia" },
+    { value: "abastecimento", label: "Abastecimento" },
+    { value: "alimentacao", label: "Alimentação" },
+    { value: "outros", label: "Outros" },
+  ];
   const [roteiro, setRoteiro] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -37,11 +44,48 @@ export default function RoteiroExecucao() {
     lojaEsperadaNome: "",
     justificativa: "",
   });
+  const [gastoForm, setGastoForm] = useState({
+    categoria: "transporte",
+    valor: "",
+    observacao: "",
+  });
+  const [lancandoGasto, setLancandoGasto] = useState(false);
 
   const lojaEstaConcluida = (status) =>
     ["concluido", "concluida", "finalizado", "finalizada"].includes(
       String(status || "").toLowerCase(),
     );
+
+  const formatarMoedaBRL = (valor) =>
+    Number(valor || 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+  const formatarDataHora = (dataIso) => {
+    const data = new Date(dataIso);
+    if (Number.isNaN(data.getTime())) {
+      return { data: "-", hora: "-" };
+    }
+    return {
+      data: data.toLocaleDateString("pt-BR"),
+      hora: data.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  };
+
+  const parseValorMonetario = (valorTexto) => {
+    const texto = String(valorTexto || "").trim();
+    if (!texto) return 0;
+    return Number(texto.replace(",", "."));
+  };
+
+  const getLabelCategoriaGasto = (categoria) =>
+    CATEGORIAS_GASTO.find((item) => item.value === categoria)?.label ||
+    categoria ||
+    "-";
 
   useEffect(() => {
     carregarRoteiro();
@@ -177,6 +221,62 @@ export default function RoteiroExecucao() {
     await carregarRoteiro();
   };
 
+  const handleLancarGasto = async () => {
+    const categoriasPermitidas = CATEGORIAS_GASTO.map((item) => item.value);
+    if (!categoriasPermitidas.includes(gastoForm.categoria)) {
+      setError("Categoria de gasto inválida.");
+      return;
+    }
+
+    const valorNumerico = parseValorMonetario(gastoForm.valor);
+    if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+      setError("Informe um valor válido para o gasto.");
+      return;
+    }
+
+    const saldoAtual = Number(roteiro?.saldoGastoHoje ?? 0);
+    if (Number.isFinite(saldoAtual) && valorNumerico > saldoAtual) {
+      setError(
+        `Saldo diário insuficiente para este lançamento. Saldo disponível: ${formatarMoedaBRL(saldoAtual)}.`,
+      );
+      return;
+    }
+
+    try {
+      setLancandoGasto(true);
+      setError("");
+      setSuccess("");
+
+      const payload = {
+        categoria: gastoForm.categoria,
+        valor: valorNumerico,
+        observacao: gastoForm.observacao?.trim() || null,
+      };
+
+      const res = await api.post(`/roteiros/${id}/gastos`, payload);
+      setSuccess(res?.data?.message || "Gasto diário registrado com sucesso.");
+      setGastoForm((prev) => ({
+        ...prev,
+        valor: "",
+        observacao: "",
+      }));
+      await carregarRoteiro();
+    } catch (err) {
+      const mensagemErro =
+        err?.response?.data?.error || "Erro ao registrar gasto diário.";
+      const saldoDisponivelErro = err?.response?.data?.saldoDisponivel;
+      if (typeof saldoDisponivelErro === "number") {
+        setError(
+          `${mensagemErro}. Saldo disponível: ${formatarMoedaBRL(saldoDisponivelErro)}.`,
+        );
+      } else {
+        setError(mensagemErro);
+      }
+    } finally {
+      setLancandoGasto(false);
+    }
+  };
+
   const executarFinalizacaoRoteiro = async () => {
     if (!roteiro) return;
 
@@ -233,6 +333,31 @@ export default function RoteiroExecucao() {
     );
 
   const observacaoAdmin = String(roteiro.observacao || "").trim();
+  const orcamentoConvertido = Number(roteiro.orcamentoDiario);
+  const totalGastoConvertido = Number(roteiro.totalGastoHoje);
+  const saldoConvertido = Number(roteiro.saldoGastoHoje);
+
+  const orcamentoDiario = Number.isFinite(orcamentoConvertido)
+    ? orcamentoConvertido
+    : 2000;
+  const totalGastoHoje = Number.isFinite(totalGastoConvertido)
+    ? totalGastoConvertido
+    : 0;
+  const saldoGastoHoje = Number.isFinite(saldoConvertido)
+    ? saldoConvertido
+    : orcamentoDiario - totalGastoHoje;
+  const percentualSaldo =
+    orcamentoDiario > 0 ? saldoGastoHoje / orcamentoDiario : 0;
+  const percentualSaldoBarra = Math.max(0, Math.min(100, percentualSaldo * 100));
+  const saldoClassName =
+    saldoGastoHoje <= 0
+      ? "text-red-600"
+      : percentualSaldo < 0.25
+        ? "text-yellow-600"
+        : "text-green-600";
+  const gastosHojeOrdenados = [...(roteiro.gastosHoje || [])].sort(
+    (a, b) => new Date(b.dataHora) - new Date(a.dataHora),
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 text-[#24094E]">
@@ -268,6 +393,181 @@ export default function RoteiroExecucao() {
             </p>
           </section>
         )}
+
+        <section className="mb-8 bg-white rounded-xl shadow p-5 border border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <h2 className="text-lg font-bold">💸 Gastos Diários do Roteiro</h2>
+            <span className="text-xs bg-gray-100 px-3 py-1 rounded-full font-semibold text-gray-600">
+              {roteiro.status === "finalizado"
+                ? "Roteiro finalizado"
+                : "Lançamento disponível"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-bold text-blue-700">Orçamento Diário</p>
+              <p className="text-xl font-extrabold text-blue-800">
+                {formatarMoedaBRL(orcamentoDiario)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <p className="text-xs font-bold text-orange-700">Total Gasto Hoje</p>
+              <p className="text-xl font-extrabold text-orange-800">
+                {formatarMoedaBRL(totalGastoHoje)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-bold text-gray-600">Saldo Disponível</p>
+              <p className={`text-xl font-extrabold ${saldoClassName}`}>
+                {formatarMoedaBRL(saldoGastoHoje)}
+              </p>
+            </div>
+          </div>
+
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
+            <div
+              className={`h-full transition-all ${
+                saldoGastoHoje <= 0
+                  ? "bg-red-500"
+                  : percentualSaldo < 0.25
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
+              }`}
+              style={{ width: `${percentualSaldoBarra}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                Categoria
+              </label>
+              <select
+                className="w-full p-3 border rounded-lg bg-white"
+                value={gastoForm.categoria}
+                onChange={(e) =>
+                  setGastoForm((prev) => ({
+                    ...prev,
+                    categoria: e.target.value,
+                  }))
+                }
+                disabled={lancandoGasto || roteiro.status === "finalizado"}
+              >
+                {CATEGORIAS_GASTO.map((categoria) => (
+                  <option key={categoria.value} value={categoria.value}>
+                    {categoria.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                Valor
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                className="w-full p-3 border rounded-lg bg-white"
+                placeholder="Ex: 120.50"
+                value={gastoForm.valor}
+                onChange={(e) =>
+                  setGastoForm((prev) => ({
+                    ...prev,
+                    valor: e.target.value,
+                  }))
+                }
+                disabled={lancandoGasto || roteiro.status === "finalizado"}
+              />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-bold text-gray-700 mb-1">
+              Observação (opcional)
+            </label>
+            <textarea
+              rows="3"
+              className="w-full p-3 border rounded-lg bg-white resize-y"
+              placeholder="Ex: Uber entre lojas"
+              value={gastoForm.observacao}
+              onChange={(e) =>
+                setGastoForm((prev) => ({
+                  ...prev,
+                  observacao: e.target.value,
+                }))
+              }
+              disabled={lancandoGasto || roteiro.status === "finalizado"}
+            />
+          </div>
+
+          <div className="flex justify-end mb-4">
+            <button
+              className="bg-blue-600 text-white py-2 px-5 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-60"
+              onClick={handleLancarGasto}
+              disabled={lancandoGasto || roteiro.status === "finalizado"}
+            >
+              {lancandoGasto ? "Lançando..." : "Lançar gasto"}
+            </button>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-bold">Categoria</th>
+                  <th className="px-3 py-2 text-left font-bold">Valor</th>
+                  <th className="px-3 py-2 text-left font-bold">Observação</th>
+                  <th className="px-3 py-2 text-left font-bold">Funcionário</th>
+                  <th className="px-3 py-2 text-left font-bold">Data</th>
+                  <th className="px-3 py-2 text-left font-bold">Hora</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gastosHojeOrdenados.length > 0 ? (
+                  gastosHojeOrdenados.map((gasto) => {
+                    const dataHoraFormatada = formatarDataHora(gasto.dataHora);
+                    return (
+                      <tr key={gasto.id} className="border-t border-gray-100">
+                        <td className="px-3 py-2">
+                          {getLabelCategoriaGasto(gasto.categoria)}
+                        </td>
+                        <td className="px-3 py-2 font-semibold text-gray-800">
+                          {formatarMoedaBRL(gasto.valor)}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {gasto.observacao?.trim() || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {gasto.usuario?.nome || usuario?.nome || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {dataHoraFormatada.data}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {dataHoraFormatada.hora}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-3 py-4 text-center text-gray-500 italic"
+                    >
+                      Nenhum gasto lançado hoje para este roteiro.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-2">
             Selecione uma loja para movimentar:
