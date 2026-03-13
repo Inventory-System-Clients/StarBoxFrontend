@@ -313,6 +313,7 @@ export function LojaDetalhes() {
       movimentacoes: 0,
     };
     const blocos = [];
+    let maquinasComMovimentacao = 0;
     const chavesOrdenadas = Array.from(movimentacoesPorMaquina.keys()).sort(
       (a, b) => {
         const nomeA = maquinaPorId.get(a)?.nome || "";
@@ -323,12 +324,26 @@ export function LojaDetalhes() {
       },
     );
 
-    chavesOrdenadas.forEach((maquinaIdAtual) => {
+    chavesOrdenadas.forEach((maquinaIdAtual, indiceMaquina) => {
       const maquinaAtual = maquinaPorId.get(maquinaIdAtual);
+      const codigoMaquina = maquinaAtual?.codigo || maquinaIdAtual;
+      const nomeMaquina = maquinaAtual?.nome || "Maquina";
       const valorJogada = Number(maquinaAtual?.valorFicha || 0);
       const movimentacoesOrdenadas = [
         ...movimentacoesPorMaquina.get(maquinaIdAtual),
       ].sort((a, b) => obterDataMovimentacao(a) - obterDataMovimentacao(b));
+
+      const totaisMaquina = {
+        entradas: 0,
+        saidas: 0,
+        jogado: 0,
+        liquido: 0,
+        especie: 0,
+        notas: 0,
+        digital: 0,
+      };
+      const blocosMaquina = [];
+      let movimentacoesNoPeriodoMaquina = 0;
 
       let contadorInAnterior = 0;
       let contadorOutAnterior = 0;
@@ -384,10 +399,20 @@ export function LojaDetalhes() {
           totais.digital += valorDigital;
           totais.movimentacoes += 1;
 
-          blocos.push(
+          totaisMaquina.entradas += diferencaIn;
+          totaisMaquina.saidas += quantidadeSaiu;
+          totaisMaquina.jogado += jogado;
+          totaisMaquina.liquido += saldo;
+          totaisMaquina.especie += saldo;
+          totaisMaquina.notas += valorNotas;
+          totaisMaquina.digital += valorDigital;
+          movimentacoesNoPeriodoMaquina += 1;
+
+          blocosMaquina.push(
             [
-              "___________________________________",
-              `${maquinaAtual?.codigo || mov.maquina?.codigo || "-"} | ${maquinaAtual?.nome || mov.maquina?.nome || "Máquina"}`,
+              "-----------------------------------",
+              `Movimentacao ${movimentacoesNoPeriodoMaquina}`,
+              `${codigoMaquina} | ${nomeMaquina}`,
               `Produto: ${nomeProduto}`,
               `Data: ${formatarDataHora(dataMovimentacao)}`,
               `Lançado por: ${mov.usuario?.nome || "Usuário"}`,
@@ -416,6 +441,25 @@ export function LojaDetalhes() {
         contadorInAnterior = contadorInAtual;
         contadorOutAnterior = contadorOutAtual;
       });
+
+      if (movimentacoesNoPeriodoMaquina > 0) {
+        maquinasComMovimentacao += 1;
+        blocos.push(
+          [
+            "",
+            "===================================",
+            `TROCA DE MAQUINA -> ${codigoMaquina} | ${nomeMaquina}`,
+            `Maquina ${indiceMaquina + 1} no escopo`,
+            `Movimentacoes no periodo: ${formatarInteiro(movimentacoesNoPeriodoMaquina)}`,
+            `Entradas da maquina: R$${formatarMoeda(totaisMaquina.entradas)}`,
+            `Saidas da maquina..: ${formatarInteiro(totaisMaquina.saidas)}`,
+            `Jogado da maquina..: ${formatarMoeda(totaisMaquina.jogado)}`,
+            `Liquido da maquina.: ${formatarMoeda(totaisMaquina.liquido)}`,
+            "===================================",
+            ...blocosMaquina,
+          ].join("\n"),
+        );
+      }
     });
 
     if (blocos.length === 0) {
@@ -438,6 +482,7 @@ export function LojaDetalhes() {
       `Escopo: ${escopoLabel}`,
       "___________________________________",
       `Qtde Maqs....: ${formatarInteiro(escopo === "selecionada" ? 1 : maquinasNoEscopo.length)}`,
+      `Maqs c/ mov..: ${formatarInteiro(maquinasComMovimentacao)}`,
       `Movimentacoes: ${formatarInteiro(totais.movimentacoes)}`,
       `Entradas.....: R$${formatarMoeda(totais.entradas)}`,
       `Saidas.......: ${formatarInteiro(totais.saidas)}`,
@@ -446,6 +491,8 @@ export function LojaDetalhes() {
       `Digital......: R$${formatarMoeda(totais.digital)}`,
       `Liquido......: ${formatarMoeda(totais.liquido)}`,
       `Especie......: ${formatarMoeda(totais.especie)}`,
+      "",
+      "========== DETALHE POR MAQUINA ==========",
       ...blocos,
     ].join("\n");
 
