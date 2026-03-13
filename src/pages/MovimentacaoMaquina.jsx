@@ -293,6 +293,9 @@ export default function MovimentacaoMaquina() {
     const precoProduto = Number(produtoSelecionado?.preco || 0);
     const valorMedioSaidaPorPelucia =
       quantidadeSaiu > 0 ? diferencaIn / quantidadeSaiu - precoProduto : 0;
+    const valorJogadaMedia = 2;
+    const jogadasMediasPorPelucia =
+      quantidadeSaiu > 0 ? diferencaIn / valorJogadaMedia / quantidadeSaiu : 0;
 
     const lojaCodigo = String(maquina?.loja?.id || lojaId || "")
       .slice(0, 8)
@@ -314,6 +317,7 @@ export default function MovimentacaoMaquina() {
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
       `Saldo: R$${formatarMoeda(saldo)}`,
       `Valor medio de saida por pelucia: ${formatarMoeda(valorMedioSaidaPorPelucia)}`,
+      `Jogadas medias por pelucia: ${formatarMoeda(jogadasMediasPorPelucia)}`,
       "___________________________________",
       "Qtde Maqs....: 01",
       `Entradas.....: ${formatarInteiro(diferencaIn)}`,
