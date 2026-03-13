@@ -373,6 +373,9 @@ export default function RoteiroExecucao() {
       : percentualSaldo < 0.25
         ? "text-yellow-600"
         : "text-green-600";
+  const kmObrigatorioPendente =
+    gastoForm.categoria === "abastecimento" &&
+    String(gastoForm.quilometragem || "").trim() === "";
   const gastosHojeOrdenados = [...(roteiro.gastosHoje || [])].sort(
     (a, b) => new Date(b.dataHora) - new Date(a.dataHora),
   );
@@ -516,16 +519,17 @@ export default function RoteiroExecucao() {
           {gastoForm.categoria === "abastecimento" && (
             <div className="mb-3">
               <label className="block text-sm font-bold text-gray-700 mb-1">
-                KM do abastecimento
+                KM do abastecimento *
               </label>
               <input
                 type="number"
                 min="0"
                 step="1"
                 inputMode="numeric"
-                className="w-full p-3 border rounded-lg bg-white"
-                placeholder="Ex: 105430"
+                className={`w-full p-3 border rounded-lg bg-white ${kmObrigatorioPendente ? "border-red-400" : ""}`}
+                placeholder="Obrigatório para abastecimento (ex: 105430)"
                 value={gastoForm.quilometragem}
+                required
                 onChange={(e) =>
                   setGastoForm((prev) => ({
                     ...prev,
@@ -534,6 +538,9 @@ export default function RoteiroExecucao() {
                 }
                 disabled={lancandoGasto || roteiro.status === "finalizado"}
               />
+              <p className="mt-1 text-xs text-red-600 font-semibold">
+                Campo obrigatório quando a categoria for Abastecimento.
+              </p>
             </div>
           )}
 
@@ -560,7 +567,11 @@ export default function RoteiroExecucao() {
             <button
               className="bg-blue-600 text-white py-2 px-5 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-60"
               onClick={handleLancarGasto}
-              disabled={lancandoGasto || roteiro.status === "finalizado"}
+              disabled={
+                lancandoGasto ||
+                roteiro.status === "finalizado" ||
+                kmObrigatorioPendente
+              }
             >
               {lancandoGasto ? "Lançando..." : "Lançar gasto"}
             </button>
