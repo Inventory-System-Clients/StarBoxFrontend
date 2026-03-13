@@ -291,9 +291,8 @@ export default function MovimentacaoMaquina() {
       (p) => String(p.id) === String(formData.produto_id),
     );
     const precoProduto = Number(produtoSelecionado?.preco || 0);
-    // Média Bicho = (preço do produto × qtd saiu) / dinheiro que entrou (diferencaIn)
-    const mediaBicho =
-      diferencaIn > 0 ? (precoProduto * quantidadeSaiu) / diferencaIn : 0;
+    const valorMedioSaidaPorPelucia =
+      quantidadeSaiu > 0 ? diferencaIn / quantidadeSaiu - precoProduto : 0;
 
     const lojaCodigo = String(maquina?.loja?.id || lojaId || "")
       .slice(0, 8)
@@ -314,7 +313,7 @@ export default function MovimentacaoMaquina() {
       `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
       `Saldo: R$${formatarMoeda(saldo)}`,
-      `Media Bicho: ${formatarMoeda(mediaBicho)}`,
+      `Valor medio de saida por pelucia: ${formatarMoeda(valorMedioSaidaPorPelucia)}`,
       "___________________________________",
       "Qtde Maqs....: 01",
       `Entradas.....: ${formatarInteiro(diferencaIn)}`,
