@@ -82,6 +82,8 @@ export function Lojas() {
         </svg>
       ),
       render: (loja) => (
+        <Link
+            to={`/lojas/${loja.id}`}>
         <div className="flex items-center gap-2">
           {loja.isDepositoPrincipal && (
             <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-semibold" title="Depósito Principal">
@@ -90,6 +92,7 @@ export function Lojas() {
           )}
           <span className="font-medium text-gray-900">{loja.nome}</span>
         </div>
+        </Link>
       ),
     },
     {
