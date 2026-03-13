@@ -9,6 +9,7 @@ import { Modal, AlertBox } from "../components/UIComponents";
 export function Roteiros() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const LIMITE_OBSERVACAO_ROTEIRO = 1000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
     "finalizado",
     "finalizada",
@@ -82,8 +83,12 @@ export function Roteiros() {
   const [showModalAdicionarLoja, setShowModalAdicionarLoja] = useState(false);
   const [novoNomeRoteiro, setNovoNomeRoteiro] = useState("");
   const [novosDiasRoteiro, setNovosDiasRoteiro] = useState([]);
+  const [novaObservacaoRoteiro, setNovaObservacaoRoteiro] = useState("");
+  const [filtroNomeRoteiro, setFiltroNomeRoteiro] = useState("");
   const [roteiroParaAdicionar, setRoteiroParaAdicionar] = useState(null);
   const [filtroLojaAdicionar, setFiltroLojaAdicionar] = useState("");
+  const [observacoesPendentes, setObservacoesPendentes] = useState({});
+  const [salvandoObservacao, setSalvandoObservacao] = useState({});
   const [modalFinalizar, setModalFinalizar] = useState({
     aberto: false,
     etapa: 1,
@@ -105,6 +110,68 @@ export function Roteiros() {
 
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
+
+  const getObservacaoRoteiro = (roteiro) => {
+    if (observacoesPendentes[roteiro.id] !== undefined) {
+      return observacoesPendentes[roteiro.id];
+    }
+    return roteiro.observacao || "";
+  };
+
+  const handleObservacaoChange = (roteiroId, valor) => {
+    const valorLimitado = valor.slice(0, LIMITE_OBSERVACAO_ROTEIRO);
+    setObservacoesPendentes((prev) => ({
+      ...prev,
+      [roteiroId]: valorLimitado,
+    }));
+  };
+
+  const salvarObservacao = async (roteiroId) => {
+    const observacaoDigitada = observacoesPendentes[roteiroId];
+    if (observacaoDigitada === undefined) return;
+
+    const roteiroAtual = getRoteiroById(roteiroId);
+    const observacaoAtualNormalizada = String(
+      roteiroAtual?.observacao || "",
+    ).trim();
+    const observacaoNormalizada = observacaoDigitada.trim();
+    const observacaoPayload = observacaoNormalizada || null;
+
+    if (observacaoNormalizada === observacaoAtualNormalizada) {
+      setObservacoesPendentes((prev) => {
+        const copia = { ...prev };
+        delete copia[roteiroId];
+        return copia;
+      });
+      return;
+    }
+
+    try {
+      setSalvandoObservacao((prev) => ({ ...prev, [roteiroId]: true }));
+      await api.patch(`/roteiros/${roteiroId}`, {
+        observacao: observacaoPayload,
+      });
+
+      setRoteiros((prev) =>
+        prev.map((item) =>
+          item.id === roteiroId
+            ? { ...item, observacao: observacaoPayload }
+            : item,
+        ),
+      );
+
+      setObservacoesPendentes((prev) => {
+        const copia = { ...prev };
+        delete copia[roteiroId];
+        return copia;
+      });
+      setSuccess("Observação do roteiro salva com sucesso!");
+    } catch {
+      setError("Erro ao salvar observação do roteiro.");
+    } finally {
+      setSalvandoObservacao((prev) => ({ ...prev, [roteiroId]: false }));
+    }
+  };
 
   const normalizarTextoFiltro = (texto = "") =>
     String(texto)
@@ -135,6 +202,16 @@ export function Roteiros() {
 
     return textoBuscaLoja.includes(termoBuscaLoja);
   });
+
+  const roteirosDoUsuario =
+    usuario?.role === "ADMIN"
+      ? roteiros
+      : roteiros.filter((r) => String(r.funcionarioId) === String(usuario?.id));
+
+  const termoBuscaRoteiro = normalizarTextoFiltro(filtroNomeRoteiro);
+  const roteirosFiltrados = roteirosDoUsuario.filter((roteiro) =>
+    normalizarTextoFiltro(roteiro?.nome || "").includes(termoBuscaRoteiro),
+  );
 
   // Depende de usuario?.role para esperar o AuthContext hidratar do localStorage
   useEffect(() => {
@@ -167,12 +244,15 @@ export function Roteiros() {
   // --- AÇÕES ---
   const handleCriarRoteiro = async () => {
     try {
+      const observacaoNormalizada = novaObservacaoRoteiro.trim();
       await api.post("/roteiros", {
         nome: novoNomeRoteiro,
         diasSemana: novosDiasRoteiro,
+        observacao: observacaoNormalizada || null,
       });
       setNovoNomeRoteiro("");
       setNovosDiasRoteiro([]);
+      setNovaObservacaoRoteiro("");
       setShowModalCriarRoteiro(false);
       setSuccess("Roteiro criado com sucesso!");
       carregarDadosIniciais();
@@ -376,6 +456,19 @@ export function Roteiros() {
           )}
         </div>
 
+        <div className="mb-6">
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Buscar roteiro por nome
+          </label>
+          <input
+            type="text"
+            value={filtroNomeRoteiro}
+            onChange={(e) => setFiltroNomeRoteiro(e.target.value)}
+            placeholder="Digite o nome do roteiro..."
+            className="w-full max-w-md p-3 border rounded-xl bg-white focus:ring-2 focus:ring-[#24094E] outline-none"
+          />
+        </div>
+
         {error && (
           <AlertBox type="error" message={error} onClose={() => setError("")} />
         )}
@@ -389,21 +482,20 @@ export function Roteiros() {
 
         {/* Funcionários veem só os roteiros atribuídos a eles */}
         {usuario?.role !== "ADMIN" &&
-          roteiros.filter(
-            (r) => String(r.funcionarioId) === String(usuario?.id),
-          ).length === 0 && (
+          roteirosDoUsuario.length === 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
               Nenhum roteiro atribuído a você no momento.
             </div>
           )}
 
+        {roteirosDoUsuario.length > 0 && roteirosFiltrados.length === 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-600 font-medium mb-6">
+            Nenhum roteiro encontrado com esse nome.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(usuario?.role === "ADMIN"
-            ? roteiros
-            : roteiros.filter(
-                (r) => String(r.funcionarioId) === String(usuario?.id),
-              )
-          ).map((roteiro) => (
+          {roteirosFiltrados.map((roteiro) => (
             <div
               key={roteiro.id}
               onDragOver={(e) => {
@@ -544,6 +636,52 @@ export function Roteiros() {
                   )}
               </div>
 
+              {/* Seção de Observação */}
+              <div className="mb-4">
+                <label className="text-xs font-bold text-gray-400 block mb-2">
+                  OBSERVAÇÃO DO ROTEIRO
+                </label>
+                {usuario?.role === "ADMIN" ? (
+                  <>
+                    <textarea
+                      name="observacao"
+                      rows="3"
+                      className="w-full p-2 text-sm border rounded bg-gray-50 resize-y focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="Ex: conferir máquina M003, levar peças de reposição..."
+                      value={getObservacaoRoteiro(roteiro)}
+                      onChange={(e) =>
+                        handleObservacaoChange(roteiro.id, e.target.value)
+                      }
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-gray-500">
+                        {getObservacaoRoteiro(roteiro).length}/
+                        {LIMITE_OBSERVACAO_ROTEIRO}
+                      </span>
+                      {observacoesPendentes[roteiro.id] !== undefined && (
+                        <button
+                          onClick={() => salvarObservacao(roteiro.id)}
+                          disabled={salvandoObservacao[roteiro.id]}
+                          className="py-1 px-3 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                        >
+                          {salvandoObservacao[roteiro.id]
+                            ? "Salvando..."
+                            : "Salvar observação"}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : roteiro.observacao?.trim() ? (
+                  <p className="text-sm whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    {roteiro.observacao}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    Sem observação cadastrada.
+                  </p>
+                )}
+              </div>
+
               {/* Lista de Lojas */}
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
@@ -677,11 +815,30 @@ export function Roteiros() {
                 );
               })}
             </div>
+            <label className="text-xs font-bold text-gray-400 block mb-2">
+              Observação do roteiro
+            </label>
+            <textarea
+              name="observacao"
+              rows="4"
+              className="w-full p-3 border rounded-xl mb-1 focus:ring-2 focus:ring-blue-500 outline-none resize-y"
+              placeholder="Ex: conferir máquina M003, levar peças de reposição..."
+              value={novaObservacaoRoteiro}
+              onChange={(e) =>
+                setNovaObservacaoRoteiro(
+                  e.target.value.slice(0, LIMITE_OBSERVACAO_ROTEIRO),
+                )
+              }
+            />
+            <p className="text-xs text-gray-500 mb-4">
+              {novaObservacaoRoteiro.length}/{LIMITE_OBSERVACAO_ROTEIRO}
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   setShowModalCriarRoteiro(false);
                   setNovosDiasRoteiro([]);
+                  setNovaObservacaoRoteiro("");
                 }}
                 className="flex-1 py-3 text-gray-500 font-bold"
               >

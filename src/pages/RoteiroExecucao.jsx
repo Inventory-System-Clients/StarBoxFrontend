@@ -232,6 +232,8 @@ export default function RoteiroExecucao() {
       <div className="p-20 text-center font-bold">Roteiro não encontrado.</div>
     );
 
+  const observacaoAdmin = String(roteiro.observacao || "").trim();
+
   return (
     <div className="min-h-screen bg-gray-100 text-[#24094E]">
       <Navbar />
@@ -255,6 +257,16 @@ export default function RoteiroExecucao() {
             message={success}
             onClose={() => setSuccess("")}
           />
+        )}
+        {observacaoAdmin && (
+          <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <h3 className="text-sm font-bold text-amber-800 mb-1">
+              Observações do Admin
+            </h3>
+            <p className="text-sm text-amber-900 whitespace-pre-wrap">
+              {observacaoAdmin}
+            </p>
+          </section>
         )}
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-2">
