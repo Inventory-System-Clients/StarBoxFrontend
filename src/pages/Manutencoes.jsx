@@ -66,6 +66,107 @@ const montarMensagemDetalhesManutencao = (detalhe) => {
   ].join("\n");
 };
 
+const normalizarTextoBusca = (valor) =>
+  String(valor || "")
+    .trim()
+    .toLowerCase();
+
+function CampoSelectDigitavel({
+  id,
+  label,
+  value,
+  options,
+  onValueChange,
+  placeholder = "Digite para buscar",
+  required = false,
+  disabled = false,
+}) {
+  const [textoBusca, setTextoBusca] = useState("");
+
+  useEffect(() => {
+    const valorAtual = String(value || "");
+    const opcaoSelecionada = options.find(
+      (opcao) => opcao.value === valorAtual,
+    );
+    setTextoBusca(opcaoSelecionada?.label || "");
+  }, [options, value]);
+
+  const listaId = `${id}-opcoes`;
+
+  const obterOpcaoPorTexto = (texto) => {
+    const termo = normalizarTextoBusca(texto);
+    if (!termo) return null;
+
+    return (
+      options.find((opcao) => normalizarTextoBusca(opcao.label) === termo) ||
+      null
+    );
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium" htmlFor={id}>
+        {label}
+      </label>
+
+      <input
+        id={id}
+        type="text"
+        className="input-field w-full"
+        value={textoBusca}
+        onChange={(event) => {
+          const valorDigitado = event.target.value;
+          setTextoBusca(valorDigitado);
+
+          if (!valorDigitado.trim()) {
+            onValueChange("");
+            return;
+          }
+
+          const opcao = obterOpcaoPorTexto(valorDigitado);
+          if (opcao) {
+            onValueChange(opcao.value);
+          }
+        }}
+        onBlur={(event) => {
+          const valorDigitado = event.target.value;
+          const opcao = obterOpcaoPorTexto(valorDigitado);
+
+          if (opcao) {
+            if (String(value || "") !== opcao.value) {
+              onValueChange(opcao.value);
+            }
+            setTextoBusca(opcao.label);
+            return;
+          }
+
+          if (!valorDigitado.trim()) {
+            onValueChange("");
+            setTextoBusca("");
+            return;
+          }
+
+          const opcaoSelecionada = options.find(
+            (item) => item.value === String(value || ""),
+          );
+          setTextoBusca(opcaoSelecionada?.label || "");
+        }}
+        list={listaId}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        autoComplete="off"
+      />
+
+      <datalist id={listaId}>
+        {options.map((opcao) => (
+          <option key={opcao.value} value={opcao.label} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
 function Manutencoes() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === "ADMIN";
@@ -200,8 +301,50 @@ function Manutencoes() {
 
   const maquinasFiltradas = useMemo(() => {
     if (!novaManutencao.lojaId) return [];
-    return maquinas.filter((m) => m.lojaId === novaManutencao.lojaId);
+    return maquinas.filter(
+      (m) => String(m.lojaId) === String(novaManutencao.lojaId),
+    );
   }, [maquinas, novaManutencao.lojaId]);
+
+  const opcoesLojas = useMemo(
+    () =>
+      lojas.map((loja) => ({
+        value: String(loja.id),
+        label: loja.nome,
+      })),
+    [lojas],
+  );
+
+  const opcoesMaquinas = useMemo(
+    () =>
+      maquinasFiltradas.map((maquina) => ({
+        value: String(maquina.id),
+        label: `${maquina.codigo}${maquina.nome ? ` - ${maquina.nome}` : ""}`,
+      })),
+    [maquinasFiltradas],
+  );
+
+  const opcoesFuncionarios = useMemo(
+    () =>
+      funcionarios.map((funcionario) => ({
+        value: String(funcionario.id),
+        label: funcionario.nome,
+      })),
+    [funcionarios],
+  );
+
+  const opcoesDestinatariosWhatsApp = useMemo(
+    () =>
+      destinatariosWhatsApp.map((destinatario) => ({
+        value: String(destinatario.id),
+        label: `${destinatario.nome}${
+          destinatario.telefone
+            ? ` - ${destinatario.telefone}`
+            : " - sem telefone"
+        }`,
+      })),
+    [destinatariosWhatsApp],
+  );
 
   const lojasFiltro = useMemo(() => {
     return Array.from(
@@ -345,8 +488,31 @@ function Manutencoes() {
     setShowNovaManutencao(true);
   };
 
+  const limparCamposNovaManutencao = () => {
+    setNovaManutencao({
+      lojaId: "",
+      maquinaId: "",
+      funcionarioId: "",
+      destinatarioWhatsAppId: "",
+      descricao: "",
+    });
+    setDestinatariosWhatsApp([]);
+    setOrigemDestinatarioPadrao("");
+    setError("");
+  };
+
   const handleNovaManutencao = async (event) => {
     event.preventDefault();
+
+    if (!novaManutencao.lojaId) {
+      setError("Selecione uma loja válida na lista.");
+      return;
+    }
+
+    if (!novaManutencao.maquinaId) {
+      setError("Selecione uma máquina válida na lista.");
+      return;
+    }
 
     // Reserva a aba durante o clique para evitar bloqueio e nao trocar a aba atual.
     const popupReservado = window.open("about:blank", "_blank");
@@ -436,8 +602,12 @@ function Manutencoes() {
   };
 
   const handleEditOpen = () => {
+    if (!funcionarios.length) {
+      carregarDadosFormulario();
+    }
+
     setEditData({
-      funcionarioId: detalhe?.funcionarioId || "",
+      funcionarioId: String(detalhe?.funcionarioId || ""),
       status: detalhe?.status || "pendente",
       descricao: detalhe?.descricao || "",
     });
@@ -650,101 +820,68 @@ function Manutencoes() {
               <h3 className="text-xl font-bold mb-4">Nova Manutenção</h3>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium">Loja</label>
-                  <select
-                    className="input-field w-full"
-                    value={novaManutencao.lojaId}
-                    onChange={(e) => {
-                      const lojaId = e.target.value;
-                      setNovaManutencao((d) => ({
-                        ...d,
-                        lojaId,
-                        maquinaId: "",
-                      }));
-                      carregarDestinatariosWhatsApp(lojaId);
-                    }}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {lojas.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CampoSelectDigitavel
+                  id="nova-manutencao-loja"
+                  label="Loja"
+                  value={novaManutencao.lojaId}
+                  options={opcoesLojas}
+                  onValueChange={(lojaId) => {
+                    setNovaManutencao((dadosAtuais) => ({
+                      ...dadosAtuais,
+                      lojaId,
+                      maquinaId: "",
+                    }));
+                    carregarDestinatariosWhatsApp(lojaId);
+                  }}
+                  placeholder="Digite o nome da loja"
+                  required
+                />
+
+                <CampoSelectDigitavel
+                  id="nova-manutencao-maquina"
+                  label="Máquina"
+                  value={novaManutencao.maquinaId}
+                  options={opcoesMaquinas}
+                  onValueChange={(maquinaId) =>
+                    setNovaManutencao((dadosAtuais) => ({
+                      ...dadosAtuais,
+                      maquinaId,
+                    }))
+                  }
+                  placeholder="Digite código ou nome da máquina"
+                  required
+                  disabled={!novaManutencao.lojaId}
+                />
+
+                <CampoSelectDigitavel
+                  id="nova-manutencao-funcionario"
+                  label="Funcionário (opcional)"
+                  value={novaManutencao.funcionarioId}
+                  options={opcoesFuncionarios}
+                  onValueChange={(funcionarioId) =>
+                    setNovaManutencao((dadosAtuais) => ({
+                      ...dadosAtuais,
+                      funcionarioId,
+                    }))
+                  }
+                  placeholder="Digite o nome do funcionário"
+                />
 
                 <div>
-                  <label className="block text-sm font-medium">Máquina</label>
-                  <select
-                    className="input-field w-full"
-                    value={novaManutencao.maquinaId}
-                    onChange={(e) =>
-                      setNovaManutencao((d) => ({
-                        ...d,
-                        maquinaId: e.target.value,
-                      }))
-                    }
-                    required
-                    disabled={!novaManutencao.lojaId}
-                  >
-                    <option value="">Selecione</option>
-                    {maquinasFiltradas.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.codigo}
-                        {m.nome ? ` - ${m.nome}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium">
-                    Funcionário (opcional)
-                  </label>
-                  <select
-                    className="input-field w-full"
-                    value={novaManutencao.funcionarioId}
-                    onChange={(e) =>
-                      setNovaManutencao((d) => ({
-                        ...d,
-                        funcionarioId: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Selecione</option>
-                    {funcionarios.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium">
-                    Enviar WhatsApp para
-                  </label>
-                  <select
-                    className="input-field w-full"
+                  <CampoSelectDigitavel
+                    id="nova-manutencao-destinatario"
+                    label="Enviar WhatsApp para"
                     value={novaManutencao.destinatarioWhatsAppId}
-                    onChange={(e) =>
-                      setNovaManutencao((d) => ({
-                        ...d,
-                        destinatarioWhatsAppId: e.target.value,
+                    options={opcoesDestinatariosWhatsApp}
+                    onValueChange={(destinatarioWhatsAppId) =>
+                      setNovaManutencao((dadosAtuais) => ({
+                        ...dadosAtuais,
+                        destinatarioWhatsAppId,
                       }))
                     }
+                    placeholder="Digite nome ou telefone do destinatário"
                     disabled={!novaManutencao.lojaId}
-                  >
-                    <option value="">Selecione</option>
-                    {destinatariosWhatsApp.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                        {f.telefone ? ` - ${f.telefone}` : " - sem telefone"}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   {origemDestinatarioPadrao === "roteiro_da_loja" && (
                     <p className="text-xs text-green-700 mt-1">
                       Padrão automático: funcionário responsável pelo roteiro da
@@ -768,9 +905,18 @@ function Manutencoes() {
                   />
                 </div>
 
-                <button className="btn-primary w-full mt-2" type="submit">
-                  Cadastrar
-                </button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <button
+                    className="w-full rounded-lg border border-gray-300 bg-red-500 px-4 py-2 font-semibold text-black hover:bg-red-600"
+                    type="button"
+                    onClick={limparCamposNovaManutencao}
+                  >
+                    Limpar campos
+                  </button>
+                  <button className="btn-primary w-full" type="submit">
+                    Cadastrar
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1070,28 +1216,19 @@ function Manutencoes() {
               <h3 className="text-xl font-bold mb-4">Editar Manutenção</h3>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium">
-                    Funcionário
-                  </label>
-                  <select
-                    className="input-field w-full"
-                    value={editData.funcionarioId}
-                    onChange={(e) =>
-                      setEditData((d) => ({
-                        ...d,
-                        funcionarioId: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Selecione</option>
-                    {funcionarios.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CampoSelectDigitavel
+                  id="editar-manutencao-funcionario"
+                  label="Funcionário"
+                  value={editData.funcionarioId}
+                  options={opcoesFuncionarios}
+                  onValueChange={(funcionarioId) =>
+                    setEditData((dadosAtuais) => ({
+                      ...dadosAtuais,
+                      funcionarioId,
+                    }))
+                  }
+                  placeholder="Digite o nome do funcionário"
+                />
 
                 <div>
                   <label className="block text-sm font-medium">Status</label>
