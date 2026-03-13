@@ -34,6 +34,38 @@ const abrirWhatsAppEmNovaAba = ({ whatsappUrl, popupReservado }) => {
   return false;
 };
 
+const montarMensagemDetalhesManutencao = (detalhe) => {
+  if (!detalhe) return "";
+
+  const dataHora = detalhe?.createdAt
+    ? new Date(detalhe.createdAt).toLocaleString("pt-BR")
+    : "-";
+  const concluidaEm = detalhe?.concluidoEm
+    ? new Date(detalhe.concluidoEm).toLocaleString("pt-BR")
+    : "-";
+  const lojaNome = detalhe?.loja?.nome || "-";
+  const maquinaCodigo = detalhe?.maquina?.codigo || "-";
+  const maquinaNome = detalhe?.maquina?.nome || "-";
+  const funcionarioNome = detalhe?.funcionario?.nome || "-";
+  const concluidaPor = detalhe?.concluidoPor?.nome || "-";
+  const status = detalhe?.status || "-";
+  const descricao = detalhe?.descricao || "-";
+
+  return [
+    "STAR TOYS",
+    "*Detalhes da Manutenção*",
+    "___________________________________",
+    `Descrição: ${descricao}`,
+    `Data/Hora: ${dataHora}`,
+    `Status: ${status}`,
+    `Responsável: ${funcionarioNome}`,
+    `Concluída por: ${concluidaPor}`,
+    `Concluída em: ${concluidaEm}`,
+    `Loja: ${lojaNome}`,
+    `Máquina: ${maquinaCodigo} - ${maquinaNome}`,
+  ].join("\n");
+};
+
 function Manutencoes() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === "ADMIN";
@@ -451,6 +483,30 @@ function Manutencoes() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEnviarDetalhesWhatsApp = () => {
+    if (!detalhe) return;
+
+    setError("");
+    const mensagem = montarMensagemDetalhesManutencao(detalhe);
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+
+    const abriuWhatsApp = abrirWhatsAppEmNovaAba({
+      whatsappUrl,
+      popupReservado: null,
+    });
+
+    if (!abriuWhatsApp) {
+      setError(
+        "Não foi possível abrir o WhatsApp agora. Verifique o bloqueador de pop-up do navegador.",
+      );
+      return;
+    }
+
+    setSuccess(
+      "Detalhes preparados no WhatsApp. Agora é só escolher o contato e enviar.",
+    );
   };
 
   const concluirManutencaoDaLinha = async (manutencao) => {
@@ -947,21 +1003,36 @@ function Manutencoes() {
                 )}
               </div>
 
-              <div className="flex gap-2 mt-6">
+              <div className="flex flex-col sm:flex-row gap-2 mt-6">
+                <button
+                  className="btn-success w-full sm:w-auto"
+                  onClick={handleEnviarDetalhesWhatsApp}
+                >
+                  Enviar para WhatsApp
+                </button>
                 {isAdmin && (
-                  <button className="btn-primary" onClick={handleEditOpen}>
+                  <button
+                    className="btn-primary w-full sm:w-auto"
+                    onClick={handleEditOpen}
+                  >
                     Editar
                   </button>
                 )}
                 {isAdmin && (
-                  <button className="btn-danger" onClick={handleDelete}>
+                  <button
+                    className="btn-danger w-full sm:w-auto"
+                    onClick={handleDelete}
+                  >
                     Excluir
                   </button>
                 )}
                 {!isAdmin &&
                   detalhe.status !== "feito" &&
                   detalhe.status !== "concluida" && (
-                    <button className="btn-success" onClick={marcarComoFeita}>
+                    <button
+                      className="btn-success w-full sm:w-auto"
+                      onClick={marcarComoFeita}
+                    >
                       Marcar como Feita
                     </button>
                   )}

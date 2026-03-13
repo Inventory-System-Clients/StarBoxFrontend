@@ -18,10 +18,15 @@ export default function ManutencaoModal({
   manutencao,
   lojaId,
   usuarioId,
+  usuarioNome,
   onManutencaoConcluida,
 }) {
-  console.log('🔧 ManutencaoModal props:', { isOpen, usuarioId, manutencao: manutencao?.id });
-  
+  console.log("🔧 ManutencaoModal props:", {
+    isOpen,
+    usuarioId,
+    manutencao: manutencao?.id,
+  });
+
   const [etapa, setEtapa] = useState("escolha"); // 'escolha', 'fazer', 'nao-fazer'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,8 +40,75 @@ export default function ManutencaoModal({
   // Estado para não fazer manutenção
   const [explicacaoNaoFazer, setExplicacaoNaoFazer] = useState("");
 
+  const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
+    const textoCodificado = encodeURIComponent(mensagem || "");
+    const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+
+    const whatsappUrl = isMobile
+      ? `https://wa.me/?text=${textoCodificado}`
+      : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.location.href = whatsappUrl;
+      popupReservado.focus?.();
+      return;
+    }
+
+    const novaAba = window.open(whatsappUrl, "_blank");
+    if (novaAba && !novaAba.closed) {
+      novaAba.focus?.();
+      return;
+    }
+
+    // Fallback para garantir redirecionamento ao WhatsApp mesmo com bloqueio de popup.
+    window.location.href = whatsappUrl;
+  };
+
+  const obterNomePecaSelecionada = () => {
+    if (!pecaSelecionada || pecaSelecionada === "nao-usar")
+      return "Não usou peça";
+
+    const peca = pecasCarrinho.find((item) => {
+      const id = item.pecaId || item.id || item.Peca?.id;
+      return String(id) === String(pecaSelecionada);
+    });
+
+    return (
+      peca?.nome || peca?.Peca?.nome || peca?.peca?.nome || pecaSelecionada
+    );
+  };
+
+  const montarMensagemWhatsAppManutencao = ({
+    acao,
+    observacao,
+    pecaUsada,
+  }) => {
+    const dataHora = new Date().toLocaleString("pt-BR");
+    const lojaNome = manutencao?.loja?.nome || "-";
+    const maquinaCodigo = manutencao?.maquina?.codigo || "-";
+    const maquinaNome = manutencao?.maquina?.nome || "-";
+    const descricao = manutencao?.descricao || "-";
+    const usuarioAcao = usuarioNome || `ID ${usuarioId || "-"}`;
+
+    return [
+      "STAR TOYS",
+      "*Atualização de Manutenção*",
+      `Data/Hora: ${dataHora}`,
+      `Loja: ${lojaNome}`,
+      `Máquina: ${maquinaCodigo} - ${maquinaNome}`,
+      `Usuário: ${usuarioAcao}`,
+      "___________________________________",
+      `Descrição: ${descricao}`,
+      `Ação: ${acao}`,
+      `Peça: ${pecaUsada || "-"}`,
+      `Observação: ${observacao || "-"}`,
+    ].join("\n");
+  };
+
   const resetarModal = () => {
-    console.log('🔄 Resetando modal');
+    console.log("🔄 Resetando modal");
     setEtapa("escolha");
     setPecaSelecionada("");
     setExplicacaoSemPeca("");
@@ -46,7 +118,7 @@ export default function ManutencaoModal({
 
   useEffect(() => {
     if (isOpen && usuarioId) {
-      console.log('🔔 Modal aberto para usuário:', usuarioId);
+      console.log("🔔 Modal aberto para usuário:", usuarioId);
       resetarModal();
       carregarCarrinho();
     } else if (!isOpen) {
@@ -59,9 +131,9 @@ export default function ManutencaoModal({
   const carregarCarrinho = async () => {
     try {
       setCarregandoCarrinho(true);
-      console.log('🛒 Carregando carrinho do usuário:', usuarioId);
+      console.log("🛒 Carregando carrinho do usuário:", usuarioId);
       const res = await api.get(`/usuarios/${usuarioId}/carrinho`);
-      console.log('📦 Peças do carrinho recebidas:', res.data);
+      console.log("📦 Peças do carrinho recebidas:", res.data);
       setPecasCarrinho(res.data || []);
     } catch (err) {
       console.error("❌ Erro ao carregar carrinho:", err);
@@ -80,7 +152,10 @@ export default function ManutencaoModal({
     }
 
     // Se não usar peça, a explicação é obrigatória
-    if (pecaSelecionada === "nao-usar" && (!explicacaoSemPeca || explicacaoSemPeca.trim().length === 0)) {
+    if (
+      pecaSelecionada === "nao-usar" &&
+      (!explicacaoSemPeca || explicacaoSemPeca.trim().length === 0)
+    ) {
       setError("Digite a explicação de porque não usou peças (obrigatório)");
       return;
     }
@@ -90,6 +165,9 @@ export default function ManutencaoModal({
       return;
     }
 
+    // Reserva a nova aba durante o clique para evitar bloqueio pelo navegador.
+    const popupReservado = window.open("about:blank", "_blank");
+
     try {
       setLoading(true);
       setError("");
@@ -97,7 +175,9 @@ export default function ManutencaoModal({
       const payload = {
         status: "feito",
         pecaId: pecaSelecionada !== "nao-usar" ? pecaSelecionada : null,
-        explicacao_sem_peca: explicacaoSemPeca.trim() ? explicacaoSemPeca : null,
+        explicacao_sem_peca: explicacaoSemPeca.trim()
+          ? explicacaoSemPeca
+          : null,
         concluidoPorId: usuarioId,
       };
 
@@ -106,7 +186,9 @@ export default function ManutencaoModal({
       // Se usou uma peça, tentar remover do carrinho
       if (pecaSelecionada && pecaSelecionada !== "nao-usar") {
         try {
-          await api.delete(`/usuarios/${usuarioId}/carrinho/${pecaSelecionada}`);
+          await api.delete(
+            `/usuarios/${usuarioId}/carrinho/${pecaSelecionada}`,
+          );
         } catch (carrinhoErr) {
           // Erro 403 = backend ainda não deployado; ignora silenciosamente
           if (carrinhoErr?.response?.status !== 403) {
@@ -115,10 +197,21 @@ export default function ManutencaoModal({
         }
       }
 
+      const mensagemWhatsApp = montarMensagemWhatsAppManutencao({
+        acao: "Concluiu manutenção",
+        observacao: explicacaoSemPeca?.trim() || "-",
+        pecaUsada: obterNomePecaSelecionada(),
+      });
+
+      abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
+
       onManutencaoConcluida?.();
       resetarModal();
       onClose();
     } catch (err) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
       setError(err?.response?.data?.error || "Erro ao concluir manutenção");
     } finally {
       setLoading(false);
@@ -127,7 +220,9 @@ export default function ManutencaoModal({
 
   const handleNaoFazerManutencao = async () => {
     if (!explicacaoNaoFazer || explicacaoNaoFazer.trim().length === 0) {
-      setError("Digite a explicação de porque não fez a manutenção (obrigatório)");
+      setError(
+        "Digite a explicação de porque não fez a manutenção (obrigatório)",
+      );
       return;
     }
 
@@ -135,6 +230,9 @@ export default function ManutencaoModal({
       setError("A explicação deve ter no máximo 100 caracteres");
       return;
     }
+
+    // Reserva a nova aba durante o clique para evitar bloqueio pelo navegador.
+    const popupReservado = window.open("about:blank", "_blank");
 
     try {
       setLoading(true);
@@ -147,10 +245,21 @@ export default function ManutencaoModal({
 
       await api.put(`/manutencoes/${manutencao.id}/nao-fazer`, payload);
 
+      const mensagemWhatsApp = montarMensagemWhatsAppManutencao({
+        acao: "Não fez manutenção agora",
+        observacao: explicacaoNaoFazer?.trim() || "-",
+        pecaUsada: "Não aplicável",
+      });
+
+      abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
+
       onManutencaoConcluida?.();
       resetarModal();
       onClose();
     } catch (err) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
       setError(err?.response?.data?.error || "Erro ao registrar");
     } finally {
       setLoading(false);
@@ -251,11 +360,20 @@ export default function ManutencaoModal({
                     {pecasCarrinho.map((peca) => {
                       // Tentar múltiplos campos para o ID da peça
                       const idPeca = peca.pecaId || peca.id || peca.Peca?.id;
-                      const nomePeca = peca.nome || peca.Peca?.nome || peca.peca?.nome || "Peça desconhecida";
+                      const nomePeca =
+                        peca.nome ||
+                        peca.Peca?.nome ||
+                        peca.peca?.nome ||
+                        "Peça desconhecida";
                       const qtd = peca.quantidade || 0;
-                      
-                      console.log('🔧 Peça no select:', { idPeca, nomePeca, qtd, peca });
-                      
+
+                      console.log("🔧 Peça no select:", {
+                        idPeca,
+                        nomePeca,
+                        qtd,
+                        peca,
+                      });
+
                       return (
                         <option key={idPeca} value={idPeca}>
                           {nomePeca} - Qtd: {qtd}
@@ -264,16 +382,18 @@ export default function ManutencaoModal({
                     })}
                     <option value="nao-usar">❌ Não usar peças</option>
                   </select>
-                  
+
                   {pecasCarrinho.length === 0 && (
                     <p className="text-xs text-yellow-600 mt-2">
-                      ⚠️ Você não tem peças no carrinho. Peça ao admin para adicionar peças.
+                      ⚠️ Você não tem peças no carrinho. Peça ao admin para
+                      adicionar peças.
                     </p>
                   )}
-                  
+
                   {pecasCarrinho.length > 0 && (
                     <p className="text-xs text-gray-500 mt-2">
-                      ℹ️ Você tem {pecasCarrinho.length} peça(s) disponível(eis) no carrinho
+                      ℹ️ Você tem {pecasCarrinho.length} peça(s) disponível(eis)
+                      no carrinho
                     </p>
                   )}
                 </>
@@ -282,8 +402,8 @@ export default function ManutencaoModal({
 
             <div>
               <label className="block text-sm font-medium mb-2">
-                {pecaSelecionada === "nao-usar" 
-                  ? "Por que não vai usar peças? (máx. 100 caracteres) *" 
+                {pecaSelecionada === "nao-usar"
+                  ? "Por que não vai usar peças? (máx. 100 caracteres) *"
                   : "Observações sobre a manutenção (máx. 100 caracteres)"}
               </label>
               <textarea
@@ -295,9 +415,11 @@ export default function ManutencaoModal({
                   setExplicacaoSemPeca(e.target.value);
                   setError("");
                 }}
-                placeholder={pecaSelecionada === "nao-usar" 
-                  ? "Ex: A peça necessária não está disponível no momento..." 
-                  : "Ex: Máquina estava com problema no botão..."}
+                placeholder={
+                  pecaSelecionada === "nao-usar"
+                    ? "Ex: A peça necessária não está disponível no momento..."
+                    : "Ex: Máquina estava com problema no botão..."
+                }
               />
               <p className="text-xs text-gray-500 mt-1">
                 {explicacaoSemPeca.length}/100 caracteres

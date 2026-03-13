@@ -477,6 +477,7 @@ export default function RoteiroExecucao() {
           manutencao={manutencaoPendente}
           lojaId={lojaSelecionada?.id}
           usuarioId={usuario?.id}
+          usuarioNome={usuario?.nome}
           onManutencaoConcluida={handleManutencaoConcluida}
         />
       </main>
