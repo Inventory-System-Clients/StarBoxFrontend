@@ -278,29 +278,15 @@ export default function RoteiroExecucao() {
         categoria: gastoForm.categoria,
         valor: valorNumerico,
         quilometragem: quilometragemNumerica,
+        litros: litrosNumericos,
+        nivelCombustivel:
+          gastoForm.categoria === "abastecimento"
+            ? gastoForm.nivelCombustivel
+            : null,
         observacao: gastoForm.observacao?.trim() || null,
       };
 
       const res = await api.post(`/roteiros/${id}/gastos`, payload);
-
-      // Se abastecimento e há veículo no roteiro, criar movimentação de veículo
-      if (gastoForm.categoria === "abastecimento" && roteiro.veiculo?.id) {
-        try {
-          await api.post("/movimentacao-veiculos", {
-            veiculoId: roteiro.veiculo.id,
-            tipo: "abastecimento",
-            km: quilometragemNumerica,
-            litros: litrosNumericos,
-            roteiroId: id,
-            gasolina: gastoForm.nivelCombustivel,
-          });
-        } catch (errVeiculo) {
-          console.warn(
-            "Gasto registrado, mas falha ao registrar abastecimento no veículo:",
-            errVeiculo,
-          );
-        }
-      }
 
       setSuccess(res?.data?.message || "Gasto diário registrado com sucesso.");
       setGastoForm((prev) => ({
