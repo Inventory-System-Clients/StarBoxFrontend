@@ -16,7 +16,7 @@ const initialFormState = {
   emUso: false,
   parada: false,
   modo: "trabalho",
-  nivelCombustivel: "5 palzinhos",
+  nivelCombustivel: "Cheio",
   nivelLimpeza: "está limpo",
 };
 
@@ -312,11 +312,11 @@ export default function Veiculos() {
                   onChange={handleChange}
                   className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-200"
                 >
-                  <option value="5 palzinhos">5 palzinhos</option>
-                  <option value="4 palzinhos">4 palzinhos</option>
-                  <option value="3 palzinhos">3 palzinhos</option>
-                  <option value="2 palzinhos">2 palzinhos</option>
-                  <option value="1 palzinho">1 palzinho</option>
+                  <option value="Cheio">Cheio</option>
+                  <option value="3/4">3/4</option>
+                  <option value="Meio tanque">Meio tanque</option>
+                  <option value="1/4">1/4</option>
+                  <option value="Reserva">Reserva</option>
                   <option value="Vazio">Vazio</option>
                 </select>
               </div>

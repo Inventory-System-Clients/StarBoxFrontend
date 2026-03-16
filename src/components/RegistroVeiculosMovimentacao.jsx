@@ -2,6 +2,25 @@ import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import api from "../services/api";
 
+// Função para converter valores antigos de combustível para novos rótulos
+const converterNivelCombustivel = (valor) => {
+  if (!valor) return "-";
+  const mapa = {
+    "5 palzinhos": "Cheio",
+    "4 palzinhos": "3/4",
+    "3 palzinhos": "Meio tanque",
+    "2 palzinhos": "1/4",
+    "1 palzinho": "Reserva",
+    5: "Cheio",
+    4: "3/4",
+    3: "Meio tanque",
+    2: "1/4",
+    1: "Reserva",
+    0: "Vazio",
+  };
+  return mapa[valor] || valor;
+};
+
 export default function RegistroVeiculos({
   veiculos = [],
   loading,
@@ -155,7 +174,7 @@ export default function RegistroVeiculos({
                       {new Date(mov.dataHora).toLocaleString("pt-BR")}
                     </td>
                     <td className="px-4 py-2 border-b">
-                      {mov.gasolina || "-"}
+                      {converterNivelCombustivel(mov.gasolina)}
                     </td>
                     <td className="px-4 py-2 border-b">
                       {mov.nivel_limpeza || "-"}

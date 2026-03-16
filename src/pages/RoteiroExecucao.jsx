@@ -49,7 +49,7 @@ export default function RoteiroExecucao() {
     valor: "",
     quilometragem: "",
     litros: "",
-    nivelCombustivel: "5 palzinhos",
+    nivelCombustivel: "Cheio",
     observacao: "",
   });
   const [lancandoGasto, setLancandoGasto] = useState(false);
@@ -237,6 +237,12 @@ export default function RoteiroExecucao() {
       return;
     }
 
+    const observacaoNormalizada = String(gastoForm.observacao || "").trim();
+    if (gastoForm.categoria === "outros" && !observacaoNormalizada) {
+      setError("Observação é obrigatória quando a categoria for Outros.");
+      return;
+    }
+
     let quilometragemNumerica = null;
     let litrosNumericos = null;
     if (gastoForm.categoria === "abastecimento") {
@@ -290,7 +296,7 @@ export default function RoteiroExecucao() {
           gastoForm.categoria === "abastecimento"
             ? gastoForm.nivelCombustivel
             : null,
-        observacao: gastoForm.observacao?.trim() || null,
+        observacao: observacaoNormalizada || null,
       };
 
       const res = await api.post(`/roteiros/${id}/gastos`, payload);
@@ -410,6 +416,9 @@ export default function RoteiroExecucao() {
   const litrosObrigatorioPendente =
     gastoForm.categoria === "abastecimento" &&
     String(gastoForm.litros || "").trim() === "";
+  const observacaoObrigatoriaPendente =
+    gastoForm.categoria === "outros" &&
+    String(gastoForm.observacao || "").trim() === "";
   const gastosHojeOrdenados = [...(roteiro.gastosHoje || [])].sort(
     (a, b) => new Date(b.dataHora) - new Date(a.dataHora),
   );
@@ -624,11 +633,11 @@ export default function RoteiroExecucao() {
                   }
                   disabled={lancandoGasto || roteiro.status === "finalizado"}
                 >
-                  <option value="5 palzinhos">Cheio (5 palzinhos)</option>
-                  <option value="4 palzinhos">4 palzinhos</option>
-                  <option value="3 palzinhos">3 palzinhos</option>
-                  <option value="2 palzinhos">2 palzinhos</option>
-                  <option value="1 palzinho">1 palzinho</option>
+                  <option value="Cheio">Cheio</option>
+                  <option value="3/4">3/4</option>
+                  <option value="Meio tanque">Meio tanque</option>
+                  <option value="1/4">1/4</option>
+                  <option value="Reserva">Reserva</option>
                 </select>
               </div>
             </>
@@ -636,11 +645,15 @@ export default function RoteiroExecucao() {
 
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-1">
-              Observação (opcional)
+              {gastoForm.categoria === "outros"
+                ? "Observação *"
+                : "Observação (opcional)"}
             </label>
             <textarea
               rows="3"
-              className="w-full p-3 border rounded-lg bg-white resize-y"
+              className={`w-full p-3 border rounded-lg bg-white resize-y ${
+                observacaoObrigatoriaPendente ? "border-red-400" : ""
+              }`}
               placeholder="Ex: Uber entre lojas"
               value={gastoForm.observacao}
               onChange={(e) =>
@@ -651,6 +664,11 @@ export default function RoteiroExecucao() {
               }
               disabled={lancandoGasto || roteiro.status === "finalizado"}
             />
+            {gastoForm.categoria === "outros" && (
+              <p className="mt-1 text-xs text-red-600 font-semibold">
+                Campo obrigatório quando a categoria for Outros.
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end mb-4">
@@ -661,7 +679,8 @@ export default function RoteiroExecucao() {
                 lancandoGasto ||
                 roteiro.status === "finalizado" ||
                 kmObrigatorioPendente ||
-                litrosObrigatorioPendente
+                litrosObrigatorioPendente ||
+                observacaoObrigatoriaPendente
               }
             >
               {lancandoGasto ? "Lançando..." : "Lançar gasto"}
