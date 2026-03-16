@@ -47,18 +47,18 @@ export default function AbastecimentosVeiculos({ veiculos = [] }) {
   });
 
   // Calcular média km/L por veículo e por abastecimento individual
-  const calcularKmL = (lista, idx) => {
-    if (idx === 0) return null;
-    const atual = lista[idx];
-    const anterior = lista[idx - 1];
-    const kmAtual = Number(atual.km) || 0;
-    const kmAnterior = Number(anterior.km) || 0;
-    const litros = Number(atual.litros) || 0;
-    if (kmAtual > kmAnterior && litros > 0) {
-      return ((kmAtual - kmAnterior) / litros).toFixed(2);
-    }
-    return null;
-  };
+  // const calcularKmL = (lista, idx) => {
+  //   if (idx === 0) return null;
+  //   const atual = lista[idx];
+  //   const anterior = lista[idx - 1];
+  //   const kmAtual = Number(atual.km) || 0;
+  //   const kmAnterior = Number(anterior.km) || 0;
+  //   const litros = Number(atual.litros) || 0;
+  //   if (kmAtual > kmAnterior && litros > 0) {
+  //     return ((kmAtual - kmAnterior) / litros).toFixed(2);
+  //   }
+  //   return null;
+  // };
 
   const resumoPorVeiculo = Object.keys(porVeiculo).map((vid) => {
     const lista = porVeiculo[vid];
@@ -189,7 +189,7 @@ export default function AbastecimentosVeiculos({ veiculos = [] }) {
               <th className="px-4 py-3 border-b font-semibold">KM</th>
               <th className="px-4 py-3 border-b font-semibold">Litros</th>
               <th className="px-4 py-3 border-b font-semibold">Nível após</th>
-              <th className="px-4 py-3 border-b font-semibold">km/L (est.)</th>
+              {/* <th className="px-4 py-3 border-b font-semibold">km/L (est.)</th> */}
               <th className="px-4 py-3 border-b font-semibold">Usuário</th>
             </tr>
           </thead>
@@ -211,10 +211,10 @@ export default function AbastecimentosVeiculos({ veiculos = [] }) {
               </tr>
             ) : (
               abastecimentos.map((ab) => {
-                const vid = ab.veiculoId || ab.veiculoid;
-                const lista = porVeiculo[vid] || [];
-                const posNaLista = lista.findIndex((a) => a.id === ab.id);
-                const kml = calcularKmL(lista, posNaLista);
+                // const vid = ab.veiculoId || ab.veiculoid;
+                // const lista = porVeiculo[vid] || [];
+                // const posNaLista = lista.findIndex((a) => a.id === ab.id);
+                // const kml = calcularKmL(lista, posNaLista);
                 return (
                   <tr
                     key={ab.id}
@@ -235,9 +235,9 @@ export default function AbastecimentosVeiculos({ veiculos = [] }) {
                       {ab.litros ? `${Number(ab.litros).toFixed(1)} L` : "-"}
                     </td>
                     <td className="px-4 py-2 border-b">{ab.gasolina || "-"}</td>
-                    <td className="px-4 py-2 border-b font-semibold text-blue-700">
+                    {/* <td className="px-4 py-2 border-b font-semibold text-blue-700">
                       {kml ? `${kml} km/L` : "—"}
-                    </td>
+                    </td> */}
                     <td className="px-4 py-2 border-b">
                       {ab.usuario?.nome || "-"}
                     </td>
