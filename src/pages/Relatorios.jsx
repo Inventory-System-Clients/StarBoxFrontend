@@ -9,12 +9,15 @@ import { PageLoader } from "../components/Loading";
 import { RelatorioTodasLojas } from "../components/RelatorioTodasLojas";
 
 const TODAS_LOJAS_VALUE = "__TODAS_AS_LOJAS__";
+const SELECAO_MANUAL_LOJAS_VALUE = "__SELECAO_MANUAL_LOJAS__";
 
 export function Relatorios() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [lojas, setLojas] = useState([]);
   const [lojaSelecionada, setLojaSelecionada] = useState("");
+  const [lojasSelecionadasConsolidado, setLojasSelecionadasConsolidado] =
+    useState([]);
   const [roteiros, setRoteiros] = useState([]);
   const [roteiroSelecionado, setRoteiroSelecionado] = useState("");
   const [dataInicio, setDataInicio] = useState("");
@@ -86,6 +89,16 @@ export function Relatorios() {
     setDataInicio(seteDiasAtras.toISOString().split("T")[0]);
   };
 
+  const toggleLojaConsolidado = (lojaId) => {
+    const lojaIdNormalizado = String(lojaId);
+
+    setLojasSelecionadasConsolidado((prev) =>
+      prev.includes(lojaIdNormalizado)
+        ? prev.filter((idAtual) => idAtual !== lojaIdNormalizado)
+        : [...prev, lojaIdNormalizado],
+    );
+  };
+
   const formatarDataISO = (data) => {
     const ano = data.getFullYear();
     const mes = String(data.getMonth() + 1).padStart(2, "0");
@@ -107,6 +120,349 @@ export function Relatorios() {
   };
 
   const toNumber = (valor) => Number(valor || 0);
+
+  const normalizarTexto = (texto) =>
+    String(texto || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const extrairListaGastosFixos = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.gastos)) return payload.gastos;
+    return [];
+  };
+
+  const selecionarLojasDoRelatorioConsolidado = (
+    dadosRelatorio,
+    lojasDisponiveis,
+  ) => {
+    const idsLojas = new Set();
+    const nomesLojas = new Set();
+
+    const listasComLojas = [
+      dadosRelatorio?.graficos?.rankingLucroLojas,
+      dadosRelatorio?.graficos?.rankingGastoLojas,
+      dadosRelatorio?.graficos?.participacaoLojas,
+      dadosRelatorio?.graficos?.rankingLucroBrutoLojas,
+      dadosRelatorio?.graficos?.gastosFixosPorLoja,
+    ];
+
+    listasComLojas.forEach((lista) => {
+      (lista || []).forEach((item) => {
+        const lojaId = item?.lojaId ?? item?.id;
+        const lojaNome = item?.lojaNome ?? item?.nome;
+
+        if (lojaId !== null && lojaId !== undefined && lojaId !== "") {
+          idsLojas.add(String(lojaId));
+        }
+
+        if (lojaNome) {
+          nomesLojas.add(normalizarTexto(lojaNome));
+        }
+      });
+    });
+
+    if (!idsLojas.size && !nomesLojas.size) {
+      return Array.isArray(lojasDisponiveis) ? lojasDisponiveis : [];
+    }
+
+    return (Array.isArray(lojasDisponiveis) ? lojasDisponiveis : []).filter(
+      (loja) =>
+        idsLojas.has(String(loja?.id)) ||
+        nomesLojas.has(normalizarTexto(loja?.nome)),
+    );
+  };
+
+  const carregarGastosFixosPorLoja = async (
+    dadosRelatorio,
+    idsLojasSelecionadas = [],
+  ) => {
+    const idsSelecionados = new Set(
+      (idsLojasSelecionadas || []).map((idLoja) => String(idLoja)),
+    );
+
+    const lojasAlvo = idsSelecionados.size
+      ? (Array.isArray(lojas) ? lojas : []).filter((loja) =>
+          idsSelecionados.has(String(loja?.id)),
+        )
+      : selecionarLojasDoRelatorioConsolidado(dadosRelatorio, lojas);
+
+    if (!lojasAlvo.length) return [];
+
+    const resultados = await Promise.all(
+      lojasAlvo.map(async (loja) => {
+        try {
+          const response = await api.get(`/gastos-fixos-loja/${loja.id}`);
+          const gastos = extrairListaGastosFixos(response.data);
+          const custoFixo = gastos.reduce(
+            (acc, item) => acc + toNumber(item?.valor),
+            0,
+          );
+
+          return {
+            lojaId: loja.id,
+            lojaNome: loja.nome || `Loja ${loja.id}`,
+            custoFixo,
+          };
+        } catch (erroGastoLoja) {
+          console.warn(
+            `Não foi possível buscar gastos fixos da loja ${loja.id}:`,
+            erroGastoLoja,
+          );
+          return {
+            lojaId: loja.id,
+            lojaNome: loja.nome || `Loja ${loja.id}`,
+            custoFixo: 0,
+          };
+        }
+      }),
+    );
+
+    return resultados.sort(
+      (a, b) => Number(b.custoFixo || 0) - Number(a.custoFixo || 0),
+    );
+  };
+
+  const aplicarGastosFixosPorLojaNoConsolidado = (
+    dadosRelatorio,
+    gastosFixosPorLoja,
+  ) => {
+    if (!dadosRelatorio) return dadosRelatorio;
+
+    const gastosNormalizados = (gastosFixosPorLoja || []).map((item) => ({
+      lojaId: item?.lojaId,
+      lojaNome: item?.lojaNome || "-",
+      custoFixo: toNumber(item?.custoFixo),
+    }));
+
+    const custoFixoTotal = gastosNormalizados.reduce(
+      (acc, item) => acc + toNumber(item?.custoFixo),
+      0,
+    );
+
+    return {
+      ...dadosRelatorio,
+      totais: {
+        ...(dadosRelatorio.totais || {}),
+        custoFixoTotal,
+      },
+      graficos: {
+        ...(dadosRelatorio.graficos || {}),
+        gastosFixosPorLoja: gastosNormalizados,
+      },
+    };
+  };
+
+  const obterValorLucroBrutoPorItem = (item, lucroBrutoBase = 0) => {
+    const valorDireto =
+      item?.lucroBruto ?? item?.valor ?? item?.lucroBrutoLoja ?? null;
+
+    if (valorDireto !== null && valorDireto !== undefined && valorDireto !== "") {
+      return toNumber(valorDireto);
+    }
+
+    const participacao = toNumber(item?.participacaoLucroBruto);
+    if (participacao > 0 && lucroBrutoBase > 0) {
+      return (lucroBrutoBase * participacao) / 100;
+    }
+
+    return 0;
+  };
+
+  const itemPertenceAoConsolidadoSelecionado = (
+    item,
+    idsLojasSelecionadas,
+    nomesLojasSelecionadas,
+  ) => {
+    const lojaIdItem = item?.lojaId ?? item?.idLoja ?? item?.loja?.id;
+    const lojaNomeItem = normalizarTexto(
+      item?.lojaNome ?? item?.nome ?? item?.loja?.nome,
+    );
+
+    if (lojaIdItem !== null && lojaIdItem !== undefined && lojaIdItem !== "") {
+      return idsLojasSelecionadas.has(String(lojaIdItem));
+    }
+
+    if (lojaNomeItem) {
+      return nomesLojasSelecionadas.has(lojaNomeItem);
+    }
+
+    return false;
+  };
+
+  const aplicarFiltroLojasNoConsolidado = (
+    dadosRelatorio,
+    idsLojasSelecionadas = [],
+  ) => {
+    if (!dadosRelatorio || !idsLojasSelecionadas.length) {
+      return dadosRelatorio;
+    }
+
+    const idsSelecionados = new Set(
+      idsLojasSelecionadas.map((idLoja) => String(idLoja)),
+    );
+    const lojasSelecionadas = (Array.isArray(lojas) ? lojas : []).filter(
+      (loja) => idsSelecionados.has(String(loja?.id)),
+    );
+    const nomesSelecionados = new Set(
+      lojasSelecionadas
+        .map((loja) => normalizarTexto(loja?.nome))
+        .filter(Boolean),
+    );
+
+    const filtrarListaPorLoja = (lista = []) =>
+      (lista || []).filter((item) =>
+        itemPertenceAoConsolidadoSelecionado(
+          item,
+          idsSelecionados,
+          nomesSelecionados,
+        ),
+      );
+
+    const graficosOriginais = dadosRelatorio?.graficos || {};
+    const totaisOriginais = dadosRelatorio?.totais || {};
+    const lucroBrutoBaseOriginal = toNumber(totaisOriginais.lucroBrutoTotal);
+
+    const rankingLucroLojas = filtrarListaPorLoja(
+      graficosOriginais.rankingLucroLojas,
+    ).sort((a, b) => toNumber(b?.lucroLiquido) - toNumber(a?.lucroLiquido));
+
+    const rankingGastoLojas = filtrarListaPorLoja(
+      graficosOriginais.rankingGastoLojas,
+    ).sort((a, b) => toNumber(b?.custoTotal) - toNumber(a?.custoTotal));
+
+    const rankingLucroBrutoLojas = filtrarListaPorLoja(
+      graficosOriginais.rankingLucroBrutoLojas?.length
+        ? graficosOriginais.rankingLucroBrutoLojas
+        : graficosOriginais.participacaoLojas,
+    )
+      .map((item) => ({
+        ...item,
+        lucroBruto: obterValorLucroBrutoPorItem(item, lucroBrutoBaseOriginal),
+      }))
+      .sort((a, b) => toNumber(b?.lucroBruto) - toNumber(a?.lucroBruto));
+
+    const lucroBrutoTotalSelecionado = rankingLucroBrutoLojas.reduce(
+      (acc, item) => acc + toNumber(item?.lucroBruto),
+      0,
+    );
+
+    const participacaoLojas = filtrarListaPorLoja(
+      graficosOriginais.participacaoLojas,
+    )
+      .map((item) => {
+        const lucroBrutoItem = obterValorLucroBrutoPorItem(
+          item,
+          lucroBrutoBaseOriginal,
+        );
+
+        return {
+          ...item,
+          participacaoLucroBruto:
+            lucroBrutoTotalSelecionado > 0
+              ? (lucroBrutoItem / lucroBrutoTotalSelecionado) * 100
+              : 0,
+        };
+      })
+      .sort(
+        (a, b) =>
+          toNumber(b?.participacaoLucroBruto) -
+          toNumber(a?.participacaoLucroBruto),
+      );
+
+    const rankingTicketPremioLojas = filtrarListaPorLoja(
+      graficosOriginais.rankingTicketPremioLojas,
+    ).sort(
+      (a, b) => toNumber(b?.ticketPorPremio) - toNumber(a?.ticketPorPremio),
+    );
+
+    const nomesLojasComDados = Array.from(
+      new Set(
+        [
+          ...rankingLucroLojas,
+          ...rankingGastoLojas,
+          ...rankingLucroBrutoLojas,
+          ...participacaoLojas,
+          ...rankingTicketPremioLojas,
+        ]
+          .map((item) => item?.lojaNome || item?.nome)
+          .filter(Boolean),
+      ),
+    );
+
+    const nomesLojasComDadosNormalizados = new Set(
+      nomesLojasComDados.map((nome) => normalizarTexto(nome)).filter(Boolean),
+    );
+
+    const lojasSemDados = lojasSelecionadas
+      .map((loja) => loja?.nome)
+      .filter(
+        (nome) =>
+          nome && !nomesLojasComDadosNormalizados.has(normalizarTexto(nome)),
+      );
+
+    const totaisFiltrados = {
+      ...totaisOriginais,
+      lucroBrutoTotal: lucroBrutoTotalSelecionado,
+      lucroLiquidoTotal: rankingLucroLojas.reduce(
+        (acc, item) => acc + toNumber(item?.lucroLiquido),
+        0,
+      ),
+      custoTotal: rankingGastoLojas.reduce(
+        (acc, item) => acc + toNumber(item?.custoTotal),
+        0,
+      ),
+    };
+
+    const lojaMaiorLucro = rankingLucroLojas[0]
+      ? {
+          lojaNome:
+            rankingLucroLojas[0]?.lojaNome || rankingLucroLojas[0]?.nome || "-",
+          lucroLiquido: toNumber(rankingLucroLojas[0]?.lucroLiquido),
+        }
+      : null;
+
+    const lojaMaiorGasto = rankingGastoLojas[0]
+      ? {
+          lojaNome:
+            rankingGastoLojas[0]?.lojaNome || rankingGastoLojas[0]?.nome || "-",
+          custoTotal: toNumber(rankingGastoLojas[0]?.custoTotal),
+        }
+      : null;
+
+    const lojaMaiorParticipacao = participacaoLojas[0]
+      ? {
+          lojaNome:
+            participacaoLojas[0]?.lojaNome || participacaoLojas[0]?.nome || "-",
+          participacaoLucroBruto: toNumber(
+            participacaoLojas[0]?.participacaoLucroBruto,
+          ),
+        }
+      : null;
+
+    return {
+      ...dadosRelatorio,
+      lojasComDados: nomesLojasComDados.length,
+      lojasSemDados,
+      totais: totaisFiltrados,
+      destaques: {
+        ...(dadosRelatorio?.destaques || {}),
+        lojaMaiorLucro,
+        lojaMaiorGasto,
+        lojaMaiorParticipacao,
+      },
+      graficos: {
+        ...graficosOriginais,
+        rankingLucroLojas,
+        rankingGastoLojas,
+        rankingLucroBrutoLojas,
+        participacaoLojas,
+        rankingTicketPremioLojas,
+      },
+    };
+  };
 
   const obterTotaisFluxoCaixaRelatorio = (dadosRelatorio) => {
     const dinheiroFluxo = toNumber(
@@ -268,11 +624,452 @@ export function Relatorios() {
     };
   };
 
+  const construirConsolidadoManualPorLojas = async (
+    idsLojasSelecionadas = [],
+    periodoInicio,
+    periodoFim,
+  ) => {
+    const idsNormalizados = Array.from(
+      new Set((idsLojasSelecionadas || []).map((idLoja) => String(idLoja))),
+    );
+
+    const lojasSelecionadas = (Array.isArray(lojas) ? lojas : []).filter(
+      (loja) => idsNormalizados.includes(String(loja?.id)),
+    );
+
+    const lojaNomePorId = new Map(
+      lojasSelecionadas.map((loja) => [
+        String(loja.id),
+        loja.nome || `Loja ${loja.id}`,
+      ]),
+    );
+
+    const consolidadoBaseVazio = {
+      tipo: "todas-lojas",
+      periodo: {
+        inicio: periodoInicio,
+        fim: periodoFim,
+      },
+      lojasComDados: 0,
+      lojasSemDados: lojasSelecionadas
+        .map((loja) => loja?.nome)
+        .filter(Boolean),
+      totais: {
+        lucroBrutoTotal: 0,
+        lucroLiquidoTotal: 0,
+        custoTotal: 0,
+        custoVariavelTotal: 0,
+        custoFixoTotal: 0,
+        custoProdutosTotal: 0,
+        produtosSairamTotal: 0,
+        produtosEntraramTotal: 0,
+        fichasTotal: 0,
+        dinheiroTotal: 0,
+        cartaoPixTotal: 0,
+        cartaoPixLiquidoTotal: 0,
+        taxaDeCartaoTotal: 0,
+        percentualTaxaCartaoMediaTotal: 0,
+        faturamentoBrutoTicketTotal: 0,
+        saidasPremioTotal: 0,
+        ticketPorPremioConsolidado: 0,
+      },
+      destaques: {
+        lojaMaiorLucro: null,
+        lojaMaiorGasto: null,
+        lojaMaiorParticipacao: null,
+        produtoMaisSaiu: null,
+      },
+      graficos: {
+        rankingLucroBrutoLojas: [],
+        rankingLucroLojas: [],
+        rankingGastoLojas: [],
+        participacaoLojas: [],
+        rankingTicketPremioLojas: [],
+        rankingProdutos: [],
+        gastosFixosPorLoja: [],
+      },
+    };
+
+    if (!idsNormalizados.length) {
+      return consolidadoBaseVazio;
+    }
+
+    const respostasPorLoja = await Promise.all(
+      idsNormalizados.map(async (lojaId) => {
+        const nomeFallback = lojaNomePorId.get(lojaId) || `Loja ${lojaId}`;
+
+        try {
+          const [relatorioResponse, gastosFixosResponse] = await Promise.all([
+            api
+              .get("/relatorios/impressao", {
+                params: {
+                  lojaId,
+                  dataInicio: periodoInicio,
+                  dataFim: periodoFim,
+                },
+              })
+              .catch(() => null),
+            api.get(`/gastos-fixos-loja/${lojaId}`).catch(() => ({ data: [] })),
+          ]);
+
+          const dadosLoja = relatorioResponse?.data;
+          if (!dadosLoja) {
+            return {
+              lojaId,
+              lojaNome: nomeFallback,
+              semDados: true,
+            };
+          }
+
+          const lojaNome = dadosLoja?.loja?.nome || nomeFallback;
+          const fluxo = obterTotaisFluxoCaixaRelatorio(dadosLoja);
+          const lucroBruto = calcularValorConsolidadoRelatorio(dadosLoja);
+          const lucroLiquido = calcularLucroLiquidoRelatorio(dadosLoja);
+          const custoProdutos = calcularCustoSaidaProdutosRelatorio(dadosLoja);
+
+          const gastosFixosLista = extrairListaGastosFixos(
+            gastosFixosResponse?.data,
+          );
+          const custoFixo = gastosFixosLista.reduce(
+            (acc, item) => acc + toNumber(item?.valor),
+            0,
+          );
+
+          const gastoTotalPeriodo = toNumber(dadosLoja?.totais?.gastoTotalPeriodo);
+          const custoTotal =
+            gastoTotalPeriodo > 0
+              ? gastoTotalPeriodo
+              : custoProdutos + custoFixo;
+          const custoVariavel = Math.max(0, custoTotal - custoProdutos - custoFixo);
+
+          const fichas = toNumber(dadosLoja?.totais?.fichas);
+          const produtosSairam = toNumber(dadosLoja?.totais?.produtosSairam);
+          const produtosEntraram = toNumber(dadosLoja?.totais?.produtosEntraram);
+
+          const faturamentoBrutoTicket =
+            toNumber(dadosLoja?.totais?.faturamentoBrutoTicketTotal) ||
+            toNumber(dadosLoja?.totais?.valorTotalLojaBruto) ||
+            lucroBruto;
+          const saidasPremio =
+            toNumber(dadosLoja?.totais?.saidasPremioTotal) || produtosSairam;
+          const ticketPorPremio =
+            toNumber(dadosLoja?.totais?.ticketPorPremioTotal) ||
+            (saidasPremio > 0 ? faturamentoBrutoTicket / saidasPremio : 0);
+
+          const taxaDeCartao = Math.max(
+            0,
+            toNumber(fluxo.cartaoPixFluxoBruto) -
+              toNumber(fluxo.cartaoPixFluxoLiquido),
+          );
+
+          const produtosSairamDireto = Array.isArray(dadosLoja?.produtosSairam)
+            ? dadosLoja.produtosSairam
+            : [];
+          const produtosSairamPorMaquina = Array.isArray(dadosLoja?.maquinas)
+            ? dadosLoja.maquinas.flatMap((maquina) =>
+                Array.isArray(maquina?.produtosSairam)
+                  ? maquina.produtosSairam
+                  : [],
+              )
+            : [];
+
+          const produtosSairamLista =
+            produtosSairamDireto.length > 0
+              ? produtosSairamDireto
+              : produtosSairamPorMaquina;
+
+          return {
+            lojaId,
+            lojaNome,
+            semDados: false,
+            fluxo,
+            lucroBruto,
+            lucroLiquido,
+            custoTotal,
+            custoVariavel,
+            custoProdutos,
+            custoFixo,
+            fichas,
+            produtosSairam,
+            produtosEntraram,
+            faturamentoBrutoTicket,
+            saidasPremio,
+            ticketPorPremio,
+            taxaDeCartao,
+            produtosSairamLista,
+          };
+        } catch (erroLoja) {
+          console.warn(
+            `Não foi possível consolidar dados da loja ${lojaId}:`,
+            erroLoja,
+          );
+
+          return {
+            lojaId,
+            lojaNome: nomeFallback,
+            semDados: true,
+          };
+        }
+      }),
+    );
+
+    const lojasComDadosDetalhado = respostasPorLoja.filter(
+      (item) => !item?.semDados,
+    );
+
+    if (!lojasComDadosDetalhado.length) {
+      return consolidadoBaseVazio;
+    }
+
+    const rankingLucroBrutoLojas = lojasComDadosDetalhado
+      .map((item) => ({
+        lojaId: item.lojaId,
+        lojaNome: item.lojaNome,
+        lucroBruto: toNumber(item.lucroBruto),
+      }))
+      .sort((a, b) => toNumber(b.lucroBruto) - toNumber(a.lucroBruto));
+
+    const lucroBrutoTotal = rankingLucroBrutoLojas.reduce(
+      (acc, item) => acc + toNumber(item.lucroBruto),
+      0,
+    );
+
+    const participacaoLojas = rankingLucroBrutoLojas.map((item) => ({
+      lojaId: item.lojaId,
+      lojaNome: item.lojaNome,
+      participacaoLucroBruto:
+        lucroBrutoTotal > 0
+          ? (toNumber(item.lucroBruto) / lucroBrutoTotal) * 100
+          : 0,
+    }));
+
+    const rankingLucroLojas = lojasComDadosDetalhado
+      .map((item) => ({
+        lojaId: item.lojaId,
+        lojaNome: item.lojaNome,
+        lucroLiquido: toNumber(item.lucroLiquido),
+      }))
+      .sort((a, b) => toNumber(b.lucroLiquido) - toNumber(a.lucroLiquido));
+
+    const rankingGastoLojas = lojasComDadosDetalhado
+      .map((item) => ({
+        lojaId: item.lojaId,
+        lojaNome: item.lojaNome,
+        custoTotal: toNumber(item.custoTotal),
+      }))
+      .sort((a, b) => toNumber(b.custoTotal) - toNumber(a.custoTotal));
+
+    const rankingTicketPremioLojas = lojasComDadosDetalhado
+      .map((item) => ({
+        lojaId: item.lojaId,
+        lojaNome: item.lojaNome,
+        ticketPorPremio: toNumber(item.ticketPorPremio),
+        saidasPremio: toNumber(item.saidasPremio),
+        faturamentoBrutoTicket: toNumber(item.faturamentoBrutoTicket),
+      }))
+      .sort(
+        (a, b) => toNumber(b.ticketPorPremio) - toNumber(a.ticketPorPremio),
+      );
+
+    const gastosFixosPorLoja = lojasComDadosDetalhado
+      .map((item) => ({
+        lojaId: item.lojaId,
+        lojaNome: item.lojaNome,
+        custoFixo: toNumber(item.custoFixo),
+      }))
+      .sort((a, b) => toNumber(b.custoFixo) - toNumber(a.custoFixo));
+
+    const mapaProdutos = new Map();
+
+    lojasComDadosDetalhado.forEach((item) => {
+      (item.produtosSairamLista || []).forEach((produto) => {
+        const chaveProduto =
+          produto?.id !== undefined && produto?.id !== null
+            ? `id:${produto.id}`
+            : `nome:${normalizarTexto(produto?.nome)}`;
+
+        if (!chaveProduto || chaveProduto === "nome:") return;
+
+        const atual = mapaProdutos.get(chaveProduto) || {
+          id: produto?.id,
+          nome: produto?.nome || "Produto",
+          emoji: produto?.emoji || "📦",
+          codigo: produto?.codigo,
+          quantidade: 0,
+        };
+
+        atual.quantidade += toNumber(produto?.quantidade);
+        mapaProdutos.set(chaveProduto, atual);
+      });
+    });
+
+    const rankingProdutos = Array.from(mapaProdutos.values()).sort(
+      (a, b) => toNumber(b.quantidade) - toNumber(a.quantidade),
+    );
+
+    const dinheiroTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.fluxo?.dinheiroFluxo),
+      0,
+    );
+    const cartaoPixTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.fluxo?.cartaoPixFluxoBruto),
+      0,
+    );
+    const cartaoPixLiquidoTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.fluxo?.cartaoPixFluxoLiquido),
+      0,
+    );
+    const taxaDeCartaoTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.taxaDeCartao),
+      0,
+    );
+
+    const lucroLiquidoTotal = rankingLucroLojas.reduce(
+      (acc, item) => acc + toNumber(item?.lucroLiquido),
+      0,
+    );
+    const custoTotal = rankingGastoLojas.reduce(
+      (acc, item) => acc + toNumber(item?.custoTotal),
+      0,
+    );
+    const custoVariavelTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.custoVariavel),
+      0,
+    );
+    const custoFixoTotal = gastosFixosPorLoja.reduce(
+      (acc, item) => acc + toNumber(item?.custoFixo),
+      0,
+    );
+    const custoProdutosTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.custoProdutos),
+      0,
+    );
+    const produtosSairamTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.produtosSairam),
+      0,
+    );
+    const produtosEntraramTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.produtosEntraram),
+      0,
+    );
+    const fichasTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.fichas),
+      0,
+    );
+    const faturamentoBrutoTicketTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.faturamentoBrutoTicket),
+      0,
+    );
+    const saidasPremioTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.saidasPremio),
+      0,
+    );
+    const ticketPorPremioConsolidado =
+      saidasPremioTotal > 0
+        ? faturamentoBrutoTicketTotal / saidasPremioTotal
+        : 0;
+    const percentualTaxaCartaoMediaTotal =
+      cartaoPixTotal > 0 ? (taxaDeCartaoTotal / cartaoPixTotal) * 100 : 0;
+
+    const nomesLojasComDados = new Set(
+      lojasComDadosDetalhado.map((item) => item?.lojaNome).filter(Boolean),
+    );
+
+    const lojasSemDados = lojasSelecionadas
+      .map((loja) => loja?.nome)
+      .filter((nome) => nome && !nomesLojasComDados.has(nome));
+
+    const produtoMaisSaiu = rankingProdutos[0]
+      ? {
+          nome: rankingProdutos[0]?.nome || "-",
+          emoji: rankingProdutos[0]?.emoji || "📦",
+          quantidade: toNumber(rankingProdutos[0]?.quantidade),
+        }
+      : null;
+
+    return {
+      tipo: "todas-lojas",
+      periodo: {
+        inicio: periodoInicio,
+        fim: periodoFim,
+      },
+      lojasComDados: lojasComDadosDetalhado.length,
+      lojasSemDados,
+      totais: {
+        lucroBrutoTotal,
+        lucroLiquidoTotal,
+        custoTotal,
+        custoVariavelTotal,
+        custoFixoTotal,
+        custoProdutosTotal,
+        produtosSairamTotal,
+        produtosEntraramTotal,
+        fichasTotal,
+        dinheiroTotal,
+        cartaoPixTotal,
+        cartaoPixLiquidoTotal,
+        taxaDeCartaoTotal,
+        percentualTaxaCartaoMediaTotal,
+        faturamentoBrutoTicketTotal,
+        saidasPremioTotal,
+        ticketPorPremioConsolidado,
+      },
+      destaques: {
+        lojaMaiorLucro: rankingLucroLojas[0]
+          ? {
+              lojaNome: rankingLucroLojas[0]?.lojaNome || "-",
+              lucroLiquido: toNumber(rankingLucroLojas[0]?.lucroLiquido),
+            }
+          : null,
+        lojaMaiorGasto: rankingGastoLojas[0]
+          ? {
+              lojaNome: rankingGastoLojas[0]?.lojaNome || "-",
+              custoTotal: toNumber(rankingGastoLojas[0]?.custoTotal),
+            }
+          : null,
+        lojaMaiorParticipacao: participacaoLojas[0]
+          ? {
+              lojaNome: participacaoLojas[0]?.lojaNome || "-",
+              participacaoLucroBruto: toNumber(
+                participacaoLojas[0]?.participacaoLucroBruto,
+              ),
+            }
+          : null,
+        produtoMaisSaiu,
+      },
+      graficos: {
+        rankingLucroBrutoLojas,
+        rankingLucroLojas,
+        rankingGastoLojas,
+        participacaoLojas,
+        rankingTicketPremioLojas,
+        rankingProdutos,
+        gastosFixosPorLoja,
+      },
+    };
+  };
+
   const gerarRelatorio = async () => {
-    if (!dataInicio || !dataFim || (!lojaSelecionada && !roteiroSelecionado)) {
+    if (!dataInicio || !dataFim) {
       setError("Por favor, preencha todos os campos obrigatórios");
       return;
     }
+
+    if (!lojaSelecionada && !roteiroSelecionado) {
+      setError("Selecione uma loja (ou roteiro) para gerar o relatório");
+      return;
+    }
+
+    if (
+      lojaSelecionada === SELECAO_MANUAL_LOJAS_VALUE &&
+      lojasSelecionadasConsolidado.length === 0
+    ) {
+      setError(
+        "Selecione pelo menos uma loja para gerar o consolidado manual",
+      );
+      return;
+    }
+
     const inicio = new Date(dataInicio);
     const fim = new Date(dataFim);
     if (fim < inicio) {
@@ -290,10 +1087,130 @@ export function Relatorios() {
       setAbaTicketPremio("loja");
       setGastosFixosLoja([]);
       setComparativoMensal(null);
-      if (lojaSelecionada === TODAS_LOJAS_VALUE) {
+
+      const consolidadoManual = lojaSelecionada === SELECAO_MANUAL_LOJAS_VALUE;
+      const consolidadoTodas = lojaSelecionada === TODAS_LOJAS_VALUE;
+
+      if (consolidadoManual) {
+        const relatorioTodasLojas = await construirConsolidadoManualPorLojas(
+          lojasSelecionadasConsolidado,
+          dataInicio,
+          dataFim,
+        );
+
+        let comparativoMensal = null;
+        try {
+          const dataInicioMesAnterior = obterMesmoDiaNoMesAnterior(dataInicio);
+          const dataFimMesAnterior = obterMesmoDiaNoMesAnterior(dataFim);
+
+          const relatorioMesAnterior = await construirConsolidadoManualPorLojas(
+            lojasSelecionadasConsolidado,
+            dataInicioMesAnterior,
+            dataFimMesAnterior,
+          );
+
+          const totaisAtual = relatorioTodasLojas?.totais || {};
+          const totaisAnterior = relatorioMesAnterior?.totais || {};
+
+          const valorConsolidadoAtual =
+            toNumber(totaisAtual.lucroBrutoTotal) ||
+            toNumber(totaisAtual.dinheiroTotal) +
+              toNumber(totaisAtual.cartaoPixTotal);
+
+          const valorConsolidadoAnterior =
+            toNumber(totaisAnterior.lucroBrutoTotal) ||
+            toNumber(totaisAnterior.dinheiroTotal) +
+              toNumber(totaisAnterior.cartaoPixTotal);
+
+          comparativoMensal = {
+            periodoAtual: {
+              inicio: dataInicio,
+              fim: dataFim,
+            },
+            periodoAnterior: {
+              inicio: dataInicioMesAnterior,
+              fim: dataFimMesAnterior,
+            },
+            metricas: [
+              {
+                chave: "lucroLiquidoTotal",
+                titulo: "Lucro Líquido Total",
+                icone: "📉",
+                indicador: montarIndicadorComparacao(
+                  toNumber(totaisAtual.lucroLiquidoTotal),
+                  toNumber(totaisAnterior.lucroLiquidoTotal),
+                  "maior",
+                ),
+              },
+              {
+                chave: "valorFichasTotal",
+                titulo: "Valor das Fichas (Estimado)",
+                icone: "🎟️",
+                observacao:
+                  "Estimado com valor médio de R$ 2,50 por ficha no consolidado.",
+                indicador: montarIndicadorComparacao(
+                  toNumber(totaisAtual.fichasTotal) * 2.5,
+                  toNumber(totaisAnterior.fichasTotal) * 2.5,
+                  "maior",
+                ),
+              },
+              {
+                chave: "valorConsolidado",
+                titulo: "Valor Consolidado",
+                icone: "💰",
+                indicador: montarIndicadorComparacao(
+                  valorConsolidadoAtual,
+                  valorConsolidadoAnterior,
+                  "maior",
+                ),
+              },
+              {
+                chave: "custoSaidaProdutos",
+                titulo: "Custo de Saída dos Produtos",
+                icone: "💸",
+                indicador: montarIndicadorComparacao(
+                  toNumber(totaisAtual.custoProdutosTotal),
+                  toNumber(totaisAnterior.custoProdutosTotal),
+                  "menor",
+                ),
+              },
+            ],
+          };
+        } catch (erroComparativoTodasLojas) {
+          console.warn(
+            "Não foi possível gerar comparativo das lojas selecionadas com o mês passado:",
+            erroComparativoTodasLojas,
+          );
+        }
+
+        setRelatorio({
+          ...relatorioTodasLojas,
+          comparativoMensal,
+        });
+      } else if (consolidadoTodas) {
         const response = await api.get("/relatorios/todas-lojas", {
           params: { dataInicio, dataFim },
         });
+
+        let relatorioTodasLojas = response.data;
+
+        try {
+          const gastosFixosPorLoja = await carregarGastosFixosPorLoja(
+            relatorioTodasLojas,
+          );
+
+          if (gastosFixosPorLoja.length > 0) {
+            relatorioTodasLojas = aplicarGastosFixosPorLojaNoConsolidado(
+              relatorioTodasLojas,
+              gastosFixosPorLoja,
+            );
+          }
+        } catch (erroGastosFixosTodasLojas) {
+          console.warn(
+            "Não foi possível recalcular os gastos fixos por lojaId no consolidado:",
+            erroGastosFixosTodasLojas,
+          );
+        }
 
         let comparativoMensal = null;
         try {
@@ -307,7 +1224,7 @@ export function Relatorios() {
             },
           });
 
-          const totaisAtual = response.data?.totais || {};
+          const totaisAtual = relatorioTodasLojas?.totais || {};
           const totaisAnterior = responseMesAnterior.data?.totais || {};
 
           const valorConsolidadoAtual =
@@ -382,7 +1299,7 @@ export function Relatorios() {
         }
 
         setRelatorio({
-          ...response.data,
+          ...relatorioTodasLojas,
           comparativoMensal,
         });
       } else if (roteiroSelecionado) {
@@ -649,9 +1566,13 @@ export function Relatorios() {
                 onChange={(e) => {
                   setRoteiroSelecionado(e.target.value);
                   setLojaSelecionada("");
+                  setLojasSelecionadasConsolidado([]);
                 }}
                 className="input-field w-full"
-                disabled={lojaSelecionada === TODAS_LOJAS_VALUE}
+                disabled={
+                  lojaSelecionada === TODAS_LOJAS_VALUE ||
+                  lojaSelecionada === SELECAO_MANUAL_LOJAS_VALUE
+                }
               >
                 <option value="">Selecione um roteiro (opcional)</option>
                 {roteiros.map((r) => (
@@ -668,14 +1589,22 @@ export function Relatorios() {
               <select
                 value={lojaSelecionada}
                 onChange={(e) => {
-                  setLojaSelecionada(e.target.value);
+                  const valorSelecionado = e.target.value;
+                  setLojaSelecionada(valorSelecionado);
                   setRoteiroSelecionado("");
+
+                  if (valorSelecionado !== SELECAO_MANUAL_LOJAS_VALUE) {
+                    setLojasSelecionadasConsolidado([]);
+                  }
                 }}
                 className="input-field w-full"
                 disabled={!!roteiroSelecionado}
               >
                 <option value="">Selecione uma loja</option>
                 <option value={TODAS_LOJAS_VALUE}>Todas as lojas</option>
+                <option value={SELECAO_MANUAL_LOJAS_VALUE}>
+                  Selecionar lojas manualmente (consolidado)
+                </option>
                 {lojas.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
@@ -706,6 +1635,69 @@ export function Relatorios() {
               />
             </div>
           </div>
+
+          {lojaSelecionada === SELECAO_MANUAL_LOJAS_VALUE &&
+            !roteiroSelecionado && (
+              <div className="mt-4 p-4 rounded-lg border border-indigo-200 bg-indigo-50/40">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <p className="text-sm font-semibold text-gray-800">
+                    Lojas selecionadas para o consolidado:{" "}
+                    {lojasSelecionadasConsolidado.length}
+                  </p>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLojasSelecionadasConsolidado(
+                          (lojas || []).map((loja) => String(loja.id)),
+                        )
+                      }
+                      className="px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 text-sm font-medium"
+                    >
+                      Selecionar todas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLojasSelecionadasConsolidado([])}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 text-sm font-medium"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                  {(lojas || []).map((loja) => {
+                    const lojaIdNormalizado = String(loja.id);
+                    const selecionada = lojasSelecionadasConsolidado.includes(
+                      lojaIdNormalizado,
+                    );
+
+                    return (
+                      <label
+                        key={loja.id}
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                          selecionada
+                            ? "bg-indigo-50 border-indigo-300"
+                            : "bg-white border-gray-200 hover:border-indigo-200"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selecionada}
+                          onChange={() => toggleLojaConsolidado(loja.id)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm text-gray-800 truncate">
+                          {loja.nome}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">

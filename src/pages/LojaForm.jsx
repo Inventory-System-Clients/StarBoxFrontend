@@ -65,6 +65,62 @@ export function LojaForm() {
     return Number.isFinite(numero) ? numero : 0;
   };
 
+  const normalizarIdLoja = (valor) => {
+    if (valor === null || valor === undefined) return "";
+    return String(valor);
+  };
+
+  const extrairListaGastosFixos = (payload, lojaIdAtual) => {
+    const listaPorLojaId =
+      payload?.gastosPorLoja?.[lojaIdAtual] ||
+      payload?.gastosFixosPorLoja?.[lojaIdAtual] ||
+      payload?.data?.gastosPorLoja?.[lojaIdAtual] ||
+      payload?.data?.gastosFixosPorLoja?.[lojaIdAtual];
+
+    if (Array.isArray(listaPorLojaId)) {
+      return listaPorLojaId;
+    }
+
+    const candidatos = [
+      payload,
+      payload?.gastos,
+      payload?.gastosFixos,
+      payload?.data,
+      payload?.data?.gastos,
+      payload?.data?.gastosFixos,
+      payload?.items,
+      payload?.results,
+    ];
+
+    const lista = candidatos.find(Array.isArray) || [];
+
+    if (!Array.isArray(lista) || lista.length === 0) {
+      if (
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload) &&
+        (payload.nome || payload.valor !== undefined)
+      ) {
+        return [payload];
+      }
+
+      return [];
+    }
+
+    const lojaIdAtualNormalizado = normalizarIdLoja(lojaIdAtual);
+    const possuiLojaIdNaLista = lista.some(
+      (item) => item?.lojaId !== undefined && item?.lojaId !== null,
+    );
+
+    if (!possuiLojaIdNaLista) {
+      return lista;
+    }
+
+    return lista.filter(
+      (item) => normalizarIdLoja(item?.lojaId) === lojaIdAtualNormalizado,
+    );
+  };
+
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
@@ -158,12 +214,10 @@ export function LojaForm() {
   const carregarGastosFixos = async () => {
     try {
       setLoadingGastosFixos(true);
-      const response = await api.get(`/gastos-fixos-loja/${id}`);
-      const listaRecebida = Array.isArray(response.data)
-        ? response.data
-        : Array.isArray(response.data?.gastos)
-          ? response.data.gastos
-          : [];
+      const response = await api.get(`/gastos-fixos-loja/${id}`, {
+        params: { lojaId: id },
+      });
+      const listaRecebida = extrairListaGastosFixos(response.data, id);
 
       const valoresPorNome = new Map();
       const gastosExtras = [];
@@ -246,6 +300,7 @@ export function LojaForm() {
     }
 
     const payload = {
+      lojaId,
       gastos: gastosComDados.map((item) => ({
         nome: item.nome.trim(),
         valor: parseValorMonetario(item.valor),
