@@ -348,6 +348,9 @@ export default function RoteiroExecucao() {
     );
 
   const observacaoAdmin = String(roteiro.observacao || "").trim();
+  const veiculoResumo = roteiro?.veiculo
+    ? [roteiro.veiculo.nome, roteiro.veiculo.modelo].filter(Boolean).join(" - ")
+    : "Sem veículo associado";
   const orcamentoConvertido = Number(roteiro.orcamentoDiario);
   const totalGastoConvertido = Number(roteiro.totalGastoHoje);
   const saldoConvertido = Number(roteiro.saldoGastoHoje);
@@ -394,6 +397,7 @@ export default function RoteiroExecucao() {
             </span>
           )}
         </h1>
+        <p className="text-sm text-gray-600 mb-4">🚗 Veículo: {veiculoResumo}</p>
         {error && (
           <AlertBox type="error" message={error} onClose={() => setError("")} />
         )}

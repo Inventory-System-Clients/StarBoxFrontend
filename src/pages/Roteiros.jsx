@@ -21,6 +21,7 @@ export function Roteiros() {
   // --- ESTADOS DE DADOS ---
   const [roteiros, setRoteiros] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
+  const [veiculos, setVeiculos] = useState([]);
   const [todasLojas, setTodasLojas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -83,6 +84,7 @@ export function Roteiros() {
   const [showModalCriarRoteiro, setShowModalCriarRoteiro] = useState(false);
   const [showModalAdicionarLoja, setShowModalAdicionarLoja] = useState(false);
   const [novoNomeRoteiro, setNovoNomeRoteiro] = useState("");
+  const [novoVeiculoId, setNovoVeiculoId] = useState("");
   const [novosDiasRoteiro, setNovosDiasRoteiro] = useState([]);
   const [novaObservacaoRoteiro, setNovaObservacaoRoteiro] = useState("");
   const [filtroNomeRoteiro, setFiltroNomeRoteiro] = useState("");
@@ -113,6 +115,41 @@ export function Roteiros() {
 
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
+
+  const normalizarIdOpcional = (valor) => {
+    const texto = String(valor || "").trim();
+    return texto || null;
+  };
+
+  const getVeiculoLabel = (veiculo) => {
+    const nome = String(veiculo?.nome || "").trim();
+    const modelo = String(veiculo?.modelo || "").trim();
+
+    if (!nome && !modelo) return "Veículo sem identificação";
+    return [nome, modelo].filter(Boolean).join(" - ");
+  };
+
+  const getVeiculoResumoRoteiro = (roteiro) => {
+    if (!roteiro?.veiculo) return "Sem veículo associado";
+    return getVeiculoLabel(roteiro.veiculo);
+  };
+
+  const getMensagemErroVeiculo = (err, fallback) => {
+    const mensagemBackend = String(err?.response?.data?.error || "");
+    const mensagemNormalizada = mensagemBackend
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    if (
+      err?.response?.status === 404 &&
+      mensagemNormalizada.includes("veiculo nao encontrado")
+    ) {
+      return "Veículo não encontrado. Selecione um veículo válido e tente novamente.";
+    }
+
+    return mensagemBackend || fallback;
+  };
 
   const formatarMoedaBRL = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
@@ -315,12 +352,16 @@ export function Roteiros() {
         usuario?.role === "ADMIN"
           ? api.get("/usuarios/funcionarios")
           : Promise.resolve({ data: [] }),
+        usuario?.role === "ADMIN"
+          ? api.get("/veiculos")
+          : Promise.resolve({ data: [] }),
       ];
-      const [resRoteiros, resLojas, resFuncionarios] =
+      const [resRoteiros, resLojas, resFuncionarios, resVeiculos] =
         await Promise.all(promises);
       setRoteiros(resRoteiros.data || []);
       setTodasLojas(resLojas.data || []);
       setFuncionarios(resFuncionarios.data || []);
+      setVeiculos(resVeiculos.data || []);
     } catch (err) {
       setError("Erro ao carregar dados dos roteiros.");
     } finally {
@@ -328,23 +369,70 @@ export function Roteiros() {
     }
   };
 
+  const handleAtualizarVeiculoRoteiro = async (roteiro, valorSelecionado) => {
+    const veiculoId = normalizarIdOpcional(valorSelecionado);
+    const veiculoIdAnterior = normalizarIdOpcional(roteiro?.veiculoId);
+    const veiculoSelecionado =
+      veiculos.find((item) => String(item.id) === String(veiculoId)) || null;
+
+    if (veiculoId === veiculoIdAnterior) return;
+
+    setRoteiros((prev) =>
+      prev.map((item) =>
+        item.id === roteiro.id
+          ? { ...item, veiculoId, veiculo: veiculoSelecionado }
+          : item,
+      ),
+    );
+
+    try {
+      await api.patch(`/roteiros/${roteiro.id}`, {
+        veiculoId,
+      });
+
+      setSuccess(
+        veiculoSelecionado
+          ? `Veículo ${getVeiculoLabel(veiculoSelecionado)} associado com sucesso.`
+          : "Veículo removido do roteiro com sucesso.",
+      );
+      carregarDadosIniciais();
+    } catch (err) {
+      setError(getMensagemErroVeiculo(err, "Erro ao atualizar veículo do roteiro."));
+
+      setRoteiros((prev) =>
+        prev.map((item) =>
+          item.id === roteiro.id
+            ? {
+                ...item,
+                veiculoId: veiculoIdAnterior,
+                veiculo: roteiro.veiculo || null,
+              }
+            : item,
+        ),
+      );
+    }
+  };
+
   // --- AÇÕES ---
   const handleCriarRoteiro = async () => {
     try {
       const observacaoNormalizada = novaObservacaoRoteiro.trim();
+      const veiculoId = normalizarIdOpcional(novoVeiculoId);
       await api.post("/roteiros", {
         nome: novoNomeRoteiro,
         diasSemana: novosDiasRoteiro,
         observacao: observacaoNormalizada || null,
+        veiculoId,
       });
       setNovoNomeRoteiro("");
+      setNovoVeiculoId("");
       setNovosDiasRoteiro([]);
       setNovaObservacaoRoteiro("");
       setShowModalCriarRoteiro(false);
       setSuccess("Roteiro criado com sucesso!");
       carregarDadosIniciais();
     } catch (err) {
-      setError("Erro ao criar roteiro.");
+      setError(getMensagemErroVeiculo(err, "Erro ao criar roteiro."));
     }
   };
 
@@ -616,6 +704,10 @@ export function Roteiros() {
                 </span>
               </div>
 
+              <p className="text-xs text-gray-500 mb-3">
+                🚗 {getVeiculoResumoRoteiro(roteiro)}
+              </p>
+
               {/* Seção de Funcionário */}
               <div className="mb-4">
                 <label className="text-xs font-bold text-gray-400 block mb-1">
@@ -628,7 +720,8 @@ export function Roteiros() {
                     onChange={async (e) => {
                       const rawId = e.target.value;
                       // IDs são UUID — não converter para número
-                      const funcionarioId = rawId || null;
+                      const funcionarioId = normalizarIdOpcional(rawId);
+                      const veiculoId = normalizarIdOpcional(roteiro.veiculoId);
                       const f = funcionarios.find(
                         (x) => String(x.id) === rawId,
                       );
@@ -647,6 +740,7 @@ export function Roteiros() {
                         await api.post(`/roteiros/${roteiro.id}/iniciar`, {
                           funcionarioId,
                           funcionarioNome,
+                          veiculoId,
                         });
                         setSuccess(
                           `Funcionário ${funcionarioNome || "removido"} atribuído com sucesso.`,
@@ -654,7 +748,12 @@ export function Roteiros() {
                         // Recarregar dados do backend para garantir persistência
                         carregarDadosIniciais();
                       } catch (err) {
-                        setError("Erro ao atribuir funcionário ao roteiro.");
+                        setError(
+                          getMensagemErroVeiculo(
+                            err,
+                            "Erro ao atribuir funcionário ao roteiro.",
+                          ),
+                        );
                         // Reverter se falhou
                         setRoteiros((prev) =>
                           prev.map((r) =>
@@ -681,6 +780,31 @@ export function Roteiros() {
                   <p className="text-sm font-medium">
                     {roteiro.funcionarioNome || "Não atribuído"}
                   </p>
+                )}
+              </div>
+
+              {/* Seção de Veículo */}
+              <div className="mb-4">
+                <label className="text-xs font-bold text-gray-400 block mb-1">
+                  VEÍCULO
+                </label>
+                {usuario?.role === "ADMIN" ? (
+                  <select
+                    className="w-full p-2 text-sm border rounded bg-gray-50"
+                    value={String(roteiro.veiculoId || "")}
+                    onChange={(e) =>
+                      handleAtualizarVeiculoRoteiro(roteiro, e.target.value)
+                    }
+                  >
+                    <option value="">Sem veículo</option>
+                    {veiculos.map((veiculo) => (
+                      <option key={veiculo.id} value={String(veiculo.id)}>
+                        {getVeiculoLabel(veiculo)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm font-medium">{getVeiculoResumoRoteiro(roteiro)}</p>
                 )}
               </div>
 
@@ -944,6 +1068,21 @@ export function Roteiros() {
               })}
             </div>
             <label className="text-xs font-bold text-gray-400 block mb-2">
+              VEÍCULO (OPCIONAL)
+            </label>
+            <select
+              className="w-full p-3 border rounded-xl mb-4 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+              value={novoVeiculoId}
+              onChange={(e) => setNovoVeiculoId(e.target.value)}
+            >
+              <option value="">Sem veículo</option>
+              {veiculos.map((veiculo) => (
+                <option key={veiculo.id} value={String(veiculo.id)}>
+                  {getVeiculoLabel(veiculo)}
+                </option>
+              ))}
+            </select>
+            <label className="text-xs font-bold text-gray-400 block mb-2">
               Observação do roteiro
             </label>
             <textarea
@@ -965,6 +1104,7 @@ export function Roteiros() {
               <button
                 onClick={() => {
                   setShowModalCriarRoteiro(false);
+                  setNovoVeiculoId("");
                   setNovosDiasRoteiro([]);
                   setNovaObservacaoRoteiro("");
                 }}
