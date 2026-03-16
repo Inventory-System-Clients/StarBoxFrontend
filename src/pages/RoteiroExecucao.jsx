@@ -48,6 +48,8 @@ export default function RoteiroExecucao() {
     categoria: "transporte",
     valor: "",
     quilometragem: "",
+    litros: "",
+    nivelCombustivel: "5 palzinhos",
     observacao: "",
   });
   const [lancandoGasto, setLancandoGasto] = useState(false);
@@ -236,6 +238,7 @@ export default function RoteiroExecucao() {
     }
 
     let quilometragemNumerica = null;
+    let litrosNumericos = null;
     if (gastoForm.categoria === "abastecimento") {
       const kmDigitado = Number.parseInt(gastoForm.quilometragem, 10);
       if (!Number.isInteger(kmDigitado) || kmDigitado < 0) {
@@ -245,6 +248,17 @@ export default function RoteiroExecucao() {
         return;
       }
       quilometragemNumerica = kmDigitado;
+
+      const litrosDigitados = parseFloat(
+        String(gastoForm.litros || "").replace(",", "."),
+      );
+      if (!Number.isFinite(litrosDigitados) || litrosDigitados <= 0) {
+        setError(
+          "Informe a quantidade de litros abastecidos (maior que zero).",
+        );
+        return;
+      }
+      litrosNumericos = litrosDigitados;
     }
 
     const saldoAtual = Number(roteiro?.saldoGastoHoje ?? 0);
@@ -268,11 +282,32 @@ export default function RoteiroExecucao() {
       };
 
       const res = await api.post(`/roteiros/${id}/gastos`, payload);
+
+      // Se abastecimento e há veículo no roteiro, criar movimentação de veículo
+      if (gastoForm.categoria === "abastecimento" && roteiro.veiculo?.id) {
+        try {
+          await api.post("/movimentacao-veiculos", {
+            veiculoId: roteiro.veiculo.id,
+            tipo: "abastecimento",
+            km: quilometragemNumerica,
+            litros: litrosNumericos,
+            roteiroId: id,
+            gasolina: gastoForm.nivelCombustivel,
+          });
+        } catch (errVeiculo) {
+          console.warn(
+            "Gasto registrado, mas falha ao registrar abastecimento no veículo:",
+            errVeiculo,
+          );
+        }
+      }
+
       setSuccess(res?.data?.message || "Gasto diário registrado com sucesso.");
       setGastoForm((prev) => ({
         ...prev,
         valor: "",
         quilometragem: "",
+        litros: "",
         observacao: "",
       }));
       await carregarRoteiro();
@@ -379,6 +414,9 @@ export default function RoteiroExecucao() {
   const kmObrigatorioPendente =
     gastoForm.categoria === "abastecimento" &&
     String(gastoForm.quilometragem || "").trim() === "";
+  const litrosObrigatorioPendente =
+    gastoForm.categoria === "abastecimento" &&
+    String(gastoForm.litros || "").trim() === "";
   const gastosHojeOrdenados = [...(roteiro.gastosHoje || [])].sort(
     (a, b) => new Date(b.dataHora) - new Date(a.dataHora),
   );
@@ -397,7 +435,9 @@ export default function RoteiroExecucao() {
             </span>
           )}
         </h1>
-        <p className="text-sm text-gray-600 mb-4">🚗 Veículo: {veiculoResumo}</p>
+        <p className="text-sm text-gray-600 mb-4">
+          🚗 Veículo: {veiculoResumo}
+        </p>
         {error && (
           <AlertBox type="error" message={error} onClose={() => setError("")} />
         )}
@@ -530,7 +570,9 @@ export default function RoteiroExecucao() {
                 min="0"
                 step="1"
                 inputMode="numeric"
-                className={`w-full p-3 border rounded-lg bg-white ${kmObrigatorioPendente ? "border-red-400" : ""}`}
+                className={`w-full p-3 border rounded-lg bg-white ${
+                  kmObrigatorioPendente ? "border-red-400" : ""
+                }`}
                 placeholder="Obrigatório para abastecimento (ex: 105430)"
                 value={gastoForm.quilometragem}
                 required
@@ -546,6 +588,57 @@ export default function RoteiroExecucao() {
                 Campo obrigatório quando a categoria for Abastecimento.
               </p>
             </div>
+          )}
+
+          {gastoForm.categoria === "abastecimento" && (
+            <>
+              <div className="mb-3">
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Litros abastecidos *
+                </label>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  inputMode="decimal"
+                  className={`w-full p-3 border rounded-lg bg-white ${
+                    litrosObrigatorioPendente ? "border-red-400" : ""
+                  }`}
+                  placeholder="Ex: 12.5"
+                  value={gastoForm.litros}
+                  required
+                  onChange={(e) =>
+                    setGastoForm((prev) => ({
+                      ...prev,
+                      litros: e.target.value,
+                    }))
+                  }
+                  disabled={lancandoGasto || roteiro.status === "finalizado"}
+                />
+              </div>
+              <div className="mb-3">
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Nível após abastecimento
+                </label>
+                <select
+                  className="w-full p-3 border rounded-lg bg-white"
+                  value={gastoForm.nivelCombustivel}
+                  onChange={(e) =>
+                    setGastoForm((prev) => ({
+                      ...prev,
+                      nivelCombustivel: e.target.value,
+                    }))
+                  }
+                  disabled={lancandoGasto || roteiro.status === "finalizado"}
+                >
+                  <option value="5 palzinhos">Cheio (5 palzinhos)</option>
+                  <option value="4 palzinhos">4 palzinhos</option>
+                  <option value="3 palzinhos">3 palzinhos</option>
+                  <option value="2 palzinhos">2 palzinhos</option>
+                  <option value="1 palzinho">1 palzinho</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div className="mb-4">
@@ -574,7 +667,8 @@ export default function RoteiroExecucao() {
               disabled={
                 lancandoGasto ||
                 roteiro.status === "finalizado" ||
-                kmObrigatorioPendente
+                kmObrigatorioPendente ||
+                litrosObrigatorioPendente
               }
             >
               {lancandoGasto ? "Lançando..." : "Lançar gasto"}

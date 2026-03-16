@@ -907,7 +907,8 @@ function Manutencoes() {
 
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <button
-                    className="w-full rounded-lg border border-gray-300 bg-red-500 px-4 py-2 font-semibold text-black hover:bg-red-600"
+                    className="w-full rounded-lg border border-gray-300 bg-red-500 px-4 py-2 font-semibold text-black hover:bg-red-60
+                    03"
                     type="button"
                     onClick={limparCamposNovaManutencao}
                   >

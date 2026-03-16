@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ControleVeiculos from "../components/ControleVeiculos";
 import RegistroVeiculosMovimentacao from "../components/RegistroVeiculosMovimentacao";
+import AbastecimentosVeiculos from "../components/AbastecimentosVeiculos";
 import AlertasVeiculos from "../components/AlertasVeiculos";
 import api from "../services/api";
 
@@ -23,6 +24,7 @@ export default function Veiculos() {
   const navigate = useNavigate();
   const [modalCadastro, setModalCadastro] = useState(false);
   const [mostrarAlertas, setMostrarAlertas] = useState(false);
+  const [abaPrincipal, setAbaPrincipal] = useState("controle");
   const [form, setForm] = useState(initialFormState);
   const [veiculos, setVeiculos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -129,56 +131,78 @@ export default function Veiculos() {
         )}
 
         <div className="mb-8">
-          <div className="bg-white/90 rounded-xl shadow p-6 border border-gray-100 mb-8 backdrop-blur-sm">
-            <ControleVeiculos
-              veiculos={veiculos}
-              onRefresh={fetchVeiculos}
-              loading={loading}
-            />
-          </div>
-
-          {/* Área de Filtro de Data */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-            <label className="text-blue-900 font-medium bg-white/50 px-3 py-1 rounded-lg">
-              Ver registro de movimentação de um período:
-            </label>
-            <input
-              type="date"
-              className="border rounded-lg p-2 focus:ring-2 focus:ring-blue-200 outline-none shadow-sm cursor-pointer"
-              value={filtroDataInicio}
-              onChange={(e) => setFiltroDataInicio(e.target.value)}
-              placeholder="Data início"
-            />
-            <span className="text-gray-500">até</span>
-            <input
-              type="date"
-              className="border rounded-lg p-2 focus:ring-2 focus:ring-blue-200 outline-none shadow-sm cursor-pointer"
-              value={filtroDataFim}
-              onChange={(e) => setFiltroDataFim(e.target.value)}
-              placeholder="Data fim"
-            />
-            {(filtroDataInicio || filtroDataFim) && (
+          {/* Abas principais */}
+          <div className="flex gap-2 mb-4 border-b border-gray-200">
+            {[
+              { id: "controle", label: "🚗 Controle" },
+              { id: "movimentacoes", label: "📋 Movimentações" },
+              { id: "abastecimentos", label: "⛽ Abastecimentos" },
+            ].map((aba) => (
               <button
-                onClick={() => {
-                  setFiltroDataInicio("");
-                  setFiltroDataFim("");
-                }}
-                className="text-sm text-red-500 hover:text-red-700 underline"
+                key={aba.id}
+                onClick={() => setAbaPrincipal(aba.id)}
+                className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                  abaPrincipal === aba.id
+                    ? "border-blue-600 text-blue-700 bg-white"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
               >
-                Limpar filtro
+                {aba.label}
               </button>
-            )}
+            ))}
           </div>
 
-          {/* Tabela de Movimentação */}
-          {(filtroDataInicio || filtroDataFim) && (
-            <div className="bg-white/90 rounded-xl shadow p-6 border border-gray-100 animate-fadeIn">
+          {abaPrincipal === "controle" && (
+            <div className="bg-white/90 rounded-xl shadow p-6 border border-gray-100 backdrop-blur-sm">
+              <ControleVeiculos
+                veiculos={veiculos}
+                onRefresh={fetchVeiculos}
+                loading={loading}
+              />
+            </div>
+          )}
+
+          {abaPrincipal === "movimentacoes" && (
+            <div className="bg-white/90 rounded-xl shadow p-6 border border-gray-100 backdrop-blur-sm">
+              <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+                <label className="text-blue-900 font-medium">Período:</label>
+                <input
+                  type="date"
+                  className="border rounded-lg p-2 focus:ring-2 focus:ring-blue-200 outline-none shadow-sm"
+                  value={filtroDataInicio}
+                  onChange={(e) => setFiltroDataInicio(e.target.value)}
+                />
+                <span className="text-gray-500">até</span>
+                <input
+                  type="date"
+                  className="border rounded-lg p-2 focus:ring-2 focus:ring-blue-200 outline-none shadow-sm"
+                  value={filtroDataFim}
+                  onChange={(e) => setFiltroDataFim(e.target.value)}
+                />
+                {(filtroDataInicio || filtroDataFim) && (
+                  <button
+                    onClick={() => {
+                      setFiltroDataInicio("");
+                      setFiltroDataFim("");
+                    }}
+                    className="text-sm text-red-500 hover:text-red-700 underline"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
               <RegistroVeiculosMovimentacao
                 veiculos={veiculos}
                 loading={loading}
                 filtroDataInicio={filtroDataInicio}
                 filtroDataFim={filtroDataFim}
               />
+            </div>
+          )}
+
+          {abaPrincipal === "abastecimentos" && (
+            <div className="bg-white/90 rounded-xl shadow p-6 border border-gray-100 backdrop-blur-sm">
+              <AbastecimentosVeiculos veiculos={veiculos} />
             </div>
           )}
         </div>

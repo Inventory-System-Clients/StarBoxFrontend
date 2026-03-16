@@ -25,9 +25,9 @@ export function LojaForm() {
   };
 
   const VALORES_BASE_GASTOS_FIXOS = new Map([
-    ["aluguel", "1300"],
-    ["machinepay", "40"],
-    ["datatem", "40"],
+    ["aluguel", "0"],
+    ["machinepay", "0"],
+    ["datatem", "0"],
   ]);
 
   const NOMES_GASTOS_FIXOS_PADRAO = new Set([

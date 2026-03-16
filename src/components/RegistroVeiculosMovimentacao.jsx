@@ -87,8 +87,8 @@ export default function RegistroVeiculos({
               </th>
               <th className="px-4 py-3 border-b font-semibold">Estado</th>
               <th className="px-4 py-3 border-b font-semibold">Modo</th>
-              <th className="px-4 py-3 border-b font-semibold">Km</th>{" "}
-              {/* NOVA COLUNA */}
+              <th className="px-4 py-3 border-b font-semibold">Km</th>
+              <th className="px-4 py-3 border-b font-semibold">Litros</th>
               <th className="px-4 py-3 border-b font-semibold">Observação</th>
             </tr>
           </thead>
@@ -96,7 +96,7 @@ export default function RegistroVeiculos({
             {carregandoMov ? (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={11}
                   className="text-center p-6 text-[#62A1D9] font-semibold animate-pulse"
                 >
                   Carregando movimentações...
@@ -104,7 +104,7 @@ export default function RegistroVeiculos({
               </tr>
             ) : movimentacoes.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center p-6 text-[#A6806A]">
+                  colSpan={11}
                   Nenhum registro encontrado.
                 </td>
               </tr>
@@ -133,9 +133,19 @@ export default function RegistroVeiculos({
                     </td>
                     <td className="px-4 py-2 border-b">
                       <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${mov.tipo === "retirada" ? "bg-[#62A1D9] text-white" : "bg-[#A6806A] text-white"}`}
+                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                          mov.tipo === "retirada"
+                            ? "bg-[#62A1D9] text-white"
+                            : mov.tipo === "abastecimento"
+                              ? "bg-green-600 text-white"
+                              : "bg-[#A6806A] text-white"
+                        }`}
                       >
-                        {mov.tipo === "retirada" ? "Retirada" : "Devolução"}
+                        {mov.tipo === "retirada"
+                          ? "Retirada"
+                          : mov.tipo === "abastecimento"
+                            ? "⛽ Abastecimento"
+                            : "Devolução"}
                       </span>
                     </td>
                     <td className="px-4 py-2 border-b whitespace-nowrap">
@@ -155,8 +165,10 @@ export default function RegistroVeiculos({
                           : mov.estado || "-"}
                     </td>
                     <td className="px-4 py-2 border-b">{mov.modo || "-"}</td>
-                    <td className="px-4 py-2 border-b">{mov.km ?? "-"}</td>{" "}
-                    {/* NOVO DADO */}
+                    <td className="px-4 py-2 border-b">{mov.km ?? "-"}</td>
+                    <td className="px-4 py-2 border-b font-semibold text-green-700">
+                      {mov.litros ? `${Number(mov.litros).toFixed(1)} L` : "-"}
+                    </td>
                     <td className="px-4 py-2 border-b text-left">
                       {mov.obs || mov.observacao || "-"}
                     </td>

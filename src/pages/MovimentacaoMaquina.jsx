@@ -465,7 +465,7 @@ export default function MovimentacaoMaquina() {
     return <div className="p-20 text-center font-bold">Carregando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 text-[#24094E]">
+    <div className="min-h-screen bg-gray-100 t                                                                                                                                              ext-[#24094E]">
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="card-gradient mb-6">
