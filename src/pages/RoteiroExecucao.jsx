@@ -240,6 +240,13 @@ export default function RoteiroExecucao() {
     let quilometragemNumerica = null;
     let litrosNumericos = null;
     if (gastoForm.categoria === "abastecimento") {
+      if (!roteiro?.veiculo?.id) {
+        setError(
+          "Este roteiro não possui veículo associado. Vincule um veículo antes de lançar abastecimento.",
+        );
+        return;
+      }
+
       const kmDigitado = Number.parseInt(gastoForm.quilometragem, 10);
       if (!Number.isInteger(kmDigitado) || kmDigitado < 0) {
         setError(
