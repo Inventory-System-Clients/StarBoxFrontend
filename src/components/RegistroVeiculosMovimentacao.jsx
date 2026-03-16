@@ -104,7 +104,10 @@ export default function RegistroVeiculos({
               </tr>
             ) : movimentacoes.length === 0 ? (
               <tr>
+                <td
                   colSpan={11}
+                  className="text-center p-6 text-[#A6806A] font-medium"
+                >
                   Nenhum registro encontrado.
                 </td>
               </tr>
