@@ -139,9 +139,30 @@ export function Maquinas() {
       render: (maquina) => maquina.codigo || "-",
     },
     {
-      key: "nome",
-      label: "Nome",
-      render: (maquina) => maquina.nome || "-",
+      key: "acoes",
+      label: "Ações",
+      render: (maquina) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate(`/maquinas/${maquina.id}/editar`)}
+            className="text-blue-600 hover:text-blue-800 font-semibold"
+            title="Editar"
+          >
+            ✏️
+          </button>
+          <button
+            onClick={() => handleAbrirDialogDeletar(maquina)}
+            className={`font-semibold ${
+              maquina.ativo
+                ? "text-orange-600 hover:text-orange-800"
+                : "text-red-600 hover:text-red-800"
+            }`}
+            title={maquina.ativo ? "Desativar" : "Excluir Permanentemente"}
+          >
+            {maquina.ativo ? "⚠️" : "🗑️"}
+          </button>
+        </div>
+      ),
     },
     {
       key: "loja",
@@ -151,11 +172,6 @@ export function Maquinas() {
         const loja = lojas.find((l) => l.id === maquina.lojaId);
         return loja ? loja.nome : `N/A (ID: ${maquina.lojaId})`;
       },
-    },
-    {
-      key: "tipo",
-      label: "Tipo",
-      render: (maquina) => maquina.tipo || "-",
     },
     {
       key: "capacidadePadrao",
@@ -187,32 +203,7 @@ export function Maquinas() {
         </Badge>
       ),
     },
-    {
-      key: "acoes",
-      label: "Ações",
-      render: (maquina) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate(`/maquinas/${maquina.id}/editar`)}
-            className="text-blue-600 hover:text-blue-800 font-semibold"
-            title="Editar"
-          >
-            ✏️
-          </button>
-          <button
-            onClick={() => handleAbrirDialogDeletar(maquina)}
-            className={`font-semibold ${
-              maquina.ativo
-                ? "text-orange-600 hover:text-orange-800"
-                : "text-red-600 hover:text-red-800"
-            }`}
-            title={maquina.ativo ? "Desativar" : "Excluir Permanentemente"}
-          >
-            {maquina.ativo ? "⚠️" : "🗑️"}
-          </button>
-        </div>
-      ),
-    },
+    
   ];
 
   if (loading) return <PageLoader />;
