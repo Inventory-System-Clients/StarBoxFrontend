@@ -194,7 +194,6 @@ function Manutencoes() {
   const [maquinas, setMaquinas] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
   const [destinatariosWhatsApp, setDestinatariosWhatsApp] = useState([]);
-  const [origemDestinatarioPadrao, setOrigemDestinatarioPadrao] = useState("");
 
   const [detalhe, setDetalhe] = useState(null);
   const [editando, setEditando] = useState(false);
@@ -240,7 +239,6 @@ function Manutencoes() {
   const carregarDestinatariosWhatsApp = async (lojaId) => {
     if (!lojaId) {
       setDestinatariosWhatsApp([]);
-      setOrigemDestinatarioPadrao("");
       setNovaManutencao((d) => ({
         ...d,
         destinatarioWhatsAppId: "",
@@ -258,16 +256,29 @@ function Manutencoes() {
         : [];
 
       setDestinatariosWhatsApp(lista);
-      setOrigemDestinatarioPadrao(res.data?.origemPadrao || "");
+      setNovaManutencao((dadosAtuais) => {
+        const destinatarioAtual = String(
+          dadosAtuais.destinatarioWhatsAppId || "",
+        );
 
-      const defaultId = res.data?.defaultFuncionarioId
-        ? String(res.data.defaultFuncionarioId)
-        : "";
+        if (!destinatarioAtual) {
+          return dadosAtuais;
+        }
 
-      setNovaManutencao((d) => ({
-        ...d,
-        destinatarioWhatsAppId: defaultId,
-      }));
+        const destinatarioAindaExiste = lista.some(
+          (destinatario) =>
+            String(destinatario.id) === String(destinatarioAtual),
+        );
+
+        if (destinatarioAindaExiste) {
+          return dadosAtuais;
+        }
+
+        return {
+          ...dadosAtuais,
+          destinatarioWhatsAppId: "",
+        };
+      });
     } catch (err) {
       console.error(
         "Erro ao carregar destinatarios de WhatsApp:",
@@ -281,11 +292,29 @@ function Manutencoes() {
       }));
 
       setDestinatariosWhatsApp(fallback);
-      setOrigemDestinatarioPadrao("");
-      setNovaManutencao((d) => ({
-        ...d,
-        destinatarioWhatsAppId: "",
-      }));
+      setNovaManutencao((dadosAtuais) => {
+        const destinatarioAtual = String(
+          dadosAtuais.destinatarioWhatsAppId || "",
+        );
+
+        if (!destinatarioAtual) {
+          return dadosAtuais;
+        }
+
+        const destinatarioAindaExiste = fallback.some(
+          (destinatario) =>
+            String(destinatario.id) === String(destinatarioAtual),
+        );
+
+        if (destinatarioAindaExiste) {
+          return dadosAtuais;
+        }
+
+        return {
+          ...dadosAtuais,
+          destinatarioWhatsAppId: "",
+        };
+      });
     }
   };
 
@@ -472,7 +501,6 @@ function Manutencoes() {
       descricao: "",
     });
     setDestinatariosWhatsApp([]);
-    setOrigemDestinatarioPadrao("");
   };
 
   const abrirFormularioNovaManutencao = () => {
@@ -484,7 +512,6 @@ function Manutencoes() {
       descricao: "",
     });
     setDestinatariosWhatsApp([]);
-    setOrigemDestinatarioPadrao("");
     setShowNovaManutencao(true);
   };
 
@@ -497,7 +524,6 @@ function Manutencoes() {
       descricao: "",
     });
     setDestinatariosWhatsApp([]);
-    setOrigemDestinatarioPadrao("");
     setError("");
   };
 
@@ -882,12 +908,6 @@ function Manutencoes() {
                     placeholder="Digite nome ou telefone do destinatário"
                     disabled={!novaManutencao.lojaId}
                   />
-                  {origemDestinatarioPadrao === "roteiro_da_loja" && (
-                    <p className="text-xs text-green-700 mt-1">
-                      Padrão automático: funcionário responsável pelo roteiro da
-                      loja.
-                    </p>
-                  )}
                 </div>
 
                 <div>
