@@ -7,6 +7,7 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const isFuncionario = usuario?.role === "FUNCIONARIO";
 
   const isActive = (path) => location.pathname === path;
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
@@ -61,12 +62,16 @@ export default function Navbar() {
                 <NavLink to="/roteiros" active={isActive("/roteiros")}>
                   🗺️ Roteiros
                 </NavLink>
-                <NavLink to="/maquinas" active={isActive("/maquinas")}>
-                  🎮 Máquinas
-                </NavLink>
-                <NavLink to="/lojas" active={isActive("/lojas")}>
-                  🏪 Lojas
-                </NavLink>
+                {!isFuncionario && (
+                  <NavLink to="/maquinas" active={isActive("/maquinas")}>
+                    🎮 Máquinas
+                  </NavLink>
+                )}
+                {!isFuncionario && (
+                  <NavLink to="/lojas" active={isActive("/lojas")}>
+                    🏪 Lojas
+                  </NavLink>
+                )}
 
                 <NavLink to="/produtos" active={isActive("/produtos")}>
                   🧸 Produtos
@@ -162,13 +167,15 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
-            <MobileNavLink
-              to="/lojas"
-              active={isActive("/lojas")}
-              onClick={closeMenu}
-            >
-              🏪 Lojas
-            </MobileNavLink>
+            {!isFuncionario && (
+              <MobileNavLink
+                to="/lojas"
+                active={isActive("/lojas")}
+                onClick={closeMenu}
+              >
+                🏪 Lojas
+              </MobileNavLink>
+            )}
             <MobileNavLink
               to="/estoque-usuarios"
               active={isActive("/estoque-usuarios")}

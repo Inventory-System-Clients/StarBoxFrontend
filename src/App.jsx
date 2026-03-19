@@ -86,7 +86,7 @@ function AppRoutes() {
       <Route
         path="/veiculos"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <Veiculos />
           </PrivateRoute>
         }
@@ -94,7 +94,7 @@ function AppRoutes() {
       <Route
         path="/veiculos/revisoes-pendentes"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <RevisoesPendentes />
           </PrivateRoute>
         }
@@ -146,7 +146,7 @@ function AppRoutes() {
       <Route
         path="/lojas"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <Lojas />
           </PrivateRoute>
         }
@@ -154,7 +154,7 @@ function AppRoutes() {
       <Route
         path="/lojas/:id"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <LojaDetalhes />
           </PrivateRoute>
         }
@@ -162,7 +162,7 @@ function AppRoutes() {
       <Route
         path="/lojas/nova"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <LojaForm />
           </PrivateRoute>
         }
@@ -170,7 +170,7 @@ function AppRoutes() {
       <Route
         path="/lojas/:id/editar"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <LojaForm />
           </PrivateRoute>
         }
@@ -186,7 +186,7 @@ function AppRoutes() {
       <Route
         path="/maquinas"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <Maquinas />
           </PrivateRoute>
         }
@@ -194,7 +194,7 @@ function AppRoutes() {
       <Route
         path="/maquinas/nova"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <MaquinaForm />
           </PrivateRoute>
         }
@@ -202,7 +202,7 @@ function AppRoutes() {
       <Route
         path="/maquinas/:id/editar"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <MaquinaForm />
           </PrivateRoute>
         }
@@ -210,7 +210,7 @@ function AppRoutes() {
       <Route
         path="/maquinas/:id"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
             <MaquinaDetalhes />
           </PrivateRoute>
         }

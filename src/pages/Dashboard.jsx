@@ -213,6 +213,7 @@ export function Dashboard() {
   // (removido reloadAfterModal/useEffect pois reload é imediato)
   
   const { usuario } = useAuth();
+  const isFuncionario = usuario?.role === "FUNCIONARIO";
   const [stats, setStats] = useState({
     alertas: [],
     balanco: null,
@@ -273,17 +274,23 @@ export function Dashboard() {
   const carregarDados = useCallback(async () => {
     try {
       const isAdmin = usuario?.role === "ADMIN";
+      const bloquearVisualizacaoLojasEMaquinas =
+        usuario?.role === "FUNCIONARIO";
 
-      // Buscar lojas e máquinas (acessível para todos)
+      // Para FUNCIONARIO, bloqueia o carregamento de lojas e máquinas.
       const requisicoes = [
-        api.get("/lojas").catch((err) => {
-          console.error("Erro ao carregar lojas:", err.message);
-          return { data: [] };
-        }),
-        api.get("/maquinas").catch((err) => {
-          console.error("Erro ao carregar máquinas:", err.message);
-          return { data: [] };
-        }),
+        bloquearVisualizacaoLojasEMaquinas
+          ? Promise.resolve({ data: [] })
+          : api.get("/lojas").catch((err) => {
+              console.error("Erro ao carregar lojas:", err.message);
+              return { data: [] };
+            }),
+        bloquearVisualizacaoLojasEMaquinas
+          ? Promise.resolve({ data: [] })
+          : api.get("/maquinas").catch((err) => {
+              console.error("Erro ao carregar máquinas:", err.message);
+              return { data: [] };
+            }),
         api.get("/produtos").catch((err) => {
           console.error("Erro ao carregar produtos:", err.message);
           return { data: [] };
@@ -426,6 +433,11 @@ export function Dashboard() {
 
   // Carregar revisões pendentes
   useEffect(() => {
+    if (usuario?.role === "FUNCIONARIO") {
+      setRevisoesPendentes([]);
+      return;
+    }
+
     const carregarRevisoes = async () => {
       const revisoes = await listarRevisoesPendentes();
       setRevisoesPendentes(revisoes.slice(0, 5)); // Top 5
@@ -437,7 +449,7 @@ export function Dashboard() {
     const interval = setInterval(carregarRevisoes, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [usuario?.role]);
 
   const carregarAlertasEstoqueLoja = async (lojasData) => {
     try {
@@ -541,8 +553,13 @@ export function Dashboard() {
 
   // Carregar estoque das lojas
   useEffect(() => {
-    carregarEstoqueDasLojas();
-  }, []);
+    if (usuario?.role === "ADMIN") {
+      carregarEstoqueDasLojas();
+      return;
+    }
+
+    setLojasComEstoque([]);
+  }, [usuario?.role]);
 
   const carregarDetalhesMaquina = async (maquinaId) => {
     try {
@@ -1915,34 +1932,35 @@ export function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-            {/* Veículos */}
-            <div
-              className="stat-card bg-linear-to-br from-gray-700 to-gray-900 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
-              onClick={() => navigate("/veiculos")}
-            >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium opacity-90">Veículos</h3>
-                  <svg
-                    className="w-8 h-8 opacity-80"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 13l2-2m0 0l7-7 7 7M5 11v8a2 2 0 002 2h10a2 2 0 002-2v-8"
-                    />
-                  </svg>
+            {!isFuncionario && (
+              <div
+                className="stat-card bg-linear-to-br from-gray-700 to-gray-900 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+                onClick={() => navigate("/veiculos")}
+              >
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium opacity-90">Veículos</h3>
+                    <svg
+                      className="w-8 h-8 opacity-80"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 13l2-2m0 0l7-7 7 7M5 11v8a2 2 0 002 2h10a2 2 0 002-2v-8"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-3xl font-bold">🚗🏍️</p>
+                  <p className="text-xs opacity-75 mt-1">
+                    Acessar controle de veículos
+                  </p>
                 </div>
-                <p className="text-3xl font-bold">🚗🏍️</p>
-                <p className="text-xs opacity-75 mt-1">
-                  Acessar controle de veículos
-                </p>
               </div>
-            </div>
+            )}
             {/* Estoque por Usuário */}
             <div
               className="stat-card bg-linear-to-br from-cyan-500 to-cyan-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
@@ -2057,31 +2075,32 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Controle de Revisões de Veículos */}
-        <div className="card-gradient mb-8 border-l-4 border-gray-700 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-              <span className="bg-linear-to-br from-gray-700 to-gray-900 p-2 sm:p-3 rounded-xl text-white">
-                🔧
-              </span>
-              Revisões de Veículos
-            </h2>
-            <p className="text-gray-600 text-sm sm:text-base">
-              Acompanhe e gerencie as revisões periódicas de todos os veículos da frota.
-            </p>
+        {!isFuncionario && (
+          <div className="card-gradient mb-8 border-l-4 border-gray-700 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                <span className="bg-linear-to-br from-gray-700 to-gray-900 p-2 sm:p-3 rounded-xl text-white">
+                  🔧
+                </span>
+                Revisões de Veículos
+              </h2>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Acompanhe e gerencie as revisões periódicas de todos os veículos da frota.
+              </p>
+            </div>
+            <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
+              <button
+                className="bg-gray-700 hover:bg-gray-800 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
+                onClick={() => navigate("/veiculos/revisoes-pendentes")}
+              >
+                <span className="text-2xl">🔧</span> Ver Revisões
+              </button>
+            </div>
           </div>
-          <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
-            <button
-              className="bg-gray-700 hover:bg-gray-800 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
-              onClick={() => navigate("/veiculos/revisoes-pendentes")}
-            >
-              <span className="text-2xl">🔧</span> Ver Revisões
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Card de Revisões Pendentes */}
-        {revisoesPendentes.length > 0 && (
+        {!isFuncionario && revisoesPendentes.length > 0 && (
           <div className="card-gradient mb-8 border-l-4 border-red-500 p-4 sm:p-8 rounded-xl shadow-md">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex-1 min-w-0">
@@ -2621,7 +2640,8 @@ export function Dashboard() {
         )}
 
         {/* Busca de Lojas e Máquinas */}
-        <div ref={buscaLojasRef} className="card-gradient mb-8">
+        {!isFuncionario && (
+          <div ref={buscaLojasRef} className="card-gradient mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             <span className="text-3xl">🔍</span>
             Buscar Lojas e Máquinas
@@ -3171,7 +3191,8 @@ export function Dashboard() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Alertas de Estoque - Apenas para ADMIN */}
         {usuario?.role === "ADMIN" && stats.alertas.length > 0 && (

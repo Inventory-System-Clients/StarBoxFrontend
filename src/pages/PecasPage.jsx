@@ -7,6 +7,7 @@ import Footer from "../components/Footer.jsx";
 
 export default function PecasPage() {
   const { usuario } = useAuth();
+  const isFuncionario = usuario?.role === "FUNCIONARIO";
   const [pecas, setPecas] = useState([]);
   const [pecaEditando, setPecaEditando] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -45,6 +46,11 @@ export default function PecasPage() {
 
   // Adiciona peça ao carrinho do usuário
   const adicionarAoCarrinho = async (peca) => {
+    if (isFuncionario) {
+      alert("Seu perfil não possui permissão para adicionar peças ao carrinho.");
+      return;
+    }
+
     if (!peca || peca.quantidade === 0) {
       alert(
         "Não é possível adicionar ao carrinho: peça sem estoque disponível.",
@@ -224,7 +230,7 @@ export default function PecasPage() {
         </div>
         <p className="text-gray-600 mb-4">
           Aqui você pode visualizar, cadastrar e gerenciar peças do estoque.
-          Funcionários podem adicionar peças ao carrinho para uso em roteiros.
+          Perfis autorizados podem adicionar peças ao carrinho para uso em roteiros.
         </p>
 
         <div className="overflow-x-auto bg-white rounded-xl shadow p-4 border border-gray-100 mb-8">
@@ -260,8 +266,7 @@ export default function PecasPage() {
                   <td className="px-4 py-2">
                     <div className="flex items-center justify-center gap-2">
                       {/* Botões para funcionários - Adicionar ao carrinho */}
-                      {(usuario?.role === "FUNCIONARIO" ||
-                        usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                      {(usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
                         usuario?.role === "CONTROLADOR_ESTOQUE" ||
                         usuario?.role === "MANUTENCAO" ||
                         usuario?.role === "ADMIN" ||
@@ -426,7 +431,7 @@ function ModalEditarPeca({ peca, onFechar, onSalvar }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-4 flex justify-between items-center rounded-t-xl">
+        <div className="sticky top-0 bg-linear-to-r from-blue-600 to-purple-600 text-white px-6 py-4 flex justify-between items-center rounded-t-xl">
           <h2 className="text-2xl font-bold flex items-center gap-2">
             ✏️ Editar Peça
           </h2>

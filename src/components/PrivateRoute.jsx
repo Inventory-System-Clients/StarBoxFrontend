@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 export function PrivateRoute({
   children,
   adminOnly = false,
+  deniedRoles = [],
   allowedRoles = [],
 }) {
   const { signed, loading, isAdmin, usuario } = useAuth();
@@ -21,6 +22,14 @@ export function PrivateRoute({
   }
 
   if (adminOnly && !isAdmin()) {
+    return <Navigate to="/" />;
+  }
+
+  if (
+    Array.isArray(deniedRoles) &&
+    deniedRoles.length > 0 &&
+    deniedRoles.includes(usuario?.role)
+  ) {
     return <Navigate to="/" />;
   }
 
