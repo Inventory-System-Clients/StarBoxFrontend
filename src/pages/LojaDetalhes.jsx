@@ -476,7 +476,7 @@ export function LojaDetalhes() {
       .slice(0, 8)
       .toUpperCase();
     const texto = [
-      "STAR TOYS",
+      "STAR BOX",
       `*${lojaCodigo} | ${loja?.nome || "Loja"}*`,
       `Periodo: ${formatarPeriodoSelecionado()}`,
       `Escopo: ${escopoLabel}`,

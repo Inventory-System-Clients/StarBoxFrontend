@@ -52,7 +52,7 @@ const montarMensagemDetalhesManutencao = (detalhe) => {
   const descricao = detalhe?.descricao || "-";
 
   return [
-    "STAR TOYS",
+    "STAR BOX",
     "*Detalhes da Manutenção*",
     "___________________________________",
     `Descrição: ${descricao}`,

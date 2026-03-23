@@ -307,7 +307,7 @@ export default function MovimentacaoMaquina() {
     const nomeMaquina = maquina?.nome || "Máquina";
 
     const mensagem = [
-      "STAR TOYS",
+      "STAR BOX",
       `*${lojaCodigo} | ${lojaNome}*`,
       `Data: ${dataMovimentacao}`,
       `Lançado por: ${nomeUsuario}`,

@@ -93,7 +93,7 @@ export default function ManutencaoModal({
     const usuarioAcao = usuarioNome || `ID ${usuarioId || "-"}`;
 
     return [
-      "STAR TOYS",
+      "STAR BOX",
       "*Atualização de Manutenção*",
       `Data/Hora: ${dataHora}`,
       `Loja: ${lojaNome}`,
