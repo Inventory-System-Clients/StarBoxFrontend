@@ -119,7 +119,10 @@ export function UsuarioForm() {
         telefone: formData.telefone,
         role: formData.role,
         lojasPermitidas:
-          formData.role === "FUNCIONARIO" ? formData.lojasPermitidas : [],
+          formData.role === "FUNCIONARIO" ||
+          formData.role === "CONTROLADOR_ESTOQUE"
+            ? formData.lojasPermitidas
+            : [],
       };
 
       // Só incluir senha se foi preenchida
@@ -311,8 +314,9 @@ export function UsuarioForm() {
               </div>
             </div>
 
-            {/* Lojas Permitidas (apenas para Funcionários) */}
-            {formData.role === "FUNCIONARIO" && (
+            {/* Lojas Permitidas (para Funcionários e Controlador de Estoque) */}
+            {(formData.role === "FUNCIONARIO" ||
+              formData.role === "CONTROLADOR_ESTOQUE") && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Lojas Autorizadas *

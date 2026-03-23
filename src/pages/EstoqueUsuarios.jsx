@@ -4,6 +4,11 @@ import Footer from "../components/Footer.jsx";
 import api from "../services/api";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
+// IDs de usuários/lojas que o CONTROLADOR_ESTOQUE pode ver (exemplo, adapte para sua regra)
+const IDS_PERMITIDOS_CONTROLADOR = [
+  // Exemplo: 'uuid-usuario-1', 'uuid-usuario-2'
+];
+
 const ROLES_GESTAO_ESTOQUE = ["ADMIN", "CONTROLADOR_ESTOQUE"];
 
 const toNumberOrZero = (value) => {
@@ -31,7 +36,9 @@ const formatarDataHora = (valor) => {
 
 export default function EstoqueUsuarios() {
   const { usuario } = useAuth();
-  const isGestorEstoque = ROLES_GESTAO_ESTOQUE.includes(usuario?.role);
+  const isAdmin = usuario?.role === "ADMIN";
+  const isControlador = usuario?.role === "CONTROLADOR_ESTOQUE";
+  const isGestorEstoque = isAdmin || isControlador;
 
   const [usuarios, setUsuarios] = useState([]);
   const [produtos, setProdutos] = useState([]);
@@ -157,6 +164,7 @@ export default function EstoqueUsuarios() {
         setSuccess("");
 
         const requisicoes = [api.get("/produtos")];
+
         if (isGestorEstoque) {
           requisicoes.push(api.get("/estoque-usuarios/usuarios"));
         }
@@ -168,10 +176,22 @@ export default function EstoqueUsuarios() {
         const produtosData = Array.isArray(resultados[0]?.data)
           ? resultados[0].data
           : [];
-        const usuariosData =
+
+        let usuariosData =
           isGestorEstoque && Array.isArray(resultados[1]?.data)
             ? resultados[1].data
             : [];
+
+        // Se for CONTROLADOR_ESTOQUE (mas não ADMIN), filtra os usuários/lojas permitidos
+        if (
+          isControlador &&
+          !isAdmin &&
+          IDS_PERMITIDOS_CONTROLADOR.length > 0
+        ) {
+          usuariosData = usuariosData.filter((u) =>
+            IDS_PERMITIDOS_CONTROLADOR.includes(u.id),
+          );
+        }
 
         setProdutos(produtosData);
         setUsuarios(usuariosData);
@@ -494,16 +514,20 @@ export default function EstoqueUsuarios() {
     }
 
     // Verificar se há entradas e avisar sobre desconto do depósito
-    const temEntradas = movimentacoesForm.some(m => m.tipoMovimentacao === "entrada");
-    
+    const temEntradas = movimentacoesForm.some(
+      (m) => m.tipoMovimentacao === "entrada",
+    );
+
     if (temEntradas) {
-      const totalEntradas = movimentacoesForm.filter(m => m.tipoMovimentacao === "entrada").length;
+      const totalEntradas = movimentacoesForm.filter(
+        (m) => m.tipoMovimentacao === "entrada",
+      ).length;
       const confirmar = window.confirm(
         `📦 Você está adicionando ${totalEntradas} produto(s) para "${usuarioSelecionado?.nome}".\n\n` +
-        `🏭 Estes produtos serão AUTOMATICAMENTE DESCONTADOS do depósito principal.\n\n` +
-        `Confirma a entrada de estoque para o funcionário?`
+          `🏭 Estes produtos serão AUTOMATICAMENTE DESCONTADOS do depósito principal.\n\n` +
+          `Confirma a entrada de estoque para o funcionário?`,
       );
-      
+
       if (!confirmar) {
         return;
       }
@@ -1038,8 +1062,12 @@ export default function EstoqueUsuarios() {
                         Atenção
                       </p>
                       <p className="text-sm text-blue-800">
-                        Ao adicionar estoque para este funcionário (Entrada), os produtos serão{" "}
-                        <strong>automaticamente descontados do Depósito Principal</strong>.
+                        Ao adicionar estoque para este funcionário (Entrada), os
+                        produtos serão{" "}
+                        <strong>
+                          automaticamente descontados do Depósito Principal
+                        </strong>
+                        .
                       </p>
                     </div>
                   </div>

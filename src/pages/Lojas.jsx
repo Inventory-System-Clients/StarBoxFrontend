@@ -60,9 +60,25 @@ export function Lojas() {
   };
 
   const termoBusca = filtroNome.trim().toLowerCase();
-  const lojasFiltradas = lojas.filter((loja) =>
-    termoBusca ? loja.nome?.toLowerCase().includes(termoBusca) : true,
-  );
+
+  // IDs permitidos para o controlador de estoque
+  let idsPermitidos = [];
+  if (usuario?.role === "CONTROLADOR_ESTOQUE") {
+    // Tente pegar do campo lojasPermitidas (array de ids) ou permissoesLojas (array de objetos)
+    if (Array.isArray(usuario.lojasPermitidas) && usuario.lojasPermitidas.length > 0) {
+      idsPermitidos = usuario.lojasPermitidas;
+    } else if (Array.isArray(usuario.permissoesLojas) && usuario.permissoesLojas.length > 0) {
+      idsPermitidos = usuario.permissoesLojas.map((p) => p.lojaId || p.id);
+    }
+  }
+
+  const lojasFiltradas = lojas.filter((loja) => {
+    // Se for controlador, só mostra as permitidas
+    if (usuario?.role === "CONTROLADOR_ESTOQUE" && idsPermitidos.length > 0) {
+      if (!idsPermitidos.includes(loja.id)) return false;
+    }
+    return termoBusca ? loja.nome?.toLowerCase().includes(termoBusca) : true;
+  });
 
   const headers = [
     {

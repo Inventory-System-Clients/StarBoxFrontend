@@ -151,24 +151,30 @@ export function Dashboard() {
         setMovimentacaoEnviando(false);
         return;
       }
-      
+
       // Verificar se há entradas e se não é o depósito principal
-      const lojaSelecionada = lojas?.find(l => l.id === movimentacaoLojaId);
-      const temEntradas = produtosValidos.some(p => p.tipoMovimentacao === "entrada");
-      
-      if (temEntradas && lojaSelecionada && !lojaSelecionada.isDepositoPrincipal) {
+      const lojaSelecionada = lojas?.find((l) => l.id === movimentacaoLojaId);
+      const temEntradas = produtosValidos.some(
+        (p) => p.tipoMovimentacao === "entrada",
+      );
+
+      if (
+        temEntradas &&
+        lojaSelecionada &&
+        !lojaSelecionada.isDepositoPrincipal
+      ) {
         const confirmar = window.confirm(
-          `📦 Você está adicionando ${produtosValidos.filter(p => p.tipoMovimentacao === "entrada").length} produto(s) em "${lojaSelecionada.nome}".\n\n` +
-          `🏭 Estes produtos serão AUTOMATICAMENTE DESCONTADOS do depósito principal.\n\n` +
-          `Confirma a entrada de estoque?`
+          `📦 Você está adicionando ${produtosValidos.filter((p) => p.tipoMovimentacao === "entrada").length} produto(s) em "${lojaSelecionada.nome}".\n\n` +
+            `🏭 Estes produtos serão AUTOMATICAMENTE DESCONTADOS do depósito principal.\n\n` +
+            `Confirma a entrada de estoque?`,
         );
-        
+
         if (!confirmar) {
           setMovimentacaoEnviando(false);
           return;
         }
       }
-      
+
       const payload = {
         lojaId: movimentacaoLojaId,
         usuarioId: usuario?.id,
@@ -211,7 +217,7 @@ export function Dashboard() {
 
   // Faz o reload só depois que o modal sumiu
   // (removido reloadAfterModal/useEffect pois reload é imediato)
-  
+
   const { usuario } = useAuth();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
   const [stats, setStats] = useState({
@@ -223,7 +229,7 @@ export function Dashboard() {
   // Estados para busca e navegação
 
   const [movimentacoes, setMovimentacoes] = useState([]);
-  
+
   // Estados para modal de edição de movimentações
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [movimentacaoParaEditar, setMovimentacaoParaEditar] = useState(null);
@@ -251,8 +257,8 @@ export function Dashboard() {
   const atualizarMovimentacao = (movimentacaoAtualizada) => {
     setMovimentacoes((prev) =>
       prev.map((mov) =>
-        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov
-      )
+        mov.id === movimentacaoAtualizada.id ? movimentacaoAtualizada : mov,
+      ),
     );
   };
 
@@ -409,7 +415,28 @@ export function Dashboard() {
         balanco: balancoData,
         loading: false,
       });
-      setLojas(lojasRes.data || []);
+      // Filtrar lojas permitidas para CONTROLADOR_ESTOQUE
+      let lojasVisiveis = lojasRes.data || [];
+      if (usuario?.role === "CONTROLADOR_ESTOQUE") {
+        let idsPermitidos = [];
+        if (
+          Array.isArray(usuario.lojasPermitidas) &&
+          usuario.lojasPermitidas.length > 0
+        ) {
+          idsPermitidos = usuario.lojasPermitidas;
+        } else if (
+          Array.isArray(usuario.permissoesLojas) &&
+          usuario.permissoesLojas.length > 0
+        ) {
+          idsPermitidos = usuario.permissoesLojas.map((p) => p.lojaId || p.id);
+        }
+        if (idsPermitidos.length > 0) {
+          lojasVisiveis = lojasVisiveis.filter((l) =>
+            idsPermitidos.includes(l.id),
+          );
+        }
+      }
+      setLojas(lojasVisiveis);
       setMaquinas(maquinasRes.data || []);
       setProdutos(produtosRes.data || []);
 
@@ -444,10 +471,10 @@ export function Dashboard() {
     };
 
     carregarRevisoes();
-    
+
     // Atualizar a cada 5 minutos
     const interval = setInterval(carregarRevisoes, 5 * 60 * 1000);
-    
+
     return () => clearInterval(interval);
   }, [usuario?.role]);
 
@@ -1303,12 +1330,33 @@ export function Dashboard() {
     }
   };
 
-  // Filtrar lojas conforme busca
-  const lojasFiltradas = lojas.filter(
+  // Filtrar lojas conforme busca e garantir restrição para CONTROLADOR_ESTOQUE
+  let lojasFiltradas = lojas.filter(
     (loja) =>
       loja.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loja.endereco?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
+
+  // Restrição extra para CONTROLADOR_ESTOQUE (defensivo)
+  if (usuario?.role === "CONTROLADOR_ESTOQUE") {
+    let idsPermitidos = [];
+    if (
+      Array.isArray(usuario.lojasPermitidas) &&
+      usuario.lojasPermitidas.length > 0
+    ) {
+      idsPermitidos = usuario.lojasPermitidas;
+    } else if (
+      Array.isArray(usuario.permissoesLojas) &&
+      usuario.permissoesLojas.length > 0
+    ) {
+      idsPermitidos = usuario.permissoesLojas.map((p) => p.lojaId || p.id);
+    }
+    if (idsPermitidos.length > 0) {
+      lojasFiltradas = lojasFiltradas.filter((l) =>
+        idsPermitidos.includes(l.id),
+      );
+    }
+  }
 
   // Máquinas da loja selecionada
   const maquinasDaLoja = lojaSelecionada
@@ -1357,8 +1405,12 @@ export function Dashboard() {
                     Atenção
                   </p>
                   <p className="text-sm text-blue-800">
-                    Ao adicionar estoque em uma loja (Entrada), os produtos serão{" "}
-                    <strong>automaticamente descontados do Depósito Principal</strong>.
+                    Ao adicionar estoque em uma loja (Entrada), os produtos
+                    serão{" "}
+                    <strong>
+                      automaticamente descontados do Depósito Principal
+                    </strong>
+                    .
                   </p>
                 </div>
               </div>
@@ -1417,7 +1469,7 @@ export function Dashboard() {
                   ))}
                 </select>
               </div>
-              
+
               {/* Loop dos Produtos */}
               {produtosMovimentacao.map((p, idx) => (
                 <div key={idx} className="flex gap-2 mb-2 items-center">
@@ -1425,11 +1477,7 @@ export function Dashboard() {
                   <select
                     value={p.produtoId}
                     onChange={(e) =>
-                      handleProdutoChange(
-                        idx,
-                        "produtoId",
-                        e.target.value,
-                      )
+                      handleProdutoChange(idx, "produtoId", e.target.value)
                     }
                     className="input-field flex-1"
                     required
@@ -1448,11 +1496,7 @@ export function Dashboard() {
                     min="1"
                     value={p.quantidade}
                     onChange={(e) =>
-                      handleProdutoChange(
-                        idx,
-                        "quantidade",
-                        e.target.value,
-                      )
+                      handleProdutoChange(idx, "quantidade", e.target.value)
                     }
                     placeholder="Qtd"
                     className="input-field w-20"
@@ -1567,7 +1611,6 @@ export function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            
             <button
               onClick={carregarDados}
               className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
@@ -1932,7 +1975,7 @@ export function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-            {!isFuncionario && (
+            {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
               <div
                 className="stat-card bg-linear-to-br from-gray-700 to-gray-900 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
                 onClick={() => navigate("/veiculos")}
@@ -2061,7 +2104,8 @@ export function Dashboard() {
                 Depósito Principal
               </h2>
               <p className="text-gray-600 text-sm sm:text-base">
-                Gerencie o estoque central do sistema. Todo estoque distribuído para lojas e funcionários é descontado automaticamente daqui.
+                Gerencie o estoque central do sistema. Todo estoque distribuído
+                para lojas e funcionários é descontado automaticamente daqui.
               </p>
             </div>
             <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
@@ -2075,7 +2119,7 @@ export function Dashboard() {
           </div>
         )}
 
-        {!isFuncionario && (
+        {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
           <div className="card-gradient mb-8 border-l-4 border-gray-700 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
@@ -2085,7 +2129,8 @@ export function Dashboard() {
                 Revisões de Veículos
               </h2>
               <p className="text-gray-600 text-sm sm:text-base">
-                Acompanhe e gerencie as revisões periódicas de todos os veículos da frota.
+                Acompanhe e gerencie as revisões periódicas de todos os veículos
+                da frota.
               </p>
             </div>
             <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
@@ -2100,70 +2145,74 @@ export function Dashboard() {
         )}
 
         {/* Card de Revisões Pendentes */}
-        {!isFuncionario && revisoesPendentes.length > 0 && (
-          <div className="card-gradient mb-8 border-l-4 border-red-500 p-4 sm:p-8 rounded-xl shadow-md">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                  <span className="bg-linear-to-br from-red-500 to-red-600 p-2 sm:p-3 rounded-xl text-white">
-                    🔧
-                  </span>
-                  Revisões de Veículos Pendentes
-                </h2>
-                <p className="text-gray-600 text-sm sm:text-base mb-4">
-                  {revisoesPendentes.length}{" "}
-                  {revisoesPendentes.length === 1
-                    ? "veículo precisa"
-                    : "veículos precisam"}{" "}
-                  de revisão
-                </p>
-                
-                <div className="space-y-2">
-                  {revisoesPendentes.slice(0, 3).map((revisao) => (
-                    <div
-                      key={revisao.veiculoId}
-                      className="bg-white/50 rounded-lg p-3 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">🚗</span>
-                        <div>
-                          <p className="font-bold text-gray-900">
-                            {revisao.veiculoNome}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            KM Atual: {revisao.kmAtual.toLocaleString("pt-BR")}{" "}
-                            | Revisão devida: {revisao.kmRevisaoDevida.toLocaleString("pt-BR")}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                        Atrasada
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                
-                {revisoesPendentes.length > 3 && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    + {revisoesPendentes.length - 3} mais{" "}
-                    {revisoesPendentes.length - 3 === 1
-                      ? "veículo"
-                      : "veículos"}
+        {!isFuncionario &&
+          usuario?.role !== "CONTROLADOR_ESTOQUE" &&
+          revisoesPendentes.length > 0 && (
+            <div className="card-gradient mb-8 border-l-4 border-red-500 p-4 sm:p-8 rounded-xl shadow-md">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                    <span className="bg-linear-to-br from-red-500 to-red-600 p-2 sm:p-3 rounded-xl text-white">
+                      🔧
+                    </span>
+                    Revisões de Veículos Pendentes
+                  </h2>
+                  <p className="text-gray-600 text-sm sm:text-base mb-4">
+                    {revisoesPendentes.length}{" "}
+                    {revisoesPendentes.length === 1
+                      ? "veículo precisa"
+                      : "veículos precisam"}{" "}
+                    de revisão
                   </p>
-                )}
-              </div>
-              
-              <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
-                <button
-                  className="bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
-                  onClick={() => navigate("/veiculos/revisoes-pendentes")}
-                >
-                  <span className="text-2xl">🔧</span> Ver Revisões
-                </button>
+
+                  <div className="space-y-2">
+                    {revisoesPendentes.slice(0, 3).map((revisao) => (
+                      <div
+                        key={revisao.veiculoId}
+                        className="bg-white/50 rounded-lg p-3 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">🚗</span>
+                          <div>
+                            <p className="font-bold text-gray-900">
+                              {revisao.veiculoNome}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              KM Atual:{" "}
+                              {revisao.kmAtual.toLocaleString("pt-BR")} |
+                              Revisão devida:{" "}
+                              {revisao.kmRevisaoDevida.toLocaleString("pt-BR")}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                          Atrasada
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {revisoesPendentes.length > 3 && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      + {revisoesPendentes.length - 3} mais{" "}
+                      {revisoesPendentes.length - 3 === 1
+                        ? "veículo"
+                        : "veículos"}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-col items-end">
+                  <button
+                    className="bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-2 rounded-lg shadow transition-colors flex items-center gap-2"
+                    onClick={() => navigate("/veiculos/revisoes-pendentes")}
+                  >
+                    <span className="text-2xl">🔧</span> Ver Revisões
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         {usuario?.role === "ADMIN" && <DashboardGastosRoteirosTab />}
 
@@ -2289,7 +2338,10 @@ export function Dashboard() {
             <div className="mb-6 flex justify-center">
               <button
                 onClick={() => {
-                  buscaLojasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  buscaLojasRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 }}
                 className="bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all flex items-center gap-3 text-lg"
               >
@@ -2413,57 +2465,85 @@ export function Dashboard() {
 
               <div className="space-y-4">
                 {lojasComEstoque
-                  .filter((loja) => 
-                    loja.nome.toLowerCase().includes(filtroEstoqueLoja.toLowerCase())
+                  .filter((loja) =>
+                    loja.nome
+                      .toLowerCase()
+                      .includes(filtroEstoqueLoja.toLowerCase()),
                   )
                   .map((loja) => (
-                  <div
-                    key={loja.id}
-                    className="border-2 border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors"
-                  >
-                    {/* Header - sempre visível */}
-                    <div className="p-5 bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div
-                          className="flex items-center gap-4 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => toggleLojaEstoque(loja.id)}
-                        >
-                          <span className="text-3xl">🏪</span>
-                          <div>
-                            <h3 className="font-bold text-gray-900 text-lg">
-                              {loja.nome}
-                            </h3>
-                            <p className="text-sm text-gray-600 mt-1">
-                              <span className="font-semibold">
-                                {loja.totalProdutos}
-                              </span>{" "}
-                              {loja.totalProdutos === 1
-                                ? "produto"
-                                : "produtos"}{" "}
-                              ·{" "}
-                              <span className="font-semibold">
-                                {loja.totalUnidades}
-                              </span>{" "}
-                              unidades totais
-                            </p>
-                            {loja.endereco && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                📍 {loja.endereco}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              imprimirRelatorioLoja(loja);
-                            }}
-                            className="w-full sm:w-auto px-3 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-medium text-sm flex items-center justify-center gap-2 wrap-break-word"
-                            style={{ minWidth: 0, maxWidth: "100%" }}
+                    <div
+                      key={loja.id}
+                      className="border-2 border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors"
+                    >
+                      {/* Header - sempre visível */}
+                      <div className="p-5 bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div
+                            className="flex items-center gap-4 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => toggleLojaEstoque(loja.id)}
                           >
+                            <span className="text-3xl">🏪</span>
+                            <div>
+                              <h3 className="font-bold text-gray-900 text-lg">
+                                {loja.nome}
+                              </h3>
+                              <p className="text-sm text-gray-600 mt-1">
+                                <span className="font-semibold">
+                                  {loja.totalProdutos}
+                                </span>{" "}
+                                {loja.totalProdutos === 1
+                                  ? "produto"
+                                  : "produtos"}{" "}
+                                ·{" "}
+                                <span className="font-semibold">
+                                  {loja.totalUnidades}
+                                </span>{" "}
+                                unidades totais
+                              </p>
+                              {loja.endereco && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  📍 {loja.endereco}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                imprimirRelatorioLoja(loja);
+                              }}
+                              className="w-full sm:w-auto px-3 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-medium text-sm flex items-center justify-center gap-2 wrap-break-word"
+                              style={{ minWidth: 0, maxWidth: "100%" }}
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                                />
+                              </svg>
+                              Imprimir
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                abrirEdicaoEstoque(loja);
+                              }}
+                              className="px-4 py-2 bg-primary text-black rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm flex items-center gap-2"
+                            >
+                              ✏️ Editar Estoque
+                            </button>
                             <svg
-                              className="w-4 h-4"
+                              className={`w-6 h-6 text-gray-500 transition-transform ${
+                                lojaEstoqueExpanded[loja.id] ? "rotate-180" : ""
+                              }`}
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -2472,168 +2552,142 @@ export function Dashboard() {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                                d="M19 9l-7 7-7-7"
                               />
                             </svg>
-                            Imprimir
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              abrirEdicaoEstoque(loja);
-                            }}
-                            className="px-4 py-2 bg-primary text-black rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm flex items-center gap-2"
-                          >
-                            ✏️ Editar Estoque
-                          </button>
-                          <svg
-                            className={`w-6 h-6 text-gray-500 transition-transform ${
-                              lojaEstoqueExpanded[loja.id] ? "rotate-180" : ""
-                            }`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Conteúdo - expansível */}
-                    {lojaEstoqueExpanded[loja.id] && (
-                      <div className="p-5 bg-white border-t-2 border-gray-100">
-                        {loja.estoque.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {loja.estoque
-                              .sort((a, b) => b.quantidade - a.quantidade)
-                              .map((item) => {
-                                const abaixoDoMinimo =
-                                  item.estoqueMinimo > 0 &&
-                                  item.quantidade < item.estoqueMinimo;
+                      {/* Conteúdo - expansível */}
+                      {lojaEstoqueExpanded[loja.id] && (
+                        <div className="p-5 bg-white border-t-2 border-gray-100">
+                          {loja.estoque.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {loja.estoque
+                                .sort((a, b) => b.quantidade - a.quantidade)
+                                .map((item) => {
+                                  const abaixoDoMinimo =
+                                    item.estoqueMinimo > 0 &&
+                                    item.quantidade < item.estoqueMinimo;
 
-                                return (
-                                  <div
-                                    key={item.id}
-                                    className={`p-4 rounded-lg border-2 hover:shadow-md transition-all ${
-                                      abaixoDoMinimo
-                                        ? "bg-red-50 border-red-300 shadow-md"
-                                        : "bg-gray-50 border-gray-200 hover:border-gray-300"
-                                    }`}
-                                  >
-                                    <div className="flex items-start gap-3 mb-3">
-                                      <span className="text-3xl">
-                                        {item.produto.emoji || "📦"}
-                                      </span>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          <p className="font-bold text-gray-900 text-base truncate">
-                                            {item.produto.nome}
-                                          </p>
-                                          {abaixoDoMinimo && (
-                                            <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                                              ⚠️
-                                            </span>
-                                          )}
-                                        </div>
-                                        {item.produto.codigo && (
-                                          <p className="text-xs text-gray-500 mt-1">
-                                            Cód: {item.produto.codigo}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
+                                  return (
                                     <div
-                                      className={`flex items-end justify-between mt-3 pt-3 border-t ${
+                                      key={item.id}
+                                      className={`p-4 rounded-lg border-2 hover:shadow-md transition-all ${
                                         abaixoDoMinimo
-                                          ? "border-red-200"
-                                          : "border-gray-200"
+                                          ? "bg-red-50 border-red-300 shadow-md"
+                                          : "bg-gray-50 border-gray-200 hover:border-gray-300"
                                       }`}
                                     >
-                                      <div>
-                                        <p
-                                          className={`text-xs mb-1 ${
-                                            abaixoDoMinimo
-                                              ? "text-red-700 font-semibold"
-                                              : "text-gray-600"
-                                          }`}
-                                        >
-                                          Quantidade
-                                        </p>
-                                        <span
-                                          className={`text-3xl font-bold ${
-                                            abaixoDoMinimo
-                                              ? "text-red-600"
-                                              : "text-gray-900"
-                                          }`}
-                                        >
-                                          {item.quantidade}
+                                      <div className="flex items-start gap-3 mb-3">
+                                        <span className="text-3xl">
+                                          {item.produto.emoji || "📦"}
                                         </span>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            <p className="font-bold text-gray-900 text-base truncate">
+                                              {item.produto.nome}
+                                            </p>
+                                            {abaixoDoMinimo && (
+                                              <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                                                ⚠️
+                                              </span>
+                                            )}
+                                          </div>
+                                          {item.produto.codigo && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                              Cód: {item.produto.codigo}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
-                                      <div className="text-right">
-                                        <p
-                                          className={`text-xs mb-1 ${
-                                            abaixoDoMinimo
-                                              ? "text-red-700 font-semibold"
-                                              : "text-gray-600"
-                                          }`}
-                                        >
-                                          Estoque mín.
-                                        </p>
-                                        <span
-                                          className={`text-lg font-semibold ${
-                                            abaixoDoMinimo
-                                              ? "text-red-600"
-                                              : "text-gray-600"
-                                          }`}
-                                        >
-                                          {item.estoqueMinimo}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    {abaixoDoMinimo && (
-                                      <div className="mt-3 p-2 bg-red-100 rounded-lg border border-red-200">
-                                        <p className="text-xs text-red-800 font-semibold flex items-center gap-1">
-                                          <svg
-                                            className="w-4 h-4"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
+                                      <div
+                                        className={`flex items-end justify-between mt-3 pt-3 border-t ${
+                                          abaixoDoMinimo
+                                            ? "border-red-200"
+                                            : "border-gray-200"
+                                        }`}
+                                      >
+                                        <div>
+                                          <p
+                                            className={`text-xs mb-1 ${
+                                              abaixoDoMinimo
+                                                ? "text-red-700 font-semibold"
+                                                : "text-gray-600"
+                                            }`}
                                           >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
-                                          Estoque abaixo do mínimo!
-                                        </p>
+                                            Quantidade
+                                          </p>
+                                          <span
+                                            className={`text-3xl font-bold ${
+                                              abaixoDoMinimo
+                                                ? "text-red-600"
+                                                : "text-gray-900"
+                                            }`}
+                                          >
+                                            {item.quantidade}
+                                          </span>
+                                        </div>
+                                        <div className="text-right">
+                                          <p
+                                            className={`text-xs mb-1 ${
+                                              abaixoDoMinimo
+                                                ? "text-red-700 font-semibold"
+                                                : "text-gray-600"
+                                            }`}
+                                          >
+                                            Estoque mín.
+                                          </p>
+                                          <span
+                                            className={`text-lg font-semibold ${
+                                              abaixoDoMinimo
+                                                ? "text-red-600"
+                                                : "text-gray-600"
+                                            }`}
+                                          >
+                                            {item.estoqueMinimo}
+                                          </span>
+                                        </div>
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <p className="text-5xl mb-3">📭</p>
-                            <p className="text-gray-500 font-medium">
-                              Nenhum produto no estoque
-                            </p>
-                            <p className="text-sm text-gray-400 mt-1">
-                              Clique em "Editar Estoque" acima para adicionar
-                              produtos
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                                      {abaixoDoMinimo && (
+                                        <div className="mt-3 p-2 bg-red-100 rounded-lg border border-red-200">
+                                          <p className="text-xs text-red-800 font-semibold flex items-center gap-1">
+                                            <svg
+                                              className="w-4 h-4"
+                                              fill="currentColor"
+                                              viewBox="0 0 20 20"
+                                            >
+                                              <path
+                                                fillRule="evenodd"
+                                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                                clipRule="evenodd"
+                                              />
+                                            </svg>
+                                            Estoque abaixo do mínimo!
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          ) : (
+                            <div className="text-center py-12">
+                              <p className="text-5xl mb-3">📭</p>
+                              <p className="text-gray-500 font-medium">
+                                Nenhum produto no estoque
+                              </p>
+                              <p className="text-sm text-gray-400 mt-1">
+                                Clique em "Editar Estoque" acima para adicionar
+                                produtos
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
               </div>
             </div>
           </>
@@ -2642,555 +2696,563 @@ export function Dashboard() {
         {/* Busca de Lojas e Máquinas */}
         {!isFuncionario && (
           <div ref={buscaLojasRef} className="card-gradient mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <span className="text-3xl">🔍</span>
-            Buscar Lojas e Máquinas
-          </h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <span className="text-3xl">🔍</span>
+              Buscar Lojas e Máquinas
+            </h2>
 
-          {/* Breadcrumb de Navegação */}
-          {(lojaSelecionada || maquinaSelecionada) && (
-            <div className="mb-6 flex items-center gap-2 text-sm">
-              <button
-                onClick={handleVoltar}
-                className="text-primary hover:text-primary/80 font-semibold flex items-center gap-1"
-              >
-                ← Voltar
-              </button>
-              <span className="text-gray-400">/</span>
-              {lojaSelecionada && (
-                <>
-                  <span className="text-gray-700 font-semibold">
-                    {lojaSelecionada.nome}
-                  </span>
-                  <button
-                    className="ml-3 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition font-semibold flex items-center gap-2"
-                    onClick={handleGerarPdfComissao}
-                  >
-                    Gerar PDF Comissão
-                  </button>
-                  {maquinaSelecionada && (
-                    <>
-                      <span className="text-gray-400">/</span>
-                      <span className="text-gray-700 font-semibold">
-                        {maquinaSelecionada.codigo} - {maquinaSelecionada.nome}
-                      </span>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Barra de Pesquisa - Visível apenas quando não há seleção */}
-          {!lojaSelecionada && !maquinaSelecionada && (
-            <div className="relative mb-6">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Digite o nome da loja ou endereço..."
-                className="w-full input-field pl-12 text-lg"
-              />
-              <svg
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-          )}
-
-          {/* Lista de Lojas Filtradas */}
-          {!lojaSelecionada && !maquinaSelecionada && (
-            <div className="space-y-3">
-              {lojasFiltradas.length > 0 ? (
-                lojasFiltradas.map((loja) => {
-                  const qtdMaquinas = maquinas.filter(
-                    (m) => m.lojaId === loja.id,
-                  ).length;
-                  return (
-                    <div
-                      key={loja.id}
-                      onClick={() => handleSelecionarLoja(loja)}
-                      className="p-5 border-2 border-gray-200 rounded-xl hover:border-primary hover:shadow-lg transition-all cursor-pointer bg-white"
+            {/* Breadcrumb de Navegação */}
+            {(lojaSelecionada || maquinaSelecionada) && (
+              <div className="mb-6 flex items-center gap-2 text-sm">
+                <button
+                  onClick={handleVoltar}
+                  className="text-primary hover:text-primary/80 font-semibold flex items-center gap-1"
+                >
+                  ← Voltar
+                </button>
+                <span className="text-gray-400">/</span>
+                {lojaSelecionada && (
+                  <>
+                    <span className="text-gray-700 font-semibold">
+                      {lojaSelecionada.nome}
+                    </span>
+                    <button
+                      className="ml-3 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition font-semibold flex items-center gap-2"
+                      onClick={handleGerarPdfComissao}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-gray-900 mb-1">
-                            🏪 {loja.nome}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            📍 {loja.endereco || "Endereço não cadastrado"}
-                          </p>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
-                              {qtdMaquinas}{" "}
-                              {qtdMaquinas === 1 ? "máquina" : "máquinas"}
-                            </span>
-                            {loja.ativo && (
-                              <Badge variant="success">Ativa</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <svg
-                          className="w-6 h-6 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-6xl mb-4">🔍</p>
-                  <p className="text-gray-600">
-                    {searchTerm
-                      ? "Nenhuma loja encontrada"
-                      : "Digite para buscar lojas"}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Lista de Máquinas da Loja */}
-          {lojaSelecionada && !maquinaSelecionada && (
-            <div className="space-y-3">
-              {maquinasDaLoja.length > 0 ? (
-                maquinasDaLoja.map((maquina) => {
-                  console.log("Dados da máquina:", maquina);
-                  if (maquina.movimentacoes) {
-                    console.log(
-                      `Movimentações da máquina ${maquina.codigo}:`,
-                      maquina.movimentacoes,
-                    );
-                  }
-                  if (maquina.sairam !== undefined) {
-                    console.log(
-                      `Saíram da máquina ${maquina.codigo}:`,
-                      maquina.sairam,
-                    );
-                  }
-                  return (
-                    <div
-                      key={maquina.id}
-                      onClick={() => handleSelecionarMaquina(maquina)}
-                      className="p-5 border-2 border-gray-200 rounded-xl hover:border-primary hover:shadow-lg transition-all cursor-pointer bg-white"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-gray-900 mb-1">
-                            🎰 {maquina.codigo} - {maquina.nome}
-                          </h3>
-                          <div className="flex items-center gap-4 mt-2">
-                            {maquina.tipo && (
-                              <span className="text-xs text-gray-600">
-                                Tipo: {maquina.tipo}
-                              </span>
-                            )}
-                            <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">
-                              Capacidade: {maquina.capacidadePadrao || 0}
-                            </span>
-                            {maquina.ativo && (
-                              <Badge variant="success">Ativa</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <svg
-                          className="w-6 h-6 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-6xl mb-4">🎰</p>
-                  <p className="text-gray-600">
-                    Nenhuma máquina cadastrada nesta loja
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Detalhes da Máquina Selecionada */}
-          {maquinaSelecionada && (
-            <div className="space-y-6">
-              {/* Informações da Máquina */}
-              <div className="bg-linear-to-br from-primary/10 to-secondary/10 p-6 rounded-xl">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">
-                  📊 Informações da Máquina
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Código</p>
-                    <p className="text-lg font-semibold">
-                      {maquinaSelecionada.codigo}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Nome</p>
-                    <p className="text-lg font-semibold">
-                      {maquinaSelecionada.nome}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Tipo</p>
-                    <p className="text-lg font-semibold">
-                      {maquinaSelecionada.ultimoProduto ? (
-                        <span className="flex items-center gap-2">
-                          <span>
-                            {maquinaSelecionada.ultimoProduto.emoji || "🧸"}
-                          </span>
-                          <span>{maquinaSelecionada.ultimoProduto.nome}</span>
+                      Gerar PDF Comissão
+                    </button>
+                    {maquinaSelecionada && (
+                      <>
+                        <span className="text-gray-400">/</span>
+                        <span className="text-gray-700 font-semibold">
+                          {maquinaSelecionada.codigo} -{" "}
+                          {maquinaSelecionada.nome}
                         </span>
-                      ) : (
-                        maquinaSelecionada.tipo || "-"
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Capacidade</p>
-                    <p className="text-lg font-semibold">
-                      {maquinaSelecionada.capacidadePadrao || 0}
-                    </p>
-                  </div>
-                  {usuario?.role === "ADMIN" && (
-                    <div>
-                      <p className="text-sm text-gray-600">Estoque Atual</p>
-                      <p className="text-lg font-semibold">
-                        {maquinaSelecionada.estoqueAtual || 0}
-                      </p>
-                    </div>
-                  )}
-                  {maquinaSelecionada.valorFicha && (
-                    <div>
-                      <p className="text-sm text-gray-600">Valor da Ficha</p>
-                      <p className="text-lg font-semibold">
-                        R${" "}
-                        {parseFloat(maquinaSelecionada.valorFicha).toFixed(2)}
-                      </p>
-                    </div>
-                  )}
-                  {maquinaSelecionada.fichasNecessarias && (
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        🎫 Fichas para Jogar
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {maquinaSelecionada.fichasNecessarias}{" "}
-                        {maquinaSelecionada.fichasNecessarias === 1
-                          ? "ficha"
-                          : "fichas"}
-                      </p>
-                    </div>
-                  )}
-                  {maquinaSelecionada.forcaForte !== null &&
-                    maquinaSelecionada.forcaForte !== undefined && (
-                      <div>
-                        <p className="text-sm text-gray-600">💪 Força Forte</p>
-                        <p className="text-lg font-semibold">
-                          {maquinaSelecionada.forcaForte}%
-                        </p>
-                      </div>
+                      </>
                     )}
-                  {maquinaSelecionada.forcaFraca !== null &&
-                    maquinaSelecionada.forcaFraca !== undefined && (
-                      <div>
-                        <p className="text-sm text-gray-600">🤏 Força Fraca</p>
-                        <p className="text-lg font-semibold">
-                          {maquinaSelecionada.forcaFraca}%
-                        </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Barra de Pesquisa - Visível apenas quando não há seleção */}
+            {!lojaSelecionada && !maquinaSelecionada && (
+              <div className="relative mb-6">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Digite o nome da loja ou endereço..."
+                  className="w-full input-field pl-12 text-lg"
+                />
+                <svg
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+            )}
+
+            {/* Lista de Lojas Filtradas */}
+            {!lojaSelecionada && !maquinaSelecionada && (
+              <div className="space-y-3">
+                {lojasFiltradas.length > 0 ? (
+                  lojasFiltradas.map((loja) => {
+                    const qtdMaquinas = maquinas.filter(
+                      (m) => m.lojaId === loja.id,
+                    ).length;
+                    return (
+                      <div
+                        key={loja.id}
+                        onClick={() => handleSelecionarLoja(loja)}
+                        className="p-5 border-2 border-gray-200 rounded-xl hover:border-primary hover:shadow-lg transition-all cursor-pointer bg-white"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">
+                              🏪 {loja.nome}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              📍 {loja.endereco || "Endereço não cadastrado"}
+                            </p>
+                            <div className="flex items-center gap-4 mt-2">
+                              <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
+                                {qtdMaquinas}{" "}
+                                {qtdMaquinas === 1 ? "máquina" : "máquinas"}
+                              </span>
+                              {loja.ativo && (
+                                <Badge variant="success">Ativa</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <svg
+                            className="w-6 h-6 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                        </div>
                       </div>
-                    )}
-                  {maquinaSelecionada.forcaPremium !== null &&
-                    maquinaSelecionada.forcaPremium !== undefined && (
-                      <div>
-                        <p className="text-sm text-gray-600">
-                          ⭐ Força Premium
-                        </p>
-                        <p className="text-lg font-semibold">
-                          {maquinaSelecionada.forcaPremium}%
-                        </p>
-                      </div>
-                    )}
-                  {maquinaSelecionada.jogadasPremium && (
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        🎮 Jogadas Premium
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {maquinaSelecionada.jogadasPremium}{" "}
-                        {maquinaSelecionada.jogadasPremium === 1
-                          ? "jogada"
-                          : "jogadas"}
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-gray-600">Status</p>
-                    <p className="text-lg font-semibold">
-                      {maquinaSelecionada.ativo ? (
-                        <Badge variant="success">Ativa</Badge>
-                      ) : (
-                        <Badge variant="danger">Inativa</Badge>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                {maquinaSelecionada.localizacao && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600">Localização</p>
-                    <p className="text-base text-gray-800">
-                      {maquinaSelecionada.localizacao}
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-6xl mb-4">🔍</p>
+                    <p className="text-gray-600">
+                      {searchTerm
+                        ? "Nenhuma loja encontrada"
+                        : "Digite para buscar lojas"}
                     </p>
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Movimentações - Apenas para ADMIN */}
-              {usuario?.role === "ADMIN" && (
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="text-2xl">🔄</span>
-                    Histórico de Movimentações
-                  </h3>
-
-                  {/* Filtros de Data */}
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          📅 Data Inicial
-                        </label>
-                        <input
-                          type="date"
-                          value={dataInicio}
-                          onChange={(e) => setDataInicio(e.target.value)}
-                          className="input-field w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          📅 Data Final
-                        </label>
-                        <input
-                          type="date"
-                          value={dataFim}
-                          onChange={(e) => setDataFim(e.target.value)}
-                          className="input-field w-full"
-                        />
-                      </div>
-                    </div>
-                    {(dataInicio || dataFim) && (
-                      <button
-                        onClick={() => {
-                          setDataInicio("");
-                          setDataFim("");
-                        }}
-                        className="mt-2 text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+            {/* Lista de Máquinas da Loja */}
+            {lojaSelecionada && !maquinaSelecionada && (
+              <div className="space-y-3">
+                {maquinasDaLoja.length > 0 ? (
+                  maquinasDaLoja.map((maquina) => {
+                    console.log("Dados da máquina:", maquina);
+                    if (maquina.movimentacoes) {
+                      console.log(
+                        `Movimentações da máquina ${maquina.codigo}:`,
+                        maquina.movimentacoes,
+                      );
+                    }
+                    if (maquina.sairam !== undefined) {
+                      console.log(
+                        `Saíram da máquina ${maquina.codigo}:`,
+                        maquina.sairam,
+                      );
+                    }
+                    return (
+                      <div
+                        key={maquina.id}
+                        onClick={() => handleSelecionarMaquina(maquina)}
+                        className="p-5 border-2 border-gray-200 rounded-xl hover:border-primary hover:shadow-lg transition-all cursor-pointer bg-white"
                       >
-                        ✕ Limpar filtros
-                      </button>
-                    )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">
+                              🎰 {maquina.codigo} - {maquina.nome}
+                            </h3>
+                            <div className="flex items-center gap-4 mt-2">
+                              {maquina.tipo && (
+                                <span className="text-xs text-gray-600">
+                                  Tipo: {maquina.tipo}
+                                </span>
+                              )}
+                              <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">
+                                Capacidade: {maquina.capacidadePadrao || 0}
+                              </span>
+                              {maquina.ativo && (
+                                <Badge variant="success">Ativa</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <svg
+                            className="w-6 h-6 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-6xl mb-4">🎰</p>
+                    <p className="text-gray-600">
+                      Nenhuma máquina cadastrada nesta loja
+                    </p>
                   </div>
-                  {loadingMaquina ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                      <p className="text-gray-600 mt-4">
-                        Carregando movimentações...
+                )}
+              </div>
+            )}
+
+            {/* Detalhes da Máquina Selecionada */}
+            {maquinaSelecionada && (
+              <div className="space-y-6">
+                {/* Informações da Máquina */}
+                <div className="bg-linear-to-br from-primary/10 to-secondary/10 p-6 rounded-xl">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">
+                    📊 Informações da Máquina
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Código</p>
+                      <p className="text-lg font-semibold">
+                        {maquinaSelecionada.codigo}
                       </p>
                     </div>
-                  ) : movimentacoes.length > 0 ? (
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {movimentacoes
-                        .filter((mov) => {
-                          const movData = new Date(mov.createdAt);
-                          const inicio = dataInicio
-                            ? new Date(dataInicio)
-                            : null;
-                          const fim = dataFim
-                            ? new Date(dataFim + "T23:59:59")
-                            : null;
-
-                          if (inicio && movData < inicio) return false;
-                          if (fim && movData > fim) return false;
-                          return true;
-                        })
-                        .map((mov) => (
-                          <div
-                            key={mov.id}
-                            className="p-4 border border-gray-200 rounded-lg bg-white"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <Badge
-                                variant={
-                                  mov.tipo === "entrada" ? "success" : "danger"
-                                }
-                              >
-                                {mov.tipo === "entrada"
-                                  ? "📥 Entrada"
-                                  : "📤 Saída"}
-                              </Badge>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-600">
-                                  {new Date(mov.createdAt).toLocaleDateString(
-                                    "pt-BR",
-                                  )}{" "}
-                                  às{" "}
-                                  {new Date(mov.createdAt).toLocaleTimeString(
-                                    "pt-BR",
-                                  )}
-                                </span>
-                                {podeEditar(mov) && (
-                                  <button
-                                    onClick={() => abrirModalEdicao(mov)}
-                                    className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
-                                    title="Editar movimentação"
-                                  >
-                                    <svg
-                                      className="w-3 h-3"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                      />
-                                    </svg>
-                                    Editar
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-5 gap-4 mt-3 text-sm">
-                              <div>
-                                <p className="text-gray-600">Total Pré</p>
-                                <p className="font-semibold">
-                                  {mov.totalPre || 0}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Saíram</p>
-                                <p className="font-semibold text-red-600">
-                                  {mov.sairam || 0}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Abastecidas</p>
-                                <p className="font-semibold text-green-600">
-                                  {mov.abastecidas || 0}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600 flex items-center gap-1">
-                                  <span>📦</span> Total Atual
-                                </p>
-                                <p className="font-semibold text-purple-600">
-                                  {(mov.totalPre || 0) + (mov.abastecidas || 0)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600 flex items-center gap-1">
-                                  <span>🎫</span> Fichas
-                                </p>
-                                <p className="font-semibold text-blue-600">
-                                  {mov.fichas || 0}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Contadores da Máquina */}
-                            {(mov.contadorIn || mov.contadorOut) && (
-                              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">📥</span>
-                                  <div>
-                                    <p className="text-xs text-gray-600">
-                                      Contador IN
-                                    </p>
-                                    <p className="font-bold text-green-700">
-                                      {mov.contadorIn || "-"}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">📤</span>
-                                  <div>
-                                    <p className="text-xs text-gray-600">
-                                      Contador OUT
-                                    </p>
-                                    <p className="font-bold text-orange-700">
-                                      {mov.contadorOut || "-"}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Justificativa de Quebra de Ordem */}
-                            {mov.justificativa_ordem && (
-                              <div className="mt-3 pt-3 border-t border-orange-200 bg-orange-50 p-3 rounded-lg">
-                                <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1">
-                                  ⚠️ ORDEM DO ROTEIRO ALTERADA
-                                </p>
-                                <p className="text-sm text-orange-900">
-                                  <strong>Justificativa:</strong>{" "}
-                                  {mov.justificativa_ordem}
-                                </p>
-                              </div>
-                            )}
-
-                            {mov.observacoes && (
-                              <p className="text-sm text-gray-600 mt-3 italic">
-                                💬 {mov.observacoes}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+                    <div>
+                      <p className="text-sm text-gray-600">Nome</p>
+                      <p className="text-lg font-semibold">
+                        {maquinaSelecionada.nome}
+                      </p>
                     </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-6xl mb-4">📭</p>
-                      <p className="text-gray-600">
-                        Nenhuma movimentação registrada para esta máquina
+                    <div>
+                      <p className="text-sm text-gray-600">Tipo</p>
+                      <p className="text-lg font-semibold">
+                        {maquinaSelecionada.ultimoProduto ? (
+                          <span className="flex items-center gap-2">
+                            <span>
+                              {maquinaSelecionada.ultimoProduto.emoji || "🧸"}
+                            </span>
+                            <span>{maquinaSelecionada.ultimoProduto.nome}</span>
+                          </span>
+                        ) : (
+                          maquinaSelecionada.tipo || "-"
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Capacidade</p>
+                      <p className="text-lg font-semibold">
+                        {maquinaSelecionada.capacidadePadrao || 0}
+                      </p>
+                    </div>
+                    {usuario?.role === "ADMIN" && (
+                      <div>
+                        <p className="text-sm text-gray-600">Estoque Atual</p>
+                        <p className="text-lg font-semibold">
+                          {maquinaSelecionada.estoqueAtual || 0}
+                        </p>
+                      </div>
+                    )}
+                    {maquinaSelecionada.valorFicha && (
+                      <div>
+                        <p className="text-sm text-gray-600">Valor da Ficha</p>
+                        <p className="text-lg font-semibold">
+                          R${" "}
+                          {parseFloat(maquinaSelecionada.valorFicha).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                    {maquinaSelecionada.fichasNecessarias && (
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          🎫 Fichas para Jogar
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {maquinaSelecionada.fichasNecessarias}{" "}
+                          {maquinaSelecionada.fichasNecessarias === 1
+                            ? "ficha"
+                            : "fichas"}
+                        </p>
+                      </div>
+                    )}
+                    {maquinaSelecionada.forcaForte !== null &&
+                      maquinaSelecionada.forcaForte !== undefined && (
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            💪 Força Forte
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {maquinaSelecionada.forcaForte}%
+                          </p>
+                        </div>
+                      )}
+                    {maquinaSelecionada.forcaFraca !== null &&
+                      maquinaSelecionada.forcaFraca !== undefined && (
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            🤏 Força Fraca
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {maquinaSelecionada.forcaFraca}%
+                          </p>
+                        </div>
+                      )}
+                    {maquinaSelecionada.forcaPremium !== null &&
+                      maquinaSelecionada.forcaPremium !== undefined && (
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            ⭐ Força Premium
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {maquinaSelecionada.forcaPremium}%
+                          </p>
+                        </div>
+                      )}
+                    {maquinaSelecionada.jogadasPremium && (
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          🎮 Jogadas Premium
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {maquinaSelecionada.jogadasPremium}{" "}
+                          {maquinaSelecionada.jogadasPremium === 1
+                            ? "jogada"
+                            : "jogadas"}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-gray-600">Status</p>
+                      <p className="text-lg font-semibold">
+                        {maquinaSelecionada.ativo ? (
+                          <Badge variant="success">Ativa</Badge>
+                        ) : (
+                          <Badge variant="danger">Inativa</Badge>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  {maquinaSelecionada.localizacao && (
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-600">Localização</p>
+                      <p className="text-base text-gray-800">
+                        {maquinaSelecionada.localizacao}
                       </p>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Movimentações - Apenas para ADMIN */}
+                {usuario?.role === "ADMIN" && (
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <span className="text-2xl">🔄</span>
+                      Histórico de Movimentações
+                    </h3>
+
+                    {/* Filtros de Data */}
+                    <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            📅 Data Inicial
+                          </label>
+                          <input
+                            type="date"
+                            value={dataInicio}
+                            onChange={(e) => setDataInicio(e.target.value)}
+                            className="input-field w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            📅 Data Final
+                          </label>
+                          <input
+                            type="date"
+                            value={dataFim}
+                            onChange={(e) => setDataFim(e.target.value)}
+                            className="input-field w-full"
+                          />
+                        </div>
+                      </div>
+                      {(dataInicio || dataFim) && (
+                        <button
+                          onClick={() => {
+                            setDataInicio("");
+                            setDataFim("");
+                          }}
+                          className="mt-2 text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                        >
+                          ✕ Limpar filtros
+                        </button>
+                      )}
+                    </div>
+                    {loadingMaquina ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-gray-600 mt-4">
+                          Carregando movimentações...
+                        </p>
+                      </div>
+                    ) : movimentacoes.length > 0 ? (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {movimentacoes
+                          .filter((mov) => {
+                            const movData = new Date(mov.createdAt);
+                            const inicio = dataInicio
+                              ? new Date(dataInicio)
+                              : null;
+                            const fim = dataFim
+                              ? new Date(dataFim + "T23:59:59")
+                              : null;
+
+                            if (inicio && movData < inicio) return false;
+                            if (fim && movData > fim) return false;
+                            return true;
+                          })
+                          .map((mov) => (
+                            <div
+                              key={mov.id}
+                              className="p-4 border border-gray-200 rounded-lg bg-white"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <Badge
+                                  variant={
+                                    mov.tipo === "entrada"
+                                      ? "success"
+                                      : "danger"
+                                  }
+                                >
+                                  {mov.tipo === "entrada"
+                                    ? "📥 Entrada"
+                                    : "📤 Saída"}
+                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-gray-600">
+                                    {new Date(mov.createdAt).toLocaleDateString(
+                                      "pt-BR",
+                                    )}{" "}
+                                    às{" "}
+                                    {new Date(mov.createdAt).toLocaleTimeString(
+                                      "pt-BR",
+                                    )}
+                                  </span>
+                                  {podeEditar(mov) && (
+                                    <button
+                                      onClick={() => abrirModalEdicao(mov)}
+                                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                                      title="Editar movimentação"
+                                    >
+                                      <svg
+                                        className="w-3 h-3"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                        />
+                                      </svg>
+                                      Editar
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-5 gap-4 mt-3 text-sm">
+                                <div>
+                                  <p className="text-gray-600">Total Pré</p>
+                                  <p className="font-semibold">
+                                    {mov.totalPre || 0}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600">Saíram</p>
+                                  <p className="font-semibold text-red-600">
+                                    {mov.sairam || 0}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600">Abastecidas</p>
+                                  <p className="font-semibold text-green-600">
+                                    {mov.abastecidas || 0}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600 flex items-center gap-1">
+                                    <span>📦</span> Total Atual
+                                  </p>
+                                  <p className="font-semibold text-purple-600">
+                                    {(mov.totalPre || 0) +
+                                      (mov.abastecidas || 0)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600 flex items-center gap-1">
+                                    <span>🎫</span> Fichas
+                                  </p>
+                                  <p className="font-semibold text-blue-600">
+                                    {mov.fichas || 0}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Contadores da Máquina */}
+                              {(mov.contadorIn || mov.contadorOut) && (
+                                <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">📥</span>
+                                    <div>
+                                      <p className="text-xs text-gray-600">
+                                        Contador IN
+                                      </p>
+                                      <p className="font-bold text-green-700">
+                                        {mov.contadorIn || "-"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">📤</span>
+                                    <div>
+                                      <p className="text-xs text-gray-600">
+                                        Contador OUT
+                                      </p>
+                                      <p className="font-bold text-orange-700">
+                                        {mov.contadorOut || "-"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Justificativa de Quebra de Ordem */}
+                              {mov.justificativa_ordem && (
+                                <div className="mt-3 pt-3 border-t border-orange-200 bg-orange-50 p-3 rounded-lg">
+                                  <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1">
+                                    ⚠️ ORDEM DO ROTEIRO ALTERADA
+                                  </p>
+                                  <p className="text-sm text-orange-900">
+                                    <strong>Justificativa:</strong>{" "}
+                                    {mov.justificativa_ordem}
+                                  </p>
+                                </div>
+                              )}
+
+                              {mov.observacoes && (
+                                <p className="text-sm text-gray-600 mt-3 italic">
+                                  💬 {mov.observacoes}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-6xl mb-4">📭</p>
+                        <p className="text-gray-600">
+                          Nenhuma movimentação registrada para esta máquina
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -3595,29 +3657,6 @@ export function Dashboard() {
             </div>
           </div>
         )}
-
-        {/* Ação Rápida com design destacado */}
-        <div className="mt-8 flex justify-center">
-          <Link
-            to="/movimentacoes?nova=true"
-            className="btn-primary text-lg px-10 py-4 flex items-center gap-3 shadow-2xl"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-            Registrar Nova Movimentação
-          </Link>
-        </div>
       </div>
 
       {/* Modal de Edição de Estoque */}
