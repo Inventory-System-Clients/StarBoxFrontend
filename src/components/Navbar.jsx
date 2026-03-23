@@ -62,7 +62,7 @@ export default function Navbar() {
                 <NavLink to="/roteiros" active={isActive("/roteiros")}>
                   🗺️ Roteiros
                 </NavLink>
-                {!isFuncionario && (
+                {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
                   <NavLink to="/maquinas" active={isActive("/maquinas")}>
                     🎮 Máquinas
                   </NavLink>
@@ -102,7 +102,10 @@ export default function Navbar() {
                     <NavLink to="/relatorios" active={isActive("/relatorios")}>
                       📄 Relatórios
                     </NavLink>
-                    <NavLink to="/fluxo-caixa" active={isActive("/fluxo-caixa")}>
+                    <NavLink
+                      to="/fluxo-caixa"
+                      active={isActive("/fluxo-caixa")}
+                    >
                       💰 Fluxo de Caixa
                     </NavLink>
                     <NavLink to="/usuarios" active={isActive("/usuarios")}>
@@ -167,6 +170,15 @@ export default function Navbar() {
             >
               🗺️ Roteiros
             </MobileNavLink>
+            {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
+              <MobileNavLink
+                to="/maquinas"
+                active={isActive("/maquinas")}
+                onClick={closeMenu}
+              >
+                🎮 Máquinas
+              </MobileNavLink>
+            )}
             {!isFuncionario && (
               <MobileNavLink
                 to="/lojas"
