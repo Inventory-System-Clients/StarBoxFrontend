@@ -549,7 +549,7 @@ export default function MovimentacaoMaquina() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📥 Contador IN Digital (Entrada)
+                      📥 Contador IN Mecânico (Entrada)
                     </label>
                     <input
                       type="number"
@@ -561,12 +561,12 @@ export default function MovimentacaoMaquina() {
                       min="0"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Número do contador IN Digital da máquina
+                      Número do contador IN Mecânico da máquina
                     </p>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📤 Contador OUT Digital (Saída)
+                      📤 Contador OUT Mecânico (Saída)
                     </label>
                     <input
                       type="number"
@@ -578,7 +578,7 @@ export default function MovimentacaoMaquina() {
                       min="0"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Número do contador OUT Digital da máquina
+                      Número do contador OUT Mecânico da máquina
                     </p>
                   </div>
                 </div>
@@ -596,14 +596,14 @@ export default function MovimentacaoMaquina() {
                     htmlFor="usarContadorManual"
                     className="text-sm text-gray-700"
                   >
-                    Usar contador IN/OUT manual
+                    Usar contador IN/OUT digital
                   </label>
                 </div>
                 {formData.usarContadorManual && !formData.ignoreInOut && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        📥 Contador IN Manual
+                        📥 Contador IN Digital
                       </label>
                       <input
                         type="number"
@@ -615,12 +615,12 @@ export default function MovimentacaoMaquina() {
                         min="0"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Número do contador IN manual (opcional)
+                        Número do contador IN digital (opcional)
                       </p>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        📤 Contador OUT Manual
+                        📤 Contador OUT Digital
                       </label>
                       <input
                         type="number"
@@ -632,7 +632,7 @@ export default function MovimentacaoMaquina() {
                         min="0"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Número do contador OUT manual (opcional)
+                        Número do contador OUT digital (opcional)
                       </p>
                     </div>
                   </div>
