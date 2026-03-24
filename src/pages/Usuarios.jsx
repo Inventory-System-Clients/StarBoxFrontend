@@ -50,7 +50,7 @@ export function Usuarios() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
+      <div className="min-h-screen bg-linear-to-br from-[#62A1D9] via-[#A6806A] to-[#24094E] text-[#24094E]">
         <Navbar />
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -102,7 +102,7 @@ export function Usuarios() {
               >
                 <option value="">Todos</option>
                 <option value="ADMIN">Administrador</option>
-                <option value="FUNCIONARIO">Funcionário</option>
+                <option value="FUNCIONARIO">Funcionário Abastecedor</option>
                 <option value="FUNCIONARIO_TODAS_LOJAS">
                   Funcionário (todas as lojas)
                 </option>
@@ -148,12 +148,6 @@ export function Usuarios() {
                     Perfil
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Telefone
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Lojas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -194,22 +188,8 @@ export function Usuarios() {
                               ? "Gerenciador"
                               : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
                                 ? "Funcionário (todas as lojas)"
-                                : "Funcionário"}
+                                : "Funcionário Abastecedor"}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {usuario.telefone || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {usuario.role === "ADMIN" ||
-                      usuario.role === "FUNCIONARIO_TODAS_LOJAS" ||
-                      usuario.role === "CONTROLADOR_ESTOQUE" ? (
-                        <span className="text-gray-400 italic">Todas</span>
-                      ) : usuario.permissoesLojas?.length > 0 ? (
-                        <span>{usuario.permissoesLojas.length} loja(s)</span>
-                      ) : (
-                        <span className="text-red-600">Nenhuma</span>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {usuario.ativo ? (

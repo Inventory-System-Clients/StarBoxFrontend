@@ -10,7 +10,8 @@ export default function MovimentacaoMaquina() {
   const { roteiroId, lojaId, maquinaId } = useParams();
   const navigate = useNavigate();
   const { usuario } = useAuth();
-  const isFuncionarioNormal = usuario?.role === "FUNCIONARIO";
+  const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
+  const podeVerCamposFinanceirosEObservacao = !isFuncionarioAbastecedor;
 
   // Estados para formulário
   const [formData, setFormData] = useState({
@@ -69,7 +70,7 @@ export default function MovimentacaoMaquina() {
   }, [maquinaId, usuario]);
 
   useEffect(() => {
-    if (!isFuncionarioNormal) return;
+    if (!isFuncionarioAbastecedor) return;
 
     setFormData((prev) => ({
       ...prev,
@@ -77,9 +78,12 @@ export default function MovimentacaoMaquina() {
       contadorOutManual: "",
       contadorInDigital: "",
       contadorOutDigital: "",
+      usarContadorManual: false,
       ignoreInOut: true,
+      retiradaEstoque: false,
+      retiradaDinheiro: false,
     }));
-  }, [isFuncionarioNormal]);
+  }, [isFuncionarioAbastecedor]);
 
   // Cálculo automático usando histórico de movimentações e contadores projetados
   useEffect(() => {
@@ -93,7 +97,7 @@ export default function MovimentacaoMaquina() {
       const contadorOutDigitalReferencia = formData.contadorOutDigital;
 
       const params = { maquinaId };
-      if (!isFuncionarioNormal && !formData.ignoreInOut) {
+      if (!isFuncionarioAbastecedor && !formData.ignoreInOut) {
         if (contadorOutDigitalReferencia !== "") {
           params.contadorOut = contadorOutDigitalReferencia;
         }
@@ -114,7 +118,7 @@ export default function MovimentacaoMaquina() {
         setSugestaoAbastecimento(res.data.sugestaoAbastecimento ?? null);
 
         const temContadoresDigitados =
-          !isFuncionarioNormal &&
+          !isFuncionarioAbastecedor &&
           !formData.ignoreInOut &&
           contadorOutDigitalReferencia !== "";
 
@@ -134,7 +138,7 @@ export default function MovimentacaoMaquina() {
   }, [
     maquina,
     maquinaId,
-    isFuncionarioNormal,
+    isFuncionarioAbastecedor,
     formData.contadorOutDigital,
     formData.ignoreInOut,
   ]);
@@ -142,10 +146,15 @@ export default function MovimentacaoMaquina() {
   // Sugestão de abastecimento usando backend
   const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
   useEffect(() => {
+    if (isFuncionarioAbastecedor) {
+      setAlertaDivergencia(null);
+      return;
+    }
+
     const contadorOutDigitado = parseInt(formData.contadorOutDigital, 10);
     const totalPreInformado = parseInt(formData.quantidadeAtualMaquina, 10);
 
-    if (isFuncionarioNormal || !resumoCalculo) {
+    if (!resumoCalculo) {
       setAlertaDivergencia(null);
       return;
     }
@@ -189,7 +198,7 @@ export default function MovimentacaoMaquina() {
 
     setAlertaDivergencia(null);
   }, [
-    isFuncionarioNormal,
+    isFuncionarioAbastecedor,
     resumoCalculo,
     formData.contadorOutDigital,
     formData.quantidadeAtualMaquina,
@@ -198,7 +207,10 @@ export default function MovimentacaoMaquina() {
 
   useEffect(() => {
     async function calcularSugestao() {
-      if (isFuncionarioNormal) return;
+      if (isFuncionarioAbastecedor) {
+        setSugestaoAbastecimento(null);
+        return;
+      }
 
       if (!resumoCalculo) {
         setSugestaoAbastecimento(null);
@@ -209,7 +221,7 @@ export default function MovimentacaoMaquina() {
     }
 
     calcularSugestao();
-  }, [isFuncionarioNormal, resumoCalculo]);
+  }, [isFuncionarioAbastecedor, resumoCalculo]);
 
   const parseNumeroOpcional = (valor) => {
     if (valor === "" || valor === null || valor === undefined) return null;
@@ -348,7 +360,8 @@ export default function MovimentacaoMaquina() {
     setError("");
     setSuccess("");
     try {
-      const deveIgnorarContadores = isFuncionarioNormal || formData.ignoreInOut;
+      const deveIgnorarContadores =
+        isFuncionarioAbastecedor || Boolean(formData.ignoreInOut);
       const parseContadorOpcional = (valor) => {
         if (valor === "" || valor === null || valor === undefined) return null;
         const numero = parseInt(valor, 10);
@@ -397,19 +410,27 @@ export default function MovimentacaoMaquina() {
         contadorOutDigital: deveIgnorarContadores
           ? null
           : contadorOutDigitalInformado,
-        quantidade_notas_entrada: formData.quantidade_notas_entrada
+        quantidade_notas_entrada: podeVerCamposFinanceirosEObservacao && formData.quantidade_notas_entrada
           ? parseFloat(formData.quantidade_notas_entrada)
           : null,
-        valor_entrada_maquininha_pix: formData.valor_entrada_maquininha_pix
+        valor_entrada_maquininha_pix: podeVerCamposFinanceirosEObservacao && formData.valor_entrada_maquininha_pix
           ? parseFloat(formData.valor_entrada_maquininha_pix)
           : null,
-        ignoreInOut: Boolean(formData.ignoreInOut),
-        retiradaEstoque: formData.retiradaEstoque,
+        ignoreInOut: isFuncionarioAbastecedor
+          ? true
+          : Boolean(formData.ignoreInOut),
+        retiradaEstoque: isFuncionarioAbastecedor
+          ? false
+          : formData.retiradaEstoque,
         origemEstoque: formData.origemEstoque || "usuario",
         retiradaProduto: parseInt(formData.retiradaProduto) || 0,
-        observacoes: formData.observacao || "",
+        observacoes: podeVerCamposFinanceirosEObservacao
+          ? formData.observacao || ""
+          : "",
         produtos: produtosParaEnviar,
-        retiradaDinheiro: formData.retiradaDinheiro || false,
+        retiradaDinheiro: isFuncionarioAbastecedor
+          ? false
+          : formData.retiradaDinheiro || false,
       };
 
       const enviarMovimentacao = (confirmarUsoEstoqueLoja = false) =>
@@ -489,7 +510,7 @@ export default function MovimentacaoMaquina() {
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isFuncionarioNormal ? (
+            {!isFuncionarioAbastecedor ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -609,8 +630,7 @@ export default function MovimentacaoMaquina() {
                       {resumoCalculo.contadorOutSugerido || 0}
                     </p>
                     <p className="text-xs text-indigo-700">
-                      Era para ter na máquina:{" "}
-                      {resumoCalculo.totalPreEsperado ?? 0}
+                      Era para ter na máquina: {resumoCalculo.totalPreEsperado ?? 0}
                     </p>
                     <p className="text-xs text-indigo-700">
                       Sugestão de abastecimento: {sugestaoAbastecimento ?? 0}
@@ -625,15 +645,12 @@ export default function MovimentacaoMaquina() {
                     </p>
                     {alertaDivergencia.tipo === "out_abaixo_sugerido" ? (
                       <p className="text-xs text-yellow-700">
-                        OUT digitado ({alertaDivergencia.contadorOutDigitado})
-                        está abaixo do OUT sugerido acumulado (
+                        OUT digitado ({alertaDivergencia.contadorOutDigitado}) está abaixo do OUT sugerido acumulado (
                         {alertaDivergencia.contadorOutSugerido}).
                       </p>
                     ) : (
                       <p className="text-xs text-yellow-700">
-                        Era para ter {alertaDivergencia.totalPreEsperado} na
-                        máquina, mas foi informado{" "}
-                        {alertaDivergencia.totalPreInformado}.
+                        Era para ter {alertaDivergencia.totalPreEsperado} na máquina, mas foi informado {alertaDivergencia.totalPreInformado}.
                       </p>
                     )}
                   </div>
@@ -642,8 +659,7 @@ export default function MovimentacaoMaquina() {
             ) : (
               <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <p className="text-sm text-gray-700">
-                  Para o perfil de funcionário, os campos IN/OUT não precisam
-                  ser digitados nesta movimentação.
+                  Perfil Funcionário Abastecedor: IN/OUT é ignorado automaticamente nesta movimentação.
                 </p>
               </div>
             )}
@@ -712,65 +728,71 @@ export default function MovimentacaoMaquina() {
                   </span>
                 </label>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  💵 Valor em Notas (R$)
-                </label>
-                <input
-                  type="number"
-                  name="quantidade_notas_entrada"
-                  value={formData.quantidade_notas_entrada}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Valor total em dinheiro (notas) inserido na máquina
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  💳 Valor Digital (Pix/Maquininha) (R$)
-                </label>
-                <input
-                  type="number"
-                  name="valor_entrada_maquininha_pix"
-                  value={formData.valor_entrada_maquininha_pix}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Valor total recebido via pagamento digital (Pix/Maquininha)
-                </p>
-              </div>
+              {podeVerCamposFinanceirosEObservacao && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      💵 Valor em Notas (R$)
+                    </label>
+                    <input
+                      type="number"
+                      name="quantidade_notas_entrada"
+                      value={formData.quantidade_notas_entrada}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Valor total em dinheiro (notas) inserido na máquina
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      💳 Valor Digital (Pix/Maquininha) (R$)
+                    </label>
+                    <input
+                      type="number"
+                      name="valor_entrada_maquininha_pix"
+                      value={formData.valor_entrada_maquininha_pix}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Valor total recebido via pagamento digital (Pix/Maquininha)
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="p-4 bg-linear-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-lg">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="retiradaEstoque"
-                  checked={formData.retiradaEstoque}
-                  onChange={handleChange}
-                  className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-bold text-orange-900">
-                    📦 Retirada de Estoque (não conta como dinheiro)
-                  </span>
-                  <p className="text-xs text-orange-700 mt-1">
-                    Marque esta opção quando estiver retirando produtos da
-                    máquina sem que seja uma venda (exemplo: produtos
-                    danificados, devolução, transferência). As fichas serão
-                    automaticamente zeradas.
-                  </p>
-                </div>
-              </label>
-            </div>
+            {!isFuncionarioAbastecedor && (
+              <div className="p-4 bg-linear-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-lg">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="retiradaEstoque"
+                    checked={formData.retiradaEstoque}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-bold text-orange-900">
+                      📦 Retirada de Estoque (não conta como dinheiro)
+                    </span>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Marque esta opção quando estiver retirando produtos da
+                      máquina sem que seja uma venda (exemplo: produtos
+                      danificados, devolução, transferência). As fichas serão
+                      automaticamente zeradas.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Produto *
@@ -807,42 +829,45 @@ export default function MovimentacaoMaquina() {
                 Ao escolher estoque da loja, pode ser solicitada confirmação.
               </p>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Observação
-              </label>
-              <textarea
-                name="observacao"
-                value={formData.observacao}
-                onChange={handleChange}
-                className="input-field"
-                rows="2"
-                placeholder="Informações adicionais sobre a movimentação..."
-              />
-            </div>
-
-            {/* ✨ NOVO: Checkbox Retirada de Dinheiro */}
-            <div className="p-4 bg-linear-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="retiradaDinheiro"
-                  checked={formData.retiradaDinheiro}
+            {podeVerCamposFinanceirosEObservacao && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Observação
+                </label>
+                <textarea
+                  name="observacao"
+                  value={formData.observacao}
                   onChange={handleChange}
-                  className="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
+                  className="input-field"
+                  rows="2"
+                  placeholder="Informações adicionais sobre a movimentação..."
                 />
-                <div className="flex-1">
-                  <span className="text-sm font-bold text-green-900 flex items-center gap-2">
-                    💰 Retirada de Dinheiro
-                  </span>
-                  <p className="text-xs text-green-700 mt-1">
-                    Marque esta opção se você está retirando dinheiro desta
-                    máquina. Esta movimentação aparecerá na aba "Fluxo de Caixa"
-                    para conferência pelo administrador.
-                  </p>
-                </div>
-              </label>
-            </div>
+              </div>
+            )}
+
+            {!isFuncionarioAbastecedor && (
+              <div className="p-4 bg-linear-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="retiradaDinheiro"
+                    checked={formData.retiradaDinheiro}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-bold text-green-900 flex items-center gap-2">
+                      💰 Retirada de Dinheiro
+                    </span>
+                    <p className="text-xs text-green-700 mt-1">
+                      Marque esta opção se você está retirando dinheiro desta
+                      máquina. Esta movimentação aparecerá na aba "Fluxo de Caixa"
+                      para conferência pelo administrador.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
 
             <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:justify-end pt-4 border-t border-gray-200">
               <button

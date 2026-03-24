@@ -141,7 +141,7 @@ export default function Navbar() {
                         ? "👤 Funcionário (todas as lojas)"
                         : usuario?.role === "MANUTENCAO"
                           ? "🛠️ Manutenção"
-                          : "👤 Funcionário"}
+                          : "👤 Funcionário Abastecedor"}
               </div>
             </div>
 

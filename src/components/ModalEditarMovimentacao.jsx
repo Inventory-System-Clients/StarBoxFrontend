@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./UIComponents";
 import api from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
 
 /**
  * Modal para editar movimentações de máquinas
@@ -11,6 +12,8 @@ import api from "../services/api";
  * @param {Function} onSucesso - Callback chamado após edição bem-sucedida
  */
 export default function ModalEditarMovimentacao({ movimentacao, onClose, onSucesso }) {
+  const { usuario } = useAuth();
+  const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     totalPre: "",
@@ -80,13 +83,15 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
         contadorIn: formData.contadorIn ? parseInt(formData.contadorIn) : null,
         contadorOut: formData.contadorOut ? parseInt(formData.contadorOut) : null,
         contadorMaquina: formData.contadorMaquina ? parseInt(formData.contadorMaquina) : null,
-        quantidade_notas_entrada: formData.quantidade_notas_entrada 
+        quantidade_notas_entrada: !ocultarCamposFinanceirosEObservacoes && formData.quantidade_notas_entrada 
           ? parseFloat(formData.quantidade_notas_entrada) 
           : null,
-        valor_entrada_maquininha_pix: formData.valor_entrada_maquininha_pix 
+        valor_entrada_maquininha_pix: !ocultarCamposFinanceirosEObservacoes && formData.valor_entrada_maquininha_pix 
           ? parseFloat(formData.valor_entrada_maquininha_pix) 
           : null,
-        observacoes: formData.observacoes || null,
+        observacoes: !ocultarCamposFinanceirosEObservacoes
+          ? formData.observacoes || null
+          : null,
         tipoOcorrencia: formData.tipoOcorrencia || "Normal",
         dataColeta: formData.dataColeta ? new Date(formData.dataColeta).toISOString() : null,
       };
@@ -130,8 +135,12 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
 
   const valorFaturadoCalculado = (() => {
     const fichasValor = (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
-    const notasValor = parseFloat(formData.quantidade_notas_entrada) || 0;
-    const pixValor = parseFloat(formData.valor_entrada_maquininha_pix) || 0;
+    const notasValor = ocultarCamposFinanceirosEObservacoes
+      ? 0
+      : parseFloat(formData.quantidade_notas_entrada) || 0;
+    const pixValor = ocultarCamposFinanceirosEObservacoes
+      ? 0
+      : parseFloat(formData.valor_entrada_maquininha_pix) || 0;
     return fichasValor + notasValor + pixValor;
   })();
 
@@ -277,87 +286,89 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
             </div>
           </div>
 
-          {/* VALORES */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              💰 Valores
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notas Entrada (R$)
-                </label>
-                <input
-                  type="number"
-                  name="quantidade_notas_entrada"
-                  value={formData.quantidade_notas_entrada}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  min="0"
-                  placeholder="0.00"
-                />
+          {!ocultarCamposFinanceirosEObservacoes && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                💰 Valores
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notas Entrada (R$)
+                  </label>
+                  <input
+                    type="number"
+                    name="quantidade_notas_entrada"
+                    value={formData.quantidade_notas_entrada}
+                    onChange={handleChange}
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    min="0"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Maquininha/PIX (R$)
+                  </label>
+                  <input
+                    type="number"
+                    name="valor_entrada_maquininha_pix"
+                    value={formData.valor_entrada_maquininha_pix}
+                    onChange={handleChange}
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    min="0"
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Maquininha/PIX (R$)
-                </label>
-                <input
-                  type="number"
-                  name="valor_entrada_maquininha_pix"
-                  value={formData.valor_entrada_maquininha_pix}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  min="0"
-                  placeholder="0.00"
-                />
+              <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                <span className="text-sm text-gray-600">
+                  Valor Faturado (calculado): <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
+                </span>
               </div>
             </div>
-            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-              <span className="text-sm text-gray-600">
-                Valor Faturado (calculado): <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
-              </span>
-            </div>
-          </div>
+          )}
 
-          {/* OBSERVAÇÕES */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              📝 Observações
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Ocorrência
-                </label>
-                <select
-                  name="tipoOcorrencia"
-                  value={formData.tipoOcorrencia}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="Manutenção">Manutenção</option>
-                  <option value="Troca de Máquina">Troca de Máquina</option>
-                  <option value="Problema">Problema</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observações
-                </label>
-                <textarea
-                  name="observacoes"
-                  value={formData.observacoes}
-                  onChange={handleChange}
-                  rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Observações adicionais..."
-                />
+          {!ocultarCamposFinanceirosEObservacoes && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                📝 Observações
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de Ocorrência
+                  </label>
+                  <select
+                    name="tipoOcorrencia"
+                    value={formData.tipoOcorrencia}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="Manutenção">Manutenção</option>
+                    <option value="Troca de Máquina">Troca de Máquina</option>
+                    <option value="Problema">Problema</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Observações
+                  </label>
+                  <textarea
+                    name="observacoes"
+                    value={formData.observacoes}
+                    onChange={handleChange}
+                    rows="3"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Observações adicionais..."
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Informações adicionais */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
