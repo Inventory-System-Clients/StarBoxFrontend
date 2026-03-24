@@ -414,6 +414,75 @@ export function Roteiros() {
     }
   };
 
+  const usuarioTemPilotagemAtiva = async () => {
+    if (usuario?.role !== "FUNCIONARIO_TODAS_LOJAS") return true;
+
+    try {
+      const [ultimasMovRes, veiculosRes] = await Promise.all([
+        api.get("/movimentacao-veiculos/ultimas"),
+        api.get("/veiculos"),
+      ]);
+
+      const usuarioId = String(usuario?.id || "");
+      const veiculosLista = Array.isArray(veiculosRes.data) ? veiculosRes.data : [];
+
+      const ultimasMovObj = ultimasMovRes.data || {};
+      const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
+        ? ultimasMovObj
+        : Object.values(ultimasMovObj);
+
+      const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
+        const usuarioMovId = String(
+          mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+        );
+        const tipoMov = String(mov?.tipo || "").toLowerCase();
+        const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+        const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
+
+        return (
+          usuarioMovId === usuarioId &&
+          tipoMov === "retirada" &&
+          Boolean(veiculo?.emUso)
+        );
+      });
+
+      // Fallback defensivo para APIs que já expõem vínculo de usuário no veículo.
+      const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
+        const usuarioVeiculoId = String(
+          veiculo?.usuario?.id ||
+            veiculo?.usuarioId ||
+            veiculo?.funcionarioId ||
+            veiculo?.condutorId ||
+            "",
+        );
+
+        return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
+      });
+
+      return temRetiradaAtiva || temVinculoDiretoNoVeiculo;
+    } catch (err) {
+      console.error("Erro ao validar pilotagem ativa:", err);
+      setError(
+        "Não foi possível validar a pilotagem do veículo. Tente novamente em instantes.",
+      );
+      return false;
+    }
+  };
+
+  const iniciarOuContinuarRoteiro = async (roteiroId) => {
+    setError("");
+
+    const podeProsseguir = await usuarioTemPilotagemAtiva();
+    if (!podeProsseguir) {
+      setError(
+        "Para iniciar ou continuar o roteiro, você deve iniciar a pilotagem de um veículo primeiro.",
+      );
+      return;
+    }
+
+    navigate(`/roteiros/${roteiroId}/executar`);
+  };
+
   // --- AÇÕES ---
   const handleCriarRoteiro = async () => {
     try {
@@ -1043,9 +1112,7 @@ export function Roteiros() {
                 {!roteiro.status || roteiro.status === "pendente" ? (
                   <>
                     <button
-                      onClick={() =>
-                        navigate(`/roteiros/${roteiro.id}/executar`)
-                      }
+                      onClick={() => iniciarOuContinuarRoteiro(roteiro.id)}
                       className="flex-1 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors"
                     >
                       {roteiro.funcionarioId ? "Continuar" : "Começar Rota"}

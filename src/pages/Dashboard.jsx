@@ -220,8 +220,7 @@ export function Dashboard() {
 
   const { usuario } = useAuth();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
-  const isPerfilFuncionario =
-    usuario?.role === "FUNCIONARIO" ||
+  const podeVerDefeituosasNoDashboard =
     usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const [stats, setStats] = useState({
     alertas: [],
@@ -2009,7 +2008,7 @@ export function Dashboard() {
         ) : (
           <div
             className={`grid grid-cols-1 ${
-              isPerfilFuncionario ? "md:grid-cols-4" : "md:grid-cols-3"
+              podeVerDefeituosasNoDashboard ? "md:grid-cols-4" : "md:grid-cols-3"
             } gap-4 md:gap-6 mb-8`}
           >
             {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
@@ -2071,7 +2070,7 @@ export function Dashboard() {
                 </p>
               </div>
             </div>
-            {isPerfilFuncionario && (
+            {podeVerDefeituosasNoDashboard && (
               <div
                 className="stat-card bg-linear-to-br from-amber-500 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
                 onClick={() => navigate("/dashboard/pecas-defeituosas")}
@@ -2169,7 +2168,7 @@ export function Dashboard() {
                 <span className="bg-linear-to-br from-orange-500 to-orange-600 p-2 sm:p-3 rounded-xl text-white">
                   🏭
                 </span>
-                Depósito Principal
+                Base Principal
               </h2>
               <p className="text-gray-600 text-sm sm:text-base">
                 Gerencie o estoque central do sistema. Todo estoque distribuído
@@ -3737,7 +3736,7 @@ export function Dashboard() {
                 <div>
                   <h2 className="text-2xl font-bold flex items-center gap-3">
                     <span className="text-3xl">✏️</span>
-                    Editar Estoque do Depósito
+                    Editar Estoque da Base
                   </h2>
                   <p className="text-white/90 mt-1">
                     🏪 {estoqueEditando.lojaNome}
