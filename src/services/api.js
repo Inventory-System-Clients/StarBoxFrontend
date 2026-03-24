@@ -108,4 +108,29 @@ export const reportsAPI = {
   },
 };
 
+export const pecasDefeituosasAPI = {
+  getDashboardFuncionario: async () => {
+    const response = await api.get(`/dashboard/pecas-defeituosas`);
+    return response.data;
+  },
+  getResumoAdmin: async () => {
+    const response = await api.get(`/admin/pecas-defeituosas/resumo-funcionarios`);
+    return response.data;
+  },
+  confirmarItem: async (id) => {
+    const response = await api.post(`/admin/pecas-defeituosas/${id}/confirmar`);
+    return response.data;
+  },
+  confirmarTudoFuncionario: async (usuarioId) => {
+    const response = await api.post(
+      `/admin/pecas-defeituosas/confirmar-usuario/${usuarioId}`,
+    );
+    return response.data;
+  },
+  esvaziarBase: async () => {
+    const response = await api.delete(`/admin/pecas-defeituosas/base/esvaziar`);
+    return response.data;
+  },
+};
+
 export default api;

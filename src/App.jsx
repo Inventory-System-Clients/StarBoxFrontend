@@ -40,6 +40,8 @@ import GerenciarCarrinhosPage from "./pages/GerenciarCarrinhosPage.jsx";
 import { QuebraOrdemPage } from "./pages/QuebraOrdemPage.jsx";
 import EstoqueUsuarios from "./pages/EstoqueUsuarios.jsx";
 import FluxoCaixa from "./pages/FluxoCaixa.jsx";
+import PecasDefeituosasDashboard from "./pages/PecasDefeituosasDashboard.jsx";
+import PecasDefeituosasAdminPage from "./pages/PecasDefeituosasAdminPage.jsx";
 import "./App.css";
 
 function AppRoutes() {
@@ -116,6 +118,24 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Dashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/dashboard/pecas-defeituosas"
+        element={
+          <PrivateRoute
+            allowedRoles={["FUNCIONARIO", "FUNCIONARIO_TODAS_LOJAS"]}
+          >
+            <PecasDefeituosasDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/pecas-defeituosas"
+        element={
+          <PrivateRoute adminOnly>
+            <PecasDefeituosasAdminPage />
           </PrivateRoute>
         }
       />

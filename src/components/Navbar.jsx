@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Navbar() {
   const { usuario, logout } = useAuth(); // Assumindo que seu context proveja usuario e logout
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [useCompactMenu, setUseCompactMenu] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
@@ -12,6 +13,27 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      // Desktop mantém links visíveis. Menu compacto apenas para tamanhos menores.
+      const shouldCompact = window.innerWidth < 1024;
+      setUseCompactMenu((prev) =>
+        prev === shouldCompact ? prev : shouldCompact,
+      );
+
+      if (!shouldCompact) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -30,10 +52,10 @@ export default function Navbar() {
           "linear-gradient(90deg, #62A1D9 0%, #24094E 35%, #24094E 100%)",
       }}
     >
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
-        <div className="flex items-center justify-between h-30">
+      <div className="w-full px-0 sm:px-2 lg:px-3">
+        <div className="flex items-center justify-between h-30 w-full">
           {/* Logo e Nome */}
-          <div className="flex items-center relative">
+          <div className="flex items-center relative min-w-0">
             <Link
               to="/"
               className="flex items-center space-x-2 sm:space-x-3 group min-w-0 relative z-10"
@@ -41,9 +63,9 @@ export default function Navbar() {
               <img
                 src="/starbox-logo.png"
                 alt="StarBox Logo"
-                className="p-4 w-22 h-8 sm:w-30 sm:h-10 lg:w-38 lg:h-12 object-contain transition-transform duration-300 group-hover:scale-105"
+                className="pl-1 sm:pl-2 w-18 h-7 sm:w-24 sm:h-9 lg:w-30 lg:h-10 object-contain transition-transform duration-300 group-hover:scale-105"
                 style={{
-                  maxWidth: "180px",
+                  maxWidth: "150px",
                   height: "auto",
                   background: "transparent",
                 }}
@@ -54,8 +76,8 @@ export default function Navbar() {
             </Link>
 
             {/* Menu Desktop */}
-            <div className="hidden lg:block ml-6">
-              <div className="flex items-center space-x-2">
+            <div className={`${useCompactMenu ? "hidden" : "hidden lg:block"} ml-4`}>
+              <div className="flex items-center space-x-2 whitespace-nowrap">
                 <NavLink to="/" active={isActive("/")}>
                   📊 Dashboard
                 </NavLink>
@@ -85,6 +107,16 @@ export default function Navbar() {
                   usuario?.role === "GERENCIADOR") && (
                   <NavLink to="/pecas" active={isActive("/pecas")}>
                     🛠️ Peças
+                  </NavLink>
+                )}
+
+                {(usuario?.role === "FUNCIONARIO" ||
+                  usuario?.role === "FUNCIONARIO_TODAS_LOJAS") && (
+                  <NavLink
+                    to="/dashboard/pecas-defeituosas"
+                    active={isActive("/dashboard/pecas-defeituosas")}
+                  >
+                    ♻️ Defeituosas
                   </NavLink>
                 )}
 
@@ -118,10 +150,10 @@ export default function Navbar() {
           </div>
 
           {/* User Info e Logout */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 pr-1 sm:pr-2">
             <button
               onClick={toggleMenu}
-              className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+              className={`${useCompactMenu ? "" : "lg:hidden"} p-2 rounded-lg hover:bg-white/10 transition-colors`}
             >
               {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
@@ -147,7 +179,7 @@ export default function Navbar() {
 
             <button
               onClick={handleLogout}
-              className="bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+              className="bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-1.5"
             >
               <LogoutIcon />
               <span className="hidden sm:inline">Sair</span>
@@ -158,7 +190,9 @@ export default function Navbar() {
 
       {/* Menu Mobile Dropdown */}
       {isMenuOpen && (
-        <div className="lg:hidden bg-gray-900 border-t border-white/10 animate-fade-in-down">
+        <div
+          className={`${useCompactMenu ? "" : "lg:hidden"} bg-gray-900 border-t border-white/10 animate-fade-in-down`}
+        >
           <div className="px-4 py-3 space-y-2">
             <MobileNavLink to="/" active={isActive("/")} onClick={closeMenu}>
               📊 Dashboard
@@ -209,6 +243,16 @@ export default function Navbar() {
                 🛠️ Peças
               </MobileNavLink>
             )}
+            {(usuario?.role === "FUNCIONARIO" ||
+              usuario?.role === "FUNCIONARIO_TODAS_LOJAS") && (
+              <MobileNavLink
+                to="/dashboard/pecas-defeituosas"
+                active={isActive("/dashboard/pecas-defeituosas")}
+                onClick={closeMenu}
+              >
+                ♻️ Defeituosas
+              </MobileNavLink>
+            )}
             {usuario?.role === "ADMIN" && (
               <MobileNavLink
                 to="/gerenciar-carrinhos"
@@ -248,7 +292,7 @@ export default function Navbar() {
 const NavLink = ({ to, active, children }) => (
   <Link
     to={to}
-    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+    className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
       active
         ? "bg-linear-to-r from-primary to-accent-yellow text-white shadow-lg scale-105"
         : "text-gray-300 hover:bg-white/10 hover:text-white"
@@ -262,7 +306,7 @@ const MobileNavLink = ({ to, active, onClick, children }) => (
   <Link
     to={to}
     onClick={onClick}
-    className={`block px-4 py-3 rounded-lg text-sm font-medium ${
+    className={`block px-3 py-2 rounded-lg text-sm font-medium ${
       active
         ? "bg-linear-to-r from-primary to-accent-yellow text-white"
         : "text-gray-300 hover:bg-white/10"

@@ -220,6 +220,9 @@ export function Dashboard() {
 
   const { usuario } = useAuth();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isPerfilFuncionario =
+    usuario?.role === "FUNCIONARIO" ||
+    usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const [stats, setStats] = useState({
     alertas: [],
     balanco: null,
@@ -1827,7 +1830,7 @@ export function Dashboard() {
 
         {/* Financeiro, Veículos, Quebra de Ordem, Estoque e Manutenções */}
         {usuario?.role === "ADMIN" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-6 mb-8">
             {/* Financeiro */}
             <div
               className="stat-card bg-linear-to-br from-blue-500 to-blue-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
@@ -1972,9 +1975,43 @@ export function Dashboard() {
                 </p>
               </div>
             </div>
+            {/* Base de Peças Defeituosas */}
+            <div
+              className="stat-card bg-linear-to-br from-amber-600 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              onClick={() => navigate("/admin/pecas-defeituosas")}
+            >
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium opacity-90">
+                    Base Defeituosas
+                  </h3>
+                  <svg
+                    className="w-8 h-8 opacity-80"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold">♻️</p>
+                <p className="text-xs opacity-75 mt-1">
+                  Confirmar devoluções e limpar base
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+          <div
+            className={`grid grid-cols-1 ${
+              isPerfilFuncionario ? "md:grid-cols-4" : "md:grid-cols-3"
+            } gap-4 md:gap-6 mb-8`}
+          >
             {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
               <div
                 className="stat-card bg-linear-to-br from-gray-700 to-gray-900 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
@@ -2034,6 +2071,37 @@ export function Dashboard() {
                 </p>
               </div>
             </div>
+            {isPerfilFuncionario && (
+              <div
+                className="stat-card bg-linear-to-br from-amber-500 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+                onClick={() => navigate("/dashboard/pecas-defeituosas")}
+              >
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium opacity-90">
+                      Peças Defeituosas
+                    </h3>
+                    <svg
+                      className="w-8 h-8 opacity-80"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-3xl font-bold">♻️</p>
+                  <p className="text-xs opacity-75 mt-1">
+                    Pendentes e histórico de devoluções
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Manutenções */}
             <div
               className="stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"

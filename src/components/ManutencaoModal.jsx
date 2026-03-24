@@ -33,6 +33,7 @@ export default function ManutencaoModal({
 
   // Estado para fazer manutenção
   const [pecaSelecionada, setPecaSelecionada] = useState("");
+  const [quantidadePecaUsada, setQuantidadePecaUsada] = useState("1");
   const [explicacaoSemPeca, setExplicacaoSemPeca] = useState("");
   const [pecasCarrinho, setPecasCarrinho] = useState([]);
   const [carregandoCarrinho, setCarregandoCarrinho] = useState(false);
@@ -80,6 +81,17 @@ export default function ManutencaoModal({
     );
   };
 
+  const obterQuantidadeDisponivelDaPecaSelecionada = () => {
+    if (!pecaSelecionada || pecaSelecionada === "nao-usar") return 0;
+
+    const peca = pecasCarrinho.find((item) => {
+      const id = item.pecaId || item.id || item.Peca?.id;
+      return String(id) === String(pecaSelecionada);
+    });
+
+    return Number(peca?.quantidade || 0);
+  };
+
   const montarMensagemWhatsAppManutencao = ({
     acao,
     observacao,
@@ -111,6 +123,7 @@ export default function ManutencaoModal({
     console.log("🔄 Resetando modal");
     setEtapa("escolha");
     setPecaSelecionada("");
+    setQuantidadePecaUsada("1");
     setExplicacaoSemPeca("");
     setExplicacaoNaoFazer("");
     setError("");
@@ -165,6 +178,27 @@ export default function ManutencaoModal({
       return;
     }
 
+    const quantidadeDisponivel = obterQuantidadeDisponivelDaPecaSelecionada();
+    const quantidadeSelecionada = Number.parseInt(quantidadePecaUsada, 10);
+
+    if (pecaSelecionada !== "nao-usar") {
+      if (!Number.isInteger(quantidadeSelecionada) || quantidadeSelecionada <= 0) {
+        setError("Informe uma quantidade válida de peça para a manutenção.");
+        return;
+      }
+
+      if (
+        Number.isFinite(quantidadeDisponivel) &&
+        quantidadeDisponivel > 0 &&
+        quantidadeSelecionada > quantidadeDisponivel
+      ) {
+        setError(
+          `Quantidade solicitada maior que o disponível no carrinho (${quantidadeDisponivel}).`,
+        );
+        return;
+      }
+    }
+
     // Reserva a nova aba durante o clique para evitar bloqueio pelo navegador.
     const popupReservado = window.open("about:blank", "_blank");
 
@@ -175,6 +209,7 @@ export default function ManutencaoModal({
       const payload = {
         status: "feito",
         pecaId: pecaSelecionada !== "nao-usar" ? pecaSelecionada : null,
+        quantidade: pecaSelecionada !== "nao-usar" ? quantidadeSelecionada : null,
         explicacao_sem_peca: explicacaoSemPeca.trim()
           ? explicacaoSemPeca
           : null,
@@ -183,24 +218,13 @@ export default function ManutencaoModal({
 
       await api.put(`/manutencoes/${manutencao.id}/concluir`, payload);
 
-      // Se usou uma peça, tentar remover do carrinho
-      if (pecaSelecionada && pecaSelecionada !== "nao-usar") {
-        try {
-          await api.delete(
-            `/usuarios/${usuarioId}/carrinho/${pecaSelecionada}`,
-          );
-        } catch (carrinhoErr) {
-          // Erro 403 = backend ainda não deployado; ignora silenciosamente
-          if (carrinhoErr?.response?.status !== 403) {
-            console.error("Erro ao remover peça do carrinho:", carrinhoErr);
-          }
-        }
-      }
-
       const mensagemWhatsApp = montarMensagemWhatsAppManutencao({
         acao: "Concluiu manutenção",
         observacao: explicacaoSemPeca?.trim() || "-",
-        pecaUsada: obterNomePecaSelecionada(),
+        pecaUsada:
+          pecaSelecionada !== "nao-usar"
+            ? `${obterNomePecaSelecionada()} (x${quantidadeSelecionada})`
+            : obterNomePecaSelecionada(),
       });
 
       abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
@@ -353,6 +377,7 @@ export default function ManutencaoModal({
                     value={pecaSelecionada}
                     onChange={(e) => {
                       setPecaSelecionada(e.target.value);
+                      setQuantidadePecaUsada("1");
                       setError("");
                     }}
                   >
@@ -400,6 +425,32 @@ export default function ManutencaoModal({
               )}
             </div>
 
+            {pecaSelecionada && pecaSelecionada !== "nao-usar" && (
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Quantidade da peça usada
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={Math.max(1, obterQuantidadeDisponivelDaPecaSelecionada())}
+                  className="input-field w-full"
+                  value={quantidadePecaUsada}
+                  onChange={(e) => {
+                    const valorNormalizado = String(e.target.value || "").replace(
+                      /\D/g,
+                      "",
+                    );
+                    setQuantidadePecaUsada(valorNormalizado || "1");
+                    setError("");
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Disponível no carrinho: {obterQuantidadeDisponivelDaPecaSelecionada()}
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 {pecaSelecionada === "nao-usar"
@@ -432,6 +483,7 @@ export default function ManutencaoModal({
                 onClick={() => {
                   setEtapa("escolha");
                   setPecaSelecionada("");
+                  setQuantidadePecaUsada("1");
                   setExplicacaoSemPeca("");
                   setError("");
                 }}
