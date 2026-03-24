@@ -94,6 +94,7 @@ export function Roteiros() {
   const [salvandoObservacao, setSalvandoObservacao] = useState({});
   const [orcamentosPendentes, setOrcamentosPendentes] = useState({});
   const [salvandoOrcamento, setSalvandoOrcamento] = useState({});
+  const [apagandoRoteiros, setApagandoRoteiros] = useState({});
   const [modalFinalizar, setModalFinalizar] = useState({
     aberto: false,
     etapa: 1,
@@ -433,6 +434,47 @@ export function Roteiros() {
       carregarDadosIniciais();
     } catch (err) {
       setError(getMensagemErroVeiculo(err, "Erro ao criar roteiro."));
+    }
+  };
+
+  const handleExcluirRoteiro = async (roteiro) => {
+    const confirmar = window.confirm(
+      `Deseja realmente apagar o roteiro "${roteiro.nome}"? Essa ação não pode ser desfeita.`,
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setError("");
+      setSuccess("");
+      setApagandoRoteiros((prev) => ({ ...prev, [roteiro.id]: true }));
+
+      const response = await api.delete(`/roteiros/${roteiro.id}`);
+      const mensagem =
+        response?.data?.message ||
+        response?.data?.mensagem ||
+        "Roteiro apagado com sucesso.";
+
+      setRoteiros((prev) => prev.filter((r) => r.id !== roteiro.id));
+      setSuccess(mensagem);
+    } catch (err) {
+      const status = err?.response?.status;
+      const mensagemBackend = err?.response?.data?.error;
+
+      if (status === 401) {
+        setError("Sessão expirada. Faça login novamente.");
+      } else if (status === 403) {
+        setError("Você não tem permissão para apagar roteiros.");
+      } else if (status === 404) {
+        setError("Roteiro não encontrado. A lista foi atualizada.");
+        setRoteiros((prev) => prev.filter((r) => r.id !== roteiro.id));
+      } else if (status === 500) {
+        setError(mensagemBackend || "Erro ao apagar roteiro.");
+      } else {
+        setError(mensagemBackend || "Não foi possível apagar o roteiro.");
+      }
+    } finally {
+      setApagandoRoteiros((prev) => ({ ...prev, [roteiro.id]: false }));
     }
   };
 
@@ -954,7 +996,7 @@ export function Roteiros() {
                       </button>
                     )}
                 </div>
-                <div className="min-h-[120px] bg-gray-50 rounded-lg p-3 border border-gray-100">
+                <div className="min-h-30 bg-gray-50 rounded-lg p-3 border border-gray-100">
                   {roteiro.lojas?.length > 0 ? (
                     roteiro.lojas
                       .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
@@ -1010,14 +1052,34 @@ export function Roteiros() {
                         Finalizar
                       </button>
                     )}
+                    {usuario?.role === "ADMIN" && (
+                      <button
+                        onClick={() => handleExcluirRoteiro(roteiro)}
+                        disabled={Boolean(apagandoRoteiros[roteiro.id])}
+                        className="bg-red-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {apagandoRoteiros[roteiro.id] ? "Apagando..." : "Apagar"}
+                      </button>
+                    )}
                   </>
                 ) : roteiro.status === "finalizado" ? (
-                  <button
-                    disabled
-                    className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm cursor-default opacity-90"
-                  >
-                    Finalizado
-                  </button>
+                  <>
+                    <button
+                      disabled
+                      className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm cursor-default opacity-90"
+                    >
+                      Finalizado
+                    </button>
+                    {usuario?.role === "ADMIN" && (
+                      <button
+                        onClick={() => handleExcluirRoteiro(roteiro)}
+                        disabled={Boolean(apagandoRoteiros[roteiro.id])}
+                        className="bg-red-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {apagandoRoteiros[roteiro.id] ? "Apagando..." : "Apagar"}
+                      </button>
+                    )}
+                  </>
                 ) : null}
               </div>
             </div>
