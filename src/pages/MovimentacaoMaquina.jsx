@@ -40,26 +40,44 @@ export default function MovimentacaoMaquina() {
   const [success, setSuccess] = useState("");
   const [resumoCalculo, setResumoCalculo] = useState(null);
   const [alertaDivergencia, setAlertaDivergencia] = useState(null);
+  const [isPrimeiraMovimentacao, setIsPrimeiraMovimentacao] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const [maqRes, prodRes, ultimoProdRes] = await Promise.all([
+        const [maqRes, prodRes, ultimoProdRes, movRes] = await Promise.all([
           api.get(`/maquinas/${maquinaId}`),
           api.get("/produtos"),
           api
             .get(`/maquinas/${maquinaId}/ultimo-produto`)
             .catch(() => ({ data: { produtoId: null } })),
+          api
+            .get(`/movimentacoes?maquinaId=${maquinaId}&limite=1`)
+            .catch(() => ({ data: [] })),
         ]);
         setMaquina(maqRes.data);
         setProdutos(prodRes.data);
-        if (ultimoProdRes.data?.produtoId) {
-          setFormData((prev) => ({
-            ...prev,
-            produto_id: ultimoProdRes.data.produtoId,
-          }));
-        }
+
+        const movimentacoesMaquina = Array.isArray(movRes.data)
+          ? movRes.data
+          : [];
+        const primeiraMovimentacao = movimentacoesMaquina.length === 0;
+        setIsPrimeiraMovimentacao(primeiraMovimentacao);
+        const capacidadePadrao = Number(
+          maqRes.data?.capacidadePadrao ?? maqRes.data?.capacidade ?? 0,
+        );
+
+        setFormData((prev) => ({
+          ...prev,
+          produto_id: ultimoProdRes.data?.produtoId || prev.produto_id,
+          quantidadeAtualMaquina:
+            primeiraMovimentacao &&
+            prev.quantidadeAtualMaquina === "" &&
+            capacidadePadrao > 0
+              ? String(capacidadePadrao)
+              : prev.quantidadeAtualMaquina,
+        }));
       } catch {
         setError("Erro ao carregar dados da máquina ou produtos.");
       } finally {
@@ -119,6 +137,7 @@ export default function MovimentacaoMaquina() {
 
         const temContadoresDigitados =
           !isFuncionarioAbastecedor &&
+          !isPrimeiraMovimentacao &&
           !formData.ignoreInOut &&
           contadorOutDigitalReferencia !== "";
 
@@ -139,6 +158,7 @@ export default function MovimentacaoMaquina() {
     maquina,
     maquinaId,
     isFuncionarioAbastecedor,
+    isPrimeiraMovimentacao,
     formData.contadorOutDigital,
     formData.ignoreInOut,
   ]);
