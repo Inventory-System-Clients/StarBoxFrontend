@@ -427,7 +427,7 @@ export function MaquinaForm() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Valor da Ficha (R$)
+                    Valor da Jogada (R$)
                   </label>
                   <input
                     type="number"
