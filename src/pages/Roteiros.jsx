@@ -419,12 +419,18 @@ export function Roteiros() {
     try {
       const observacaoNormalizada = novaObservacaoRoteiro.trim();
       const veiculoId = normalizarIdOpcional(novoVeiculoId);
-      await api.post("/roteiros", {
+      const payload = {
         nome: novoNomeRoteiro,
         diasSemana: novosDiasRoteiro,
-        observacao: observacaoNormalizada || null,
         veiculoId,
-      });
+      };
+
+      // Observação é opcional na criação: só envia se houver texto.
+      if (observacaoNormalizada) {
+        payload.observacao = observacaoNormalizada;
+      }
+
+      await api.post("/roteiros", payload);
       setNovoNomeRoteiro("");
       setNovoVeiculoId("");
       setNovosDiasRoteiro([]);
@@ -1145,7 +1151,7 @@ export function Roteiros() {
               ))}
             </select>
             <label className="text-xs font-bold text-gray-400 block mb-2">
-              Observação do roteiro
+              Observação do roteiro (opcional)
             </label>
             <textarea
               name="observacao"
