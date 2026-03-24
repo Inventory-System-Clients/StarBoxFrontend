@@ -149,6 +149,18 @@ export default function PecasPage() {
     }
   };
 
+  const carrinhoPorPecaId = carrinho.reduce((acc, item) => {
+    const pecaId = String(item.pecaId || item.id || "");
+    if (!pecaId) return acc;
+    acc[pecaId] = (acc[pecaId] || 0) + Number(item.quantidade || 0);
+    return acc;
+  }, {});
+
+  const pecasNoCarrinhoComZero = pecas.map((peca) => ({
+    ...peca,
+    quantidadeCarrinho: carrinhoPorPecaId[String(peca.id)] || 0,
+  }));
+
   // Editar peça
   const handleEditar = (peca) => {
     setPecaEditando(peca);
@@ -321,8 +333,8 @@ export default function PecasPage() {
               🛒 Meu Carrinho
             </h2>
 
-            {carrinho.length === 0 ? (
-              <p className="text-gray-500">Nenhuma peça no carrinho.</p>
+            {pecasNoCarrinhoComZero.length === 0 ? (
+              <p className="text-gray-500">Nenhuma peça cadastrada.</p>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
@@ -340,9 +352,9 @@ export default function PecasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {carrinho.map((item) => {
-                    const pecaId = item.pecaId || item.id;
-                    const peca = item.Peca || item; // Acessa dados do relacionamento Sequelize
+                  {pecasNoCarrinhoComZero.map((peca) => {
+                    const pecaId = peca.id;
+                    const quantidadeCarrinho = peca.quantidadeCarrinho || 0;
                     return (
                       <tr key={pecaId}>
                         <td className="px-4 py-2 font-semibold text-gray-800">
@@ -352,12 +364,17 @@ export default function PecasPage() {
                           {peca.categoria || "-"}
                         </td>
                         <td className="px-4 py-2 text-gray-700">
-                          {item.quantidade}
+                          {quantidadeCarrinho}
                         </td>
                         <td className="px-4 py-2">
                           <button
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-semibold"
+                            className={`px-3 py-1 rounded text-xs font-semibold ${
+                              quantidadeCarrinho > 0
+                                ? "bg-red-500 hover:bg-red-600 text-white"
+                                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                            }`}
                             onClick={() => removerDoCarrinho(pecaId)}
+                            disabled={quantidadeCarrinho === 0}
                           >
                             Remover
                           </button>

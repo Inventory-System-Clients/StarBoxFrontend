@@ -147,6 +147,18 @@ export default function GerenciarCarrinhosPage() {
       p.codigo?.toLowerCase().includes(buscaPeca.toLowerCase()),
   );
 
+  const carrinhoPorPecaId = carrinhoFuncionario.reduce((acc, item) => {
+    const pecaId = String(item.pecaId || item.Peca?.id || item.peca?.id || "");
+    if (!pecaId) return acc;
+    acc[pecaId] = (acc[pecaId] || 0) + Number(item.quantidade || 0);
+    return acc;
+  }, {});
+
+  const pecasNoCarrinhoComZero = pecasDisponiveis.map((peca) => ({
+    ...peca,
+    quantidadeCarrinho: carrinhoPorPecaId[String(peca.id)] || 0,
+  }));
+
   if (loading) return <PageLoader />;
 
   return (
@@ -220,52 +232,34 @@ export default function GerenciarCarrinhosPage() {
               <p className="text-gray-500 text-sm text-center py-8">
                 Selecione um funcionário para ver o carrinho
               </p>
-            ) : carrinhoFuncionario.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-8">
-                Carrinho vazio
-              </p>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {carrinhoFuncionario.map((item) => {
-                  // Tentar múltiplas formas de acessar os dados da peça
-                  let peca = item.Peca || item.peca || item.Pecum || {};
-
-                  // Se não encontrou a peça no include, buscar na lista de peças disponíveis
-                  if (!peca.nome && item.pecaId) {
-                    const pecaEncontrada = pecasDisponiveis.find(
-                      (p) =>
-                        p.id === item.pecaId ||
-                        String(p.id) === String(item.pecaId),
-                    );
-                    if (pecaEncontrada) {
-                      peca = pecaEncontrada;
-                    }
-                  }
-
-                  console.log("Item do carrinho:", item, "Peça:", peca);
-
+                {pecasNoCarrinhoComZero.map((peca) => {
+                  const quantidadeCarrinho = peca.quantidadeCarrinho || 0;
                   return (
                     <div
-                      key={item.id || item.pecaId}
+                      key={peca.id}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
                     >
                       <div className="flex-1">
                         <div className="font-semibold text-gray-800">
-                          {peca.nome ||
-                            `Peça ID: ${item.pecaId || "desconhecida"}`}
+                          {peca.nome || `Peça ID: ${peca.id || "desconhecida"}`}
                         </div>
                         <div className="text-xs text-gray-500">
                           Código: {peca.codigo || "N/A"}
                         </div>
                         <div className="text-xs text-gray-600 mt-1">
-                          Quantidade: <strong>{item.quantidade || 1}</strong>
+                          Quantidade: <strong>{quantidadeCarrinho}</strong>
                         </div>
                       </div>
                       <button
-                        onClick={() =>
-                          removerPecaDoCarrinho(item.pecaId || peca.id)
-                        }
-                        className="ml-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                        onClick={() => removerPecaDoCarrinho(peca.id)}
+                        disabled={quantidadeCarrinho === 0}
+                        className={`ml-2 px-3 py-1 rounded text-sm transition-colors ${
+                          quantidadeCarrinho > 0
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        }`}
                       >
                         ❌
                       </button>
