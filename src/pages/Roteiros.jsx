@@ -1065,10 +1065,10 @@ export function Roteiros() {
                 ) : roteiro.status === "finalizado" ? (
                   <>
                     <button
-                      disabled
-                      className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm cursor-default opacity-90"
+                      onClick={() => navigate(`/roteiros/${roteiro.id}/executar`)}
+                      className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
                     >
-                      Finalizado
+                      Abrir Rota
                     </button>
                     {usuario?.role === "ADMIN" && (
                       <button

@@ -465,9 +465,7 @@ export default function RoteiroExecucao() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
             <h2 className="text-lg font-bold">💸 Gastos Diários do Roteiro</h2>
             <span className="text-xs bg-gray-100 px-3 py-1 rounded-full font-semibold text-gray-600">
-              {roteiro.status === "finalizado"
-                ? "Roteiro finalizado"
-                : "Lançamento disponível"}
+              Lançamento de gastos disponível
             </span>
           </div>
 
@@ -529,7 +527,7 @@ export default function RoteiroExecucao() {
                         : "",
                   }))
                 }
-                disabled={lancandoGasto || roteiro.status === "finalizado"}
+                disabled={lancandoGasto}
               >
                 {CATEGORIAS_GASTO.map((categoria) => (
                   <option key={categoria.value} value={categoria.value}>
@@ -557,7 +555,7 @@ export default function RoteiroExecucao() {
                     valor: e.target.value,
                   }))
                 }
-                disabled={lancandoGasto || roteiro.status === "finalizado"}
+                disabled={lancandoGasto}
               />
             </div>
           </div>
@@ -584,7 +582,7 @@ export default function RoteiroExecucao() {
                     quilometragem: e.target.value,
                   }))
                 }
-                disabled={lancandoGasto || roteiro.status === "finalizado"}
+                disabled={lancandoGasto}
               />
               <p className="mt-1 text-xs text-red-600 font-semibold">
                 Campo obrigatório quando a categoria for Abastecimento.
@@ -615,7 +613,7 @@ export default function RoteiroExecucao() {
                       litros: e.target.value,
                     }))
                   }
-                  disabled={lancandoGasto || roteiro.status === "finalizado"}
+                  disabled={lancandoGasto}
                 />
               </div>
               <div className="mb-3">
@@ -631,7 +629,7 @@ export default function RoteiroExecucao() {
                       nivelCombustivel: e.target.value,
                     }))
                   }
-                  disabled={lancandoGasto || roteiro.status === "finalizado"}
+                  disabled={lancandoGasto}
                 >
                   <option value="Cheio">Cheio</option>
                   <option value="3/4">3/4</option>
@@ -662,7 +660,7 @@ export default function RoteiroExecucao() {
                   observacao: e.target.value,
                 }))
               }
-              disabled={lancandoGasto || roteiro.status === "finalizado"}
+              disabled={lancandoGasto}
             />
             {gastoForm.categoria === "outros" && (
               <p className="mt-1 text-xs text-red-600 font-semibold">
@@ -677,7 +675,6 @@ export default function RoteiroExecucao() {
               onClick={handleLancarGasto}
               disabled={
                 lancandoGasto ||
-                roteiro.status === "finalizado" ||
                 kmObrigatorioPendente ||
                 litrosObrigatorioPendente ||
                 observacaoObrigatoriaPendente
