@@ -82,7 +82,7 @@ export default function Navbar() {
                   📊 Dashboard
                 </NavLink>
                 <NavLink to="/roteiros" active={isActive("/roteiros")}>
-                  🗺️ Roteiros
+                  🗺️ Rotas
                 </NavLink>
                 {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
                   <NavLink to="/maquinas" active={isActive("/maquinas")}>
