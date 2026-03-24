@@ -317,6 +317,25 @@ export default function MovimentacaoMaquina() {
     const nomeUsuario = usuario?.nome || "Usuário";
     const codigoMaquina = maquina?.codigo || "-";
     const nomeMaquina = maquina?.nome || "Máquina";
+    const nomeProdutoAbastecido =
+      produtoSelecionado?.nome || "Produto não informado";
+    const quantidadeAbastecidaInformada =
+      parseInt(formData.quantidadeAdicionada, 10) || 0;
+
+    const blocoFinanceiro = isFuncionarioAbastecedor
+      ? []
+      : [
+          `Saldo: R$${formatarMoeda(saldo)}`,
+          `Jogadas medias por pelucia: ${formatarInteiro(jogadasMediasPorPelucia)}`,
+          "___________________________________",
+          "Qtde Maqs....: 01",
+          `Entradas.....: ${formatarInteiro(diferencaIn)}`,
+          `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
+          `Jogado.......: ${formatarMoeda(jogado)}`,
+          "Cliente....: 0,00",
+          `Liquido.....: ${formatarMoeda(saldo)}`,
+          `Especie.....: ${formatarMoeda(saldo)}`,
+        ];
 
     const mensagem = [
       "STAR BOX",
@@ -325,18 +344,14 @@ export default function MovimentacaoMaquina() {
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
       `${codigoMaquina} | ${nomeMaquina}`,
+      `Produto abastecido: ${nomeProdutoAbastecido}${
+        quantidadeAbastecidaInformada > 0
+          ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
+          : ""
+      }`,
       `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
-      `Saldo: R$${formatarMoeda(saldo)}`,
-      `Jogadas medias por pelucia: ${formatarInteiro(jogadasMediasPorPelucia)}`,
-      "___________________________________",
-      "Qtde Maqs....: 01",
-      `Entradas.....: ${formatarInteiro(diferencaIn)}`,
-      `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
-      `Jogado.......: ${formatarMoeda(jogado)}`,
-      "Cliente....: 0,00",
-      `Liquido.....: ${formatarMoeda(saldo)}`,
-      `Especie.....: ${formatarMoeda(saldo)}`,
+      ...blocoFinanceiro,
     ].join("\n");
 
     abrirWhatsAppComMensagem(mensagem);
