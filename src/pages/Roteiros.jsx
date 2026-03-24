@@ -743,14 +743,14 @@ export function Roteiros() {
               onClick={() => setShowModalCriarRoteiro(true)}
               className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition-shadow shadow-md"
             >
-              + Novo Roteiro
+              + Nova Rota
             </button>
           )}
         </div>
 
         <div className="mb-6">
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            Buscar roteiro por nome
+            Buscar rota por nome
           </label>
           <input
             type="text"
@@ -776,13 +776,13 @@ export function Roteiros() {
         {usuario?.role !== "ADMIN" &&
           roteirosDoUsuario.length === 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
-              Nenhum roteiro atribuído a você no momento.
+              Nenhuma rota atribuída a você no momento.
             </div>
           )}
 
         {roteirosDoUsuario.length > 0 && roteirosFiltrados.length === 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-600 font-medium mb-6">
-            Nenhum roteiro encontrado com esse nome.
+            Nenhuma rota encontrada com esse nome.
           </div>
         )}
 
@@ -1283,7 +1283,7 @@ export function Roteiros() {
             </div>
             {isRoteiroFinalizado(roteiroParaAdicionar) && (
               <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                Este roteiro está finalizado. Não é permitido adicionar lojas.
+                Esta rota está finalizada. Não é permitido adicionar lojas.
               </div>
             )}
             <div className="overflow-y-auto space-y-2 mb-4">
