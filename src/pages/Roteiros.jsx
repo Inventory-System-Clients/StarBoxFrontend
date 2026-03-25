@@ -422,8 +422,10 @@ export function Roteiros() {
     }
   };
 
-  const usuarioTemPilotagemAtiva = async () => {
-    if (usuario?.role !== "FUNCIONARIO_TODAS_LOJAS") return true;
+  const usuarioTemPilotagemAtiva = async (validarParaTodosPerfis = false) => {
+    if (!validarParaTodosPerfis && usuario?.role !== "FUNCIONARIO_TODAS_LOJAS") {
+      return true;
+    }
 
     try {
       const [ultimasMovRes, veiculosRes] = await Promise.all([
@@ -497,6 +499,27 @@ export function Roteiros() {
     }
 
     navigate(`/roteiros/${roteiroId}/executar`);
+  };
+
+  const exigirFinalizarPilotagemAntesDaRota = async (roteiroId) => {
+    const temPilotagemAtiva = await usuarioTemPilotagemAtiva(true);
+    if (!temPilotagemAtiva) return true;
+
+    const mensagemBloqueio =
+      "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
+
+    setError(mensagemBloqueio);
+    navigate("/veiculos", {
+      state: {
+        origem: "roteiros-finalizacao",
+        retornarPara: "/roteiros",
+        roteiroIdParaFinalizar: roteiroId,
+        alertaFinalizarVeiculo: mensagemBloqueio,
+        alertaFinalizarVeiculoToken: `${Date.now()}-${roteiroId}`,
+      },
+    });
+
+    return false;
   };
 
   // --- AÇÕES ---
@@ -617,6 +640,17 @@ export function Roteiros() {
     const roteiro = modalFinalizar.roteiro;
     if (!roteiro) return;
 
+    const podeFinalizar = await exigirFinalizarPilotagemAntesDaRota(roteiro.id);
+    if (!podeFinalizar) {
+      setModalFinalizar({
+        aberto: false,
+        etapa: 1,
+        roteiro: null,
+        loading: false,
+      });
+      return;
+    }
+
     const extrairNumero = (...valores) => {
       for (const valor of valores) {
         const numero = Number(valor);
@@ -661,7 +695,13 @@ export function Roteiros() {
         finalizacaoData?.totais?.peluciasUsadas,
       );
 
-      if (totalPeluciasUsadas === null) {
+      const podeConsultarMovimentacoesResumo = [
+        "ADMIN",
+        "GERENCIADOR",
+        "CONTROLADOR_ESTOQUE",
+      ].includes(usuario?.role);
+
+      if (podeConsultarMovimentacoesResumo) {
         try {
           const movRes = await api.get("/movimentacoes", {
             params: {
@@ -674,9 +714,10 @@ export function Roteiros() {
             : movRes.data?.rows || movRes.data?.movimentacoes || [];
           totalPeluciasUsadas = somarPeluciasUsadasMovimentacoes(
             listaMovimentacoes,
+            usuario?.id,
           );
         } catch {
-          totalPeluciasUsadas = null;
+          totalPeluciasUsadas = totalPeluciasUsadas ?? null;
         }
       }
 
@@ -799,12 +840,7 @@ export function Roteiros() {
         roteiro: null,
         loading: false,
       });
-      navigate("/veiculos", {
-        state: {
-          alertaFinalizarVeiculo:
-            "Rota finalizada! Não esqueça de finalizar o veículo que você está usando.",
-        },
-      });
+      carregarDadosIniciais();
     } catch (err) {
       if (popupReservado && !popupReservado.closed) {
         popupReservado.close();
@@ -814,7 +850,10 @@ export function Roteiros() {
     }
   };
 
-  const abrirModalFinalizacao = (roteiro) => {
+  const abrirModalFinalizacao = async (roteiro) => {
+    const podeFinalizar = await exigirFinalizarPilotagemAntesDaRota(roteiro.id);
+    if (!podeFinalizar) return;
+
     setModalFinalizar({
       aberto: true,
       etapa: 1,

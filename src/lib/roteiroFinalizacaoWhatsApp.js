@@ -113,23 +113,24 @@ export const extrairResumoExecucaoRoteiro = ({ roteiro, finalizacaoData }) => {
   };
 };
 
-export const somarPeluciasUsadasMovimentacoes = (movimentacoes) => {
+export const somarPeluciasUsadasMovimentacoes = (movimentacoes, usuarioId = null) => {
+  const usuarioNormalizado =
+    usuarioId === null || usuarioId === undefined ? null : String(usuarioId);
+
   return toArray(movimentacoes).reduce((total, mov) => {
-    const produtos = toArray(mov?.produtos);
+    const movUsuarioId = String(
+      mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+    );
 
-    if (produtos.length > 0) {
-      const totalProdutos = produtos.reduce((subtotal, produto) => {
-        const saidaProduto = Number(
-          produto?.quantidadeSaiu || produto?.sairam || produto?.quantidade || 0,
-        );
-        return subtotal + (Number.isFinite(saidaProduto) ? saidaProduto : 0);
-      }, 0);
-
-      return total + totalProdutos;
+    if (usuarioNormalizado && movUsuarioId !== usuarioNormalizado) {
+      return total;
     }
 
-    const saidaMov = Number(mov?.quantidadeSaiu || mov?.sairam || 0);
-    return total + (Number.isFinite(saidaMov) ? saidaMov : 0);
+    const quantidadeAbastecida = Number(
+      mov?.abastecidas || mov?.quantidadeAdicionada || mov?.totalAbastecido || 0,
+    );
+
+    return total + (Number.isFinite(quantidadeAbastecida) ? quantidadeAbastecida : 0);
   }, 0);
 };
 

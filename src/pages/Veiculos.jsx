@@ -58,8 +58,20 @@ export default function Veiculos() {
     const mensagem = location.state?.alertaFinalizarVeiculo;
     if (!mensagem) return;
 
+    const alertaToken = String(location.state?.alertaFinalizarVeiculoToken || mensagem);
+    const chaveAlerta = `alerta-veiculos-${alertaToken}`;
+    if (sessionStorage.getItem(chaveAlerta) === "1") return;
+    sessionStorage.setItem(chaveAlerta, "1");
+
+    const proximoState = { ...(location.state || {}) };
+    delete proximoState.alertaFinalizarVeiculo;
+    delete proximoState.alertaFinalizarVeiculoToken;
+
     alert(mensagem);
-    navigate(location.pathname, { replace: true, state: {} });
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(proximoState).length > 0 ? proximoState : {},
+    });
   }, [location.pathname, location.state, navigate]);
 
   const abrirModal = () => {

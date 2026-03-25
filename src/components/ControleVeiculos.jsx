@@ -355,6 +355,16 @@ export default function ControleVeiculos({
         confirmButtonText: "OK",
       });
       fecharModalFinalizar();
+
+      if (location?.state?.origem === "roteiros-finalizacao") {
+        navigate(location?.state?.retornarPara || "/roteiros", {
+          replace: true,
+          state: {
+            pilotagemFinalizada: true,
+            roteiroIdParaFinalizar: location?.state?.roteiroIdParaFinalizar,
+          },
+        });
+      }
     } catch (error) {
       console.error("Erro ao finalizar:", error);
       Swal.fire("Erro", "Não foi possível finalizar o veículo.", "error");

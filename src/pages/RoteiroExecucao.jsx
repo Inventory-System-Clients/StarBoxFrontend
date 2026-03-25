@@ -336,6 +336,78 @@ export default function RoteiroExecucao() {
   const executarFinalizacaoRoteiro = async () => {
     if (!roteiro) return;
 
+    const validarPilotagemAtivaUsuario = async () => {
+      try {
+        const [ultimasMovRes, veiculosRes] = await Promise.all([
+          api.get("/movimentacao-veiculos/ultimas"),
+          api.get("/veiculos"),
+        ]);
+
+        const usuarioId = String(usuario?.id || "");
+        const veiculosLista = Array.isArray(veiculosRes.data)
+          ? veiculosRes.data
+          : [];
+
+        const ultimasMovObj = ultimasMovRes.data || {};
+        const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
+          ? ultimasMovObj
+          : Object.values(ultimasMovObj);
+
+        const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
+          const usuarioMovId = String(
+            mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+          );
+          const tipoMov = String(mov?.tipo || "").toLowerCase();
+          const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+          const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
+
+          return (
+            usuarioMovId === usuarioId &&
+            tipoMov === "retirada" &&
+            Boolean(veiculo?.emUso)
+          );
+        });
+
+        const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
+          const usuarioVeiculoId = String(
+            veiculo?.usuario?.id ||
+              veiculo?.usuarioId ||
+              veiculo?.funcionarioId ||
+              veiculo?.condutorId ||
+              "",
+          );
+
+          return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
+        });
+
+        return temRetiradaAtiva || temVinculoDiretoNoVeiculo;
+      } catch {
+        setError(
+          "Não foi possível validar a pilotagem do veículo. Tente novamente em instantes.",
+        );
+        return false;
+      }
+    };
+
+    const temPilotagemAtiva = await validarPilotagemAtivaUsuario();
+    if (temPilotagemAtiva) {
+      const mensagemBloqueio =
+        "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
+
+      setError(mensagemBloqueio);
+      setModalFinalizar({ aberto: false, etapa: 1, loading: false });
+      navigate("/veiculos", {
+        state: {
+          origem: "roteiros-finalizacao",
+          retornarPara: "/roteiros",
+          roteiroIdParaFinalizar: id,
+          alertaFinalizarVeiculo: mensagemBloqueio,
+          alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
+        },
+      });
+      return;
+    }
+
     const extrairNumero = (...valores) => {
       for (const valor of valores) {
         const numero = Number(valor);
@@ -380,7 +452,13 @@ export default function RoteiroExecucao() {
         finalizacaoData?.totais?.peluciasUsadas,
       );
 
-      if (totalPeluciasUsadas === null) {
+      const podeConsultarMovimentacoesResumo = [
+        "ADMIN",
+        "GERENCIADOR",
+        "CONTROLADOR_ESTOQUE",
+      ].includes(usuario?.role);
+
+      if (podeConsultarMovimentacoesResumo) {
         try {
           const movRes = await api.get("/movimentacoes", {
             params: {
@@ -393,9 +471,10 @@ export default function RoteiroExecucao() {
             : movRes.data?.rows || movRes.data?.movimentacoes || [];
           totalPeluciasUsadas = somarPeluciasUsadasMovimentacoes(
             listaMovimentacoes,
+            usuario?.id,
           );
         } catch {
-          totalPeluciasUsadas = null;
+          totalPeluciasUsadas = totalPeluciasUsadas ?? null;
         }
       }
 
@@ -509,12 +588,7 @@ export default function RoteiroExecucao() {
       }
 
       setModalFinalizar({ aberto: false, etapa: 1, loading: false });
-      navigate("/veiculos", {
-        state: {
-          alertaFinalizarVeiculo:
-            "Rota finalizada! Não esqueça de finalizar o veículo que você está usando.",
-        },
-      });
+      await carregarRoteiro();
     } catch (err) {
       if (popupReservado && !popupReservado.closed) {
         popupReservado.close();
@@ -524,7 +598,73 @@ export default function RoteiroExecucao() {
     }
   };
 
-  const abrirModalFinalizacao = () => {
+  const abrirModalFinalizacao = async () => {
+    try {
+      const [ultimasMovRes, veiculosRes] = await Promise.all([
+        api.get("/movimentacao-veiculos/ultimas"),
+        api.get("/veiculos"),
+      ]);
+
+      const usuarioId = String(usuario?.id || "");
+      const veiculosLista = Array.isArray(veiculosRes.data)
+        ? veiculosRes.data
+        : [];
+
+      const ultimasMovObj = ultimasMovRes.data || {};
+      const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
+        ? ultimasMovObj
+        : Object.values(ultimasMovObj);
+
+      const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
+        const usuarioMovId = String(
+          mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+        );
+        const tipoMov = String(mov?.tipo || "").toLowerCase();
+        const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+        const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
+
+        return (
+          usuarioMovId === usuarioId &&
+          tipoMov === "retirada" &&
+          Boolean(veiculo?.emUso)
+        );
+      });
+
+      const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
+        const usuarioVeiculoId = String(
+          veiculo?.usuario?.id ||
+            veiculo?.usuarioId ||
+            veiculo?.funcionarioId ||
+            veiculo?.condutorId ||
+            "",
+        );
+
+        return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
+      });
+
+      if (temRetiradaAtiva || temVinculoDiretoNoVeiculo) {
+        const mensagemBloqueio =
+          "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
+
+        setError(mensagemBloqueio);
+        navigate("/veiculos", {
+          state: {
+            origem: "roteiros-finalizacao",
+            retornarPara: "/roteiros",
+            roteiroIdParaFinalizar: id,
+            alertaFinalizarVeiculo: mensagemBloqueio,
+            alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
+          },
+        });
+        return;
+      }
+    } catch {
+      setError(
+        "Não foi possível validar a pilotagem do veículo. Tente novamente em instantes.",
+      );
+      return;
+    }
+
     setModalFinalizar({ aberto: true, etapa: 1, loading: false });
   };
 
