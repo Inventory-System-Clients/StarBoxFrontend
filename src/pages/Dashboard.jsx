@@ -283,6 +283,8 @@ export function Dashboard() {
   // (removido reloadAfterModal/useEffect pois reload é imediato)
 
   const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isAdminLike =
+    usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
   const podeVerDefeituosasNoDashboard =
     usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const [stats, setStats] = useState({
@@ -344,7 +346,8 @@ export function Dashboard() {
 
   const carregarDados = useCallback(async () => {
     try {
-      const isAdmin = usuario?.role === "ADMIN";
+      const isAdmin =
+        usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
       const bloquearVisualizacaoLojasEMaquinas =
         usuario?.role === "FUNCIONARIO";
 
@@ -686,13 +689,13 @@ export function Dashboard() {
 
   // Carregar estoque das lojas
   useEffect(() => {
-    if (usuario?.role === "ADMIN") {
+    if (isAdminLike) {
       carregarEstoqueDasLojas();
       return;
     }
 
     setLojasComEstoque([]);
-  }, [usuario?.role]);
+  }, [isAdminLike]);
 
   const carregarDetalhesMaquina = async (maquinaId) => {
     try {
@@ -1741,9 +1744,10 @@ export function Dashboard() {
         </div>
 
         {/* Cards de Resumo com design moderno - Apenas para ADMIN */}
-        {usuario?.role === "ADMIN" && (
+        {isAdminLike && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
             {/* Faturamento Semanal - Ocupa 2 colunas */}
+            {usuario?.role === "ADMIN" && (
             <div className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2">
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
@@ -1861,6 +1865,7 @@ export function Dashboard() {
                 })()}
               </div>
             </div>
+            )}
             {/* Prêmios Saídos */}
             <div className="stat-card bg-linear-to-br from-green-500 to-green-600 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30">
               <div className="relative z-10">
@@ -1932,9 +1937,10 @@ export function Dashboard() {
         )}
 
         {/* Financeiro, Veículos, Quebra de Ordem, Estoque e Manutenções */}
-        {usuario?.role === "ADMIN" ? (
+        {isAdminLike ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-6 mb-8">
             {/* Financeiro */}
+            {usuario?.role === "ADMIN" && (
             <div
               className="stat-card bg-linear-to-br from-blue-500 to-blue-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
               onClick={() => navigate("/financeiro/")}
@@ -1960,6 +1966,7 @@ export function Dashboard() {
                 <p className="text-xs opacity-75 mt-1">Gestão Financeira</p>
               </div>
             </div>
+            )}
             {/* Veículos */}
             <div
               className="stat-card bg-linear-to-br from-gray-700 to-gray-900 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
@@ -2243,7 +2250,7 @@ export function Dashboard() {
         )}
 
         {/* Alerta de Movimentação Inconsistente - ADMIN */}
-        {usuario?.role === "ADMIN" && (
+        {isAdminLike && (
           <div className="card-gradient mb-8 border-l-4 border-yellow-500 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
@@ -2269,7 +2276,7 @@ export function Dashboard() {
         )}
 
         {/* Card do Depósito Principal - Apenas ADMIN */}
-        {usuario?.role === "ADMIN" && (
+        {isAdminLike && (
           <div className="card-gradient mb-8 border-l-4 border-orange-500 p-4 sm:p-8 rounded-xl shadow-md sm:flex-row items-center justify-between gap-6">
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
@@ -2389,10 +2396,10 @@ export function Dashboard() {
             </div>
           )}
 
-        {usuario?.role === "ADMIN" && <DashboardGastosRoteirosTab />}
+        {isAdminLike && <DashboardGastosRoteirosTab />}
 
         {/* Estatísticas de Produtos Totais - Apenas para ADMIN */}
-        {usuario?.role === "ADMIN" &&
+        {isAdminLike &&
           stats.balanco?.distribuicaoLojas?.length > 0 && (
             <div className="card-gradient mb-8 border-l-4 border-pink-500 p-4 sm:p-8 rounded-xl shadow-md">
               <div
@@ -2507,7 +2514,7 @@ export function Dashboard() {
           )}
 
         {/* Estoque dos Depósitos - Apenas para ADMIN */}
-        {usuario?.role === "ADMIN" && lojasComEstoque.length > 0 && (
+        {isAdminLike && lojasComEstoque.length > 0 && (
           <>
             {/* Botão para ir para busca de lojas */}
             <div className="mb-6 flex justify-center">
@@ -3112,7 +3119,7 @@ export function Dashboard() {
                         {maquinaSelecionada.capacidadePadrao || 0}
                       </p>
                     </div>
-                    {usuario?.role === "ADMIN" && (
+                    {isAdminLike && (
                       <div>
                         <p className="text-sm text-gray-600">Estoque Atual</p>
                         <p className="text-lg font-semibold">
@@ -3210,7 +3217,7 @@ export function Dashboard() {
                 </div>
 
                 {/* Movimentações - Apenas para ADMIN */}
-                {usuario?.role === "ADMIN" && (
+                {isAdminLike && (
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                       <span className="text-2xl">🔄</span>
@@ -3432,7 +3439,7 @@ export function Dashboard() {
         )}
 
         {/* Alertas de Estoque - Apenas para ADMIN */}
-        {usuario?.role === "ADMIN" && stats.alertas.length > 0 && (
+        {isAdminLike && stats.alertas.length > 0 && (
           <div
             className="card mb-8 border-l-4 border-red-500"
             id="alertas-estoque-maquinas"
@@ -3577,7 +3584,7 @@ export function Dashboard() {
         )}
 
         {/* Alertas de Estoque de Lojas - Apenas para ADMIN */}
-        {usuario?.role === "ADMIN" && alertasEstoqueLoja.length > 0 && (
+        {isAdminLike && alertasEstoqueLoja.length > 0 && (
           <div className="card mb-8 border-l-4 border-orange-500">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
