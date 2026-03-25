@@ -455,12 +455,16 @@ export default function MovimentacaoMaquina() {
         contadorOutDigital: deveIgnorarContadores
           ? null
           : contadorOutDigitalInformado,
-        quantidade_notas_entrada: podeVerCamposFinanceirosEObservacao && formData.quantidade_notas_entrada
-          ? parseFloat(formData.quantidade_notas_entrada)
-          : null,
-        valor_entrada_maquininha_pix: podeVerCamposFinanceirosEObservacao && formData.valor_entrada_maquininha_pix
-          ? parseFloat(formData.valor_entrada_maquininha_pix)
-          : null,
+        quantidade_notas_entrada:
+          podeVerCamposFinanceirosEObservacao &&
+          formData.quantidade_notas_entrada
+            ? parseFloat(formData.quantidade_notas_entrada)
+            : null,
+        valor_entrada_maquininha_pix:
+          podeVerCamposFinanceirosEObservacao &&
+          formData.valor_entrada_maquininha_pix
+            ? parseFloat(formData.valor_entrada_maquininha_pix)
+            : null,
         ignoreInOut: isFuncionarioAbastecedor
           ? true
           : Boolean(formData.ignoreInOut),
@@ -531,10 +535,34 @@ export default function MovimentacaoMaquina() {
     return <div className="p-20 text-center font-bold">Carregando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 t                                                                                                                                              ext-[#24094E]">
+    <div className="min-h-screen bg-gray-100 text-[#24094E]">
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="card-gradient mb-6">
+          {/* Bloco de informações da máquina */}
+          {maquina && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg flex flex-col md:flex-row md:items-center md:gap-6">
+              <div className="font-semibold text-gray-800">
+                <span className="mr-2">🔢</span>
+                <span className="mr-2">
+                  Nº:{" "}
+                  <span className="font-bold">
+                    {maquina.codigo || maquina.numero || "-"}
+                  </span>
+                </span>
+                <span className="mr-2">|</span>
+                <span className="mr-2">
+                  🖲️ Tipo:{" "}
+                  <span className="font-bold">{maquina.tipo || "-"}</span>
+                </span>
+                <span className="mr-2">|</span>
+                <span className="mr-2">
+                  🎰 Nome:{" "}
+                  <span className="font-bold">{maquina.nome || "-"}</span>
+                </span>
+              </div>
+            </div>
+          )}
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <span className="text-2xl">📝</span>
             Registrar Movimentação
@@ -675,7 +703,8 @@ export default function MovimentacaoMaquina() {
                       {resumoCalculo.contadorOutSugerido || 0}
                     </p>
                     <p className="text-xs text-indigo-700">
-                      Era para ter na máquina: {resumoCalculo.totalPreEsperado ?? 0}
+                      Era para ter na máquina:{" "}
+                      {resumoCalculo.totalPreEsperado ?? 0}
                     </p>
                     <p className="text-xs text-indigo-700">
                       Sugestão de abastecimento: {sugestaoAbastecimento ?? 0}
@@ -690,12 +719,15 @@ export default function MovimentacaoMaquina() {
                     </p>
                     {alertaDivergencia.tipo === "out_abaixo_sugerido" ? (
                       <p className="text-xs text-yellow-700">
-                        OUT digitado ({alertaDivergencia.contadorOutDigitado}) está abaixo do OUT sugerido acumulado (
+                        OUT digitado ({alertaDivergencia.contadorOutDigitado})
+                        está abaixo do OUT sugerido acumulado (
                         {alertaDivergencia.contadorOutSugerido}).
                       </p>
                     ) : (
                       <p className="text-xs text-yellow-700">
-                        Era para ter {alertaDivergencia.totalPreEsperado} na máquina, mas foi informado {alertaDivergencia.totalPreInformado}.
+                        Era para ter {alertaDivergencia.totalPreEsperado} na
+                        máquina, mas foi informado{" "}
+                        {alertaDivergencia.totalPreInformado}.
                       </p>
                     )}
                   </div>
@@ -704,7 +736,8 @@ export default function MovimentacaoMaquina() {
             ) : (
               <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <p className="text-sm text-gray-700">
-                  Perfil Funcionário Abastecedor: IN/OUT é ignorado automaticamente nesta movimentação.
+                  Perfil Funcionário Abastecedor: IN/OUT é ignorado
+                  automaticamente nesta movimentação.
                 </p>
               </div>
             )}
@@ -808,7 +841,8 @@ export default function MovimentacaoMaquina() {
                       step="0.01"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Valor total recebido via pagamento digital (Pix/Maquininha)
+                      Valor total recebido via pagamento digital
+                      (Pix/Maquininha)
                     </p>
                   </div>
                 </>
@@ -906,8 +940,8 @@ export default function MovimentacaoMaquina() {
                     </span>
                     <p className="text-xs text-green-700 mt-1">
                       Marque esta opção se você está retirando dinheiro desta
-                      máquina. Esta movimentação aparecerá na aba "Fluxo de Caixa"
-                      para conferência pelo administrador.
+                      máquina. Esta movimentação aparecerá na aba "Fluxo de
+                      Caixa" para conferência pelo administrador.
                     </p>
                   </div>
                 </label>
