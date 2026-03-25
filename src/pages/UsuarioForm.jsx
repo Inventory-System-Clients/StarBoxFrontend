@@ -306,7 +306,7 @@ export function UsuarioForm() {
                     : formData.role === "CONTROLADOR_ESTOQUE"
                       ? "Controlador de estoque acessa todas as lojas, gerencia estoques de usuários e pode operar movimentações."
                       : formData.role === "GERENCIADOR"
-                        ? "Gerenciadores têm acesso apenas à aba de Peças, podem cadastrar, excluir e gerenciar peças e carrinhos dos funcionários."
+                        ? "Gerenciador possui perfil administrativo operacional, mas sem acesso a financeiro, relatórios, fluxo de caixa e valores de faturamento de máquina."
                         : formData.role === "FUNCIONARIO_TODAS_LOJAS"
                           ? "Funcionários deste perfil visualizam todas as lojas, mas seguem com acesso operacional de funcionário."
                             : "Funcionário Abastecedor tem acesso operacional limitado às lojas autorizadas"}

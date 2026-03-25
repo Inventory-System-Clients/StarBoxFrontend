@@ -16,6 +16,8 @@ import {
 export function Roteiros() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const isGestorRoteiro =
+    usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
   const ORCAMENTO_DIARIO_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
@@ -335,10 +337,9 @@ export function Roteiros() {
     return textoBuscaLoja.includes(termoBuscaLoja);
   });
 
-  const roteirosDoUsuario =
-    usuario?.role === "ADMIN"
-      ? roteiros
-      : roteiros.filter((r) => String(r.funcionarioId) === String(usuario?.id));
+  const roteirosDoUsuario = isGestorRoteiro
+    ? roteiros
+    : roteiros.filter((r) => String(r.funcionarioId) === String(usuario?.id));
 
   const termoBuscaRoteiro = normalizarTextoFiltro(filtroNomeRoteiro);
   const roteirosFiltrados = roteirosDoUsuario.filter((roteiro) =>
@@ -357,10 +358,10 @@ export function Roteiros() {
       const promises = [
         api.get("/roteiros/com-status"),
         api.get("/lojas"),
-        usuario?.role === "ADMIN"
+        isGestorRoteiro
           ? api.get("/usuarios/funcionarios")
           : Promise.resolve({ data: [] }),
-        usuario?.role === "ADMIN"
+        isGestorRoteiro
           ? api.get("/veiculos")
           : Promise.resolve({ data: [] }),
       ];
@@ -838,7 +839,7 @@ export function Roteiros() {
 
   // --- DRAG AND DROP HANDLERS ---
   const onDragStart = (loja, roteiroId) => {
-    if (usuario?.role !== "ADMIN") return;
+    if (!isGestorRoteiro) return;
     const roteiroOrigem = getRoteiroById(roteiroId);
     if (isRoteiroFinalizado(roteiroOrigem)) return;
 
@@ -851,7 +852,7 @@ export function Roteiros() {
     const roteiroDestino = getRoteiroById(roteiroDestinoId);
 
     if (
-      usuario?.role !== "ADMIN" ||
+      !isGestorRoteiro ||
       !draggedLoja ||
       isRoteiroFinalizado(roteiroOrigem) ||
       isRoteiroFinalizado(roteiroDestino)
@@ -871,7 +872,7 @@ export function Roteiros() {
     e.preventDefault();
     setDraggedOverIndex(null);
 
-    if (usuario?.role !== "ADMIN") return;
+    if (!isGestorRoteiro) return;
 
     if (!draggedLoja) return;
 
@@ -915,7 +916,7 @@ export function Roteiros() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">🗺️ Gestão de Rotas</h1>
-          {usuario?.role === "ADMIN" && (
+          {isGestorRoteiro && (
             <button
               onClick={() => setShowModalCriarRoteiro(true)}
               className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition-shadow shadow-md"
@@ -950,7 +951,7 @@ export function Roteiros() {
         )}
 
         {/* Funcionários veem só os roteiros atribuídos a eles */}
-        {usuario?.role !== "ADMIN" &&
+        {!isGestorRoteiro &&
           roteirosDoUsuario.length === 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
               Nenhuma rota atribuída a você no momento.
@@ -968,12 +969,12 @@ export function Roteiros() {
             <div
               key={roteiro.id}
               onDragOver={(e) => {
-                if (usuario?.role !== "ADMIN" || isRoteiroFinalizado(roteiro))
+                if (!isGestorRoteiro || isRoteiroFinalizado(roteiro))
                   return;
                 e.preventDefault();
               }}
               onDrop={(e) => {
-                if (usuario?.role !== "ADMIN" || isRoteiroFinalizado(roteiro))
+                if (!isGestorRoteiro || isRoteiroFinalizado(roteiro))
                   return;
                 onDrop(e, roteiro.id);
               }}
@@ -1007,7 +1008,7 @@ export function Roteiros() {
                 <label className="text-xs font-bold text-gray-400 block mb-1">
                   RESPONSÁVEL
                 </label>
-                {usuario?.role === "ADMIN" ? (
+                {isGestorRoteiro ? (
                   <select
                     className="w-full p-2 text-sm border rounded bg-gray-50"
                     value={String(roteiro.funcionarioId || "")}
@@ -1082,7 +1083,7 @@ export function Roteiros() {
                 <label className="text-xs font-bold text-gray-400 block mb-1">
                   VEÍCULO
                 </label>
-                {usuario?.role === "ADMIN" ? (
+                {isGestorRoteiro ? (
                   <select
                     className="w-full p-2 text-sm border rounded bg-gray-50"
                     value={String(roteiro.veiculoId || "")}
@@ -1114,7 +1115,7 @@ export function Roteiros() {
                       <button
                         key={label}
                         title={full}
-                        disabled={usuario?.role !== "ADMIN"}
+                        disabled={!isGestorRoteiro}
                         onClick={() => toggleDia(roteiro.id, label)}
                         className={`px-2 py-1 rounded-md text-[11px] font-bold transition-colors border
                           ${
@@ -1122,14 +1123,14 @@ export function Roteiros() {
                               ? "bg-[#24094E] text-white border-[#24094E]"
                               : "bg-gray-100 text-gray-400 border-gray-200 hover:border-[#24094E] hover:text-[#24094E]"
                           }
-                          ${usuario?.role !== "ADMIN" ? "cursor-default opacity-70" : "cursor-pointer"}`}
+                          ${!isGestorRoteiro ? "cursor-default opacity-70" : "cursor-pointer"}`}
                       >
                         {label}
                       </button>
                     );
                   })}
                 </div>
-                {usuario?.role === "ADMIN" &&
+                {isGestorRoteiro &&
                   diasPendentes[roteiro.id] !== undefined && (
                     <button
                       onClick={() => salvarDias(roteiro.id)}
@@ -1146,7 +1147,7 @@ export function Roteiros() {
                 <label className="text-xs font-bold text-gray-400 block mb-2">
                   ORÇAMENTO DIÁRIO
                 </label>
-                {usuario?.role === "ADMIN" ? (
+                {isGestorRoteiro ? (
                   <>
                     <div className="flex items-center gap-2">
                       <input
@@ -1187,7 +1188,7 @@ export function Roteiros() {
                 <label className="text-xs font-bold text-gray-400 block mb-2">
                   OBSERVAÇÃO DO ROTEIRO
                 </label>
-                {usuario?.role === "ADMIN" ? (
+                {isGestorRoteiro ? (
                   <>
                     <textarea
                       name="observacao"
@@ -1234,7 +1235,7 @@ export function Roteiros() {
                   <span className="text-xs font-bold text-gray-400">
                     LOJAS NO DIA
                   </span>
-                  {usuario?.role === "ADMIN" &&
+                  {isGestorRoteiro &&
                     !isRoteiroFinalizado(roteiro) && (
                       <button
                         onClick={() => {
@@ -1256,7 +1257,7 @@ export function Roteiros() {
                         <div
                           key={loja.id}
                           draggable={
-                            usuario?.role === "ADMIN" &&
+                            isGestorRoteiro &&
                             !isRoteiroFinalizado(roteiro)
                           }
                           onDragStart={() => onDragStart(loja, roteiro.id)}
@@ -1264,7 +1265,7 @@ export function Roteiros() {
                           onDragLeave={onDragLeave}
                           onDrop={(e) => onDrop(e, roteiro.id, index)}
                           className={`bg-white p-3 rounded-md border shadow-sm mb-2 text-sm flex items-center gap-2 transition-colors
-                            ${usuario?.role === "ADMIN" && !isRoteiroFinalizado(roteiro) ? "cursor-move hover:border-blue-300" : ""}
+                            ${isGestorRoteiro && !isRoteiroFinalizado(roteiro) ? "cursor-move hover:border-blue-300" : ""}
                             ${draggedOverIndex === index && draggedFromRoteiro === roteiro.id ? "border-blue-500 border-2 bg-blue-50" : "border-gray-200"}
                           `}
                         >
@@ -1302,7 +1303,7 @@ export function Roteiros() {
                         Finalizar
                       </button>
                     )}
-                    {usuario?.role === "ADMIN" && (
+                    {isGestorRoteiro && (
                       <button
                         onClick={() => handleExcluirRoteiro(roteiro)}
                         disabled={Boolean(apagandoRoteiros[roteiro.id])}
@@ -1320,7 +1321,7 @@ export function Roteiros() {
                     >
                       Abrir Rota
                     </button>
-                    {usuario?.role === "ADMIN" && (
+                    {isGestorRoteiro && (
                       <button
                         onClick={() => handleExcluirRoteiro(roteiro)}
                         disabled={Boolean(apagandoRoteiros[roteiro.id])}

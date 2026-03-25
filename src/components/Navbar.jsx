@@ -9,6 +9,8 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isAdminLike =
+    usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
 
   const isActive = (path) => location.pathname === path;
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
@@ -120,7 +122,7 @@ export default function Navbar() {
                   </NavLink>
                 )}
 
-                {usuario?.role === "ADMIN" && (
+                {isAdminLike && (
                   <NavLink
                     to="/gerenciar-carrinhos"
                     active={isActive("/gerenciar-carrinhos")}
@@ -130,20 +132,21 @@ export default function Navbar() {
                 )}
 
                 {usuario?.role === "ADMIN" && (
-                  <>
-                    <NavLink to="/relatorios" active={isActive("/relatorios")}>
-                      📄 Relatórios
-                    </NavLink>
-                    <NavLink
-                      to="/fluxo-caixa"
-                      active={isActive("/fluxo-caixa")}
-                    >
-                      💰 Fluxo de Caixa
-                    </NavLink>
-                    <NavLink to="/usuarios" active={isActive("/usuarios")}>
-                      👥 Usuários
-                    </NavLink>
-                  </>
+                  <NavLink to="/relatorios" active={isActive("/relatorios")}>
+                    📄 Relatórios
+                  </NavLink>
+                )}
+
+                {usuario?.role === "ADMIN" && (
+                  <NavLink to="/fluxo-caixa" active={isActive("/fluxo-caixa")}>
+                    💰 Fluxo de Caixa
+                  </NavLink>
+                )}
+
+                {isAdminLike && (
+                  <NavLink to="/usuarios" active={isActive("/usuarios")}>
+                    👥 Usuários
+                  </NavLink>
                 )}
               </div>
             </div>
@@ -253,7 +256,7 @@ export default function Navbar() {
                 ♻️ Defeituosas
               </MobileNavLink>
             )}
-            {usuario?.role === "ADMIN" && (
+            {isAdminLike && (
               <MobileNavLink
                 to="/gerenciar-carrinhos"
                 active={isActive("/gerenciar-carrinhos")}
@@ -272,7 +275,7 @@ export default function Navbar() {
               </MobileNavLink>
             )}
             {/* ... Repetir para outros links ... */}
-            {usuario?.role === "ADMIN" && (
+            {isAdminLike && (
               <MobileNavLink
                 to="/usuarios"
                 active={isActive("/usuarios")}

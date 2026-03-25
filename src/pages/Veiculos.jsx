@@ -4,6 +4,7 @@ import ControleVeiculos from "../components/ControleVeiculos";
 import RegistroVeiculosMovimentacao from "../components/RegistroVeiculosMovimentacao";
 import AbastecimentosVeiculos from "../components/AbastecimentosVeiculos";
 import AlertasVeiculos from "../components/AlertasVeiculos";
+import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
 
 const initialFormState = {
@@ -23,6 +24,8 @@ const initialFormState = {
 export default function Veiculos() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { usuario } = useAuth();
+  const podeCriarVeiculo = usuario?.role === "ADMIN";
   const [modalCadastro, setModalCadastro] = useState(false);
   const [mostrarAlertas, setMostrarAlertas] = useState(false);
   const [abaPrincipal, setAbaPrincipal] = useState("controle");
@@ -59,7 +62,13 @@ export default function Veiculos() {
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.pathname, location.state, navigate]);
 
-  const abrirModal = () => setModalCadastro(true);
+  const abrirModal = () => {
+    if (!podeCriarVeiculo) {
+      alert("Somente administradores podem cadastrar veículos.");
+      return;
+    }
+    setModalCadastro(true);
+  };
 
   const fecharModal = () => {
     setModalCadastro(false);
@@ -82,6 +91,11 @@ export default function Veiculos() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!podeCriarVeiculo) {
+      alert("Somente administradores podem cadastrar veículos.");
+      return;
+    }
+
     try {
       await api.post("/veiculos", form);
       fetchVeiculos();
@@ -118,12 +132,14 @@ export default function Veiculos() {
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={abrirModal}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium shadow-sm transition-colors"
-            >
-              + Novo Veículo
-            </button>
+            {podeCriarVeiculo && (
+              <button
+                onClick={abrirModal}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium shadow-sm transition-colors"
+              >
+                + Novo Veículo
+              </button>
+            )}
             <button
               onClick={() => setMostrarAlertas(!mostrarAlertas)}
               className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-medium shadow-sm transition-colors"
@@ -218,7 +234,7 @@ export default function Veiculos() {
       </div>
 
       {/* Modal de cadastro */}
-      {modalCadastro && (
+      {modalCadastro && podeCriarVeiculo && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <form
             className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-blue-100 relative animate-fadeIn max-h-[90vh] overflow-y-auto"

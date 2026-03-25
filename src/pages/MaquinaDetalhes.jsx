@@ -11,6 +11,7 @@ import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 export function MaquinaDetalhes() {
   const { id } = useParams();
   const { usuario } = useAuth();
+  const podeVerFaturamentoMaquina = usuario?.role !== "GERENCIADOR";
   // const location = useLocation(); // Removido pois não é utilizado
   const [maquina, setMaquina] = useState(null);
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -281,7 +282,9 @@ export function MaquinaDetalhes() {
                     <th className="text-left py-2 px-2">Fichas</th>
                     <th className="text-left py-2 px-2">IN</th>
                     <th className="text-left py-2 px-2">OUT</th>
-                    <th className="text-left py-2 px-2">Valor</th>
+                    {podeVerFaturamentoMaquina && (
+                      <th className="text-left py-2 px-2">Valor</th>
+                    )}
                     <th className="text-left py-2 px-2">Quebra de Ordem</th>
                     <th className="text-left py-2 px-2">Observação</th>
                     <th className="text-left py-2 px-2">Ações</th>
@@ -308,11 +311,13 @@ export function MaquinaDetalhes() {
                       <td className="py-2 px-2 font-medium text-purple-600">
                         {mov.contadorOut?.toLocaleString("pt-BR") || "-"}
                       </td>
-                      <td className="py-2 px-2">
-                        {mov.valorFaturado
-                          ? `R$ ${mov.valorFaturado.toFixed(2)}`
-                          : "-"}
-                      </td>
+                      {podeVerFaturamentoMaquina && (
+                        <td className="py-2 px-2">
+                          {mov.valorFaturado
+                            ? `R$ ${mov.valorFaturado.toFixed(2)}`
+                            : "-"}
+                        </td>
+                      )}
                       <td className="py-2 px-2">
                         {mov.justificativa_ordem ? (
                           <div className="max-w-xs">

@@ -8,6 +8,7 @@ export function PrivateRoute({
   allowedRoles = [],
 }) {
   const { signed, loading, isAdmin, usuario } = useAuth();
+  const hasAdminPrivileges = isAdmin() || usuario?.role === "GERENCIADOR";
 
   if (loading) {
     return (
@@ -21,7 +22,7 @@ export function PrivateRoute({
     return <Navigate to="/login" />;
   }
 
-  if (adminOnly && !isAdmin()) {
+  if (adminOnly && !hasAdminPrivileges) {
     return <Navigate to="/" />;
   }
 

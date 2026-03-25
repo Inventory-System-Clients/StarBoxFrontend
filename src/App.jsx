@@ -80,7 +80,7 @@ function AppRoutes() {
       <Route
         path="/financeiro/*"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["GERENCIADOR"]}>
             <FinanceiroRoutes />
           </PrivateRoute>
         }
@@ -286,7 +286,7 @@ function AppRoutes() {
       <Route
         path="/relatorios"
         element={
-          <PrivateRoute adminOnly>
+          <PrivateRoute allowedRoles={["ADMIN"]}>
             <Relatorios />
           </PrivateRoute>
         }
@@ -329,7 +329,7 @@ function AppRoutes() {
       <Route
         path="/fluxo-caixa"
         element={
-          <PrivateRoute>
+          <PrivateRoute deniedRoles={["GERENCIADOR"]}>
             <FluxoCaixa />
           </PrivateRoute>
         }
