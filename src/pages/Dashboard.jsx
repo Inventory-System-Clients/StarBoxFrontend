@@ -1,13 +1,4 @@
 // Adiciona CSS para animação de piscar vermelho
-const blinkRedStyle = `
-@keyframes blink-red {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
-  50% { box-shadow: 0 0 16px 4px rgba(239,68,68,1); }
-}
-.blink-red {
-  animation: blink-red 1s infinite;
-}
-`;
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -27,6 +18,43 @@ import DashboardGastosRoteirosTab from "../components/DashboardGastosRoteirosTab
 import Swal from "sweetalert2";
 
 export function Dashboard() {
+  const blinkRedStyle = `
+                /* Define a animação brusca */
+@keyframes blinkBruscoRed {
+  /* No estado inicial, força o fundo para o roxo original */
+  0%, 49.9% { 
+    background-color: #D92E30 !important; /* Seu Roxo Original */
+    /* Mantém o gradiente original, se houver */
+    background-image: var(--seu-gradiente-original-das-ondas) !important; 
+    color: #D92E30 !important; /* Texto Branco */
+    filter: brightness(100%) !important;
+  }
+  /* No meio da animação, pula direto para o vermelho vivo */
+  50%, 100% { 
+    background-color: #D92E30 !important; /* Vermelho Alerta */
+    background-image: none !important; /* Remove o gradiente para o vermelho ficar sólido e claro */
+    color: #D92E30 !important; /* Mantém texto branco */
+    filter: brightness(120%) !important; /* Dá um leve brilho no vermelho */
+    box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.7) !important;
+  }
+}
+
+/* Aplique esta classe ao card de Manutenções */
+.blink-red {
+  /* Animação com steps(1, start) para pulos bruscos */
+  animation: blinkBruscoRed 0.7s steps(1, start) infinite !important;
+  border: 2px solid #b91c1c !important; /* Borda vermelha escura sempre visível */
+  
+  /* Mantém o arredondamento */
+  border-radius: 12px;
+}
+
+/* Garante que o conteúdo interno não seja afetado negativamente pela troca de cor */
+.blink-red * {
+  transition: color 5s; /* Garante que o texto também mude abruptamente */
+  color: #D92E30 !important;
+}
+`;
   const { usuario } = useAuth();
   // Estado para saber se há manutenção pendente atribuída ao usuário
   const [temManutencaoPendente, setTemManutencaoPendente] = useState(false);
@@ -2143,7 +2171,7 @@ export function Dashboard() {
               className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
-              {/* Injeta o CSS da animação blink-red */}
+              {/* Injeta o CSS da animação blink-red para o card inteiro */}
               <style>{blinkRedStyle}</style>
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
