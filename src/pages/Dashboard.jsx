@@ -1,3 +1,14 @@
+// Adiciona CSS para animação de piscar vermelho
+const blinkRedStyle = `
+@keyframes blink-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+  50% { box-shadow: 0 0 16px 4px rgba(239,68,68,1); }
+}
+.blink-red {
+  animation: blink-red 1s infinite;
+}
+`;
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -16,6 +27,31 @@ import DashboardGastosRoteirosTab from "../components/DashboardGastosRoteirosTab
 import Swal from "sweetalert2";
 
 export function Dashboard() {
+  const { usuario } = useAuth();
+  // Estado para saber se há manutenção pendente atribuída ao usuário
+  const [temManutencaoPendente, setTemManutencaoPendente] = useState(false);
+  // Buscar manutenções pendentes atribuídas ao usuário
+  useEffect(() => {
+    let cancelado = false;
+    async function buscarManutencoesPendentes() {
+      if (!usuario?.id) return;
+      try {
+        const res = await api.get("/manutencoes?status=pendente");
+        const pendentes = Array.isArray(res.data) ? res.data : [];
+        const atribuida = pendentes.some((m) => m.funcionarioId === usuario.id);
+        if (!cancelado) setTemManutencaoPendente(atribuida);
+      } catch (e) {
+        if (!cancelado) setTemManutencaoPendente(false);
+      }
+    }
+    buscarManutencoesPendentes();
+    // Atualiza a cada 30s
+    const interval = setInterval(buscarManutencoesPendentes, 30000);
+    return () => {
+      cancelado = true;
+      clearInterval(interval);
+    };
+  }, [usuario?.id]);
   // Função para gerar PDF de comissão
   const handleGerarPdfComissao = async () => {
     if (!lojaSelecionada) return;
@@ -218,7 +254,6 @@ export function Dashboard() {
   // Faz o reload só depois que o modal sumiu
   // (removido reloadAfterModal/useEffect pois reload é imediato)
 
-  const { usuario } = useAuth();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
   const podeVerDefeituosasNoDashboard =
     usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
@@ -1946,7 +1981,7 @@ export function Dashboard() {
             </div>
             {/* Manutenções */}
             <div
-              className="stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
               <div className="relative z-10">
@@ -2008,7 +2043,9 @@ export function Dashboard() {
         ) : (
           <div
             className={`grid grid-cols-1 ${
-              podeVerDefeituosasNoDashboard ? "md:grid-cols-4" : "md:grid-cols-3"
+              podeVerDefeituosasNoDashboard
+                ? "md:grid-cols-4"
+                : "md:grid-cols-3"
             } gap-4 md:gap-6 mb-8`}
           >
             {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
@@ -2103,9 +2140,11 @@ export function Dashboard() {
             )}
             {/* Manutenções */}
             <div
-              className="stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+              className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
+              {/* Injeta o CSS da animação blink-red */}
+              <style>{blinkRedStyle}</style>
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
