@@ -5,6 +5,13 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { Modal, AlertBox } from "../components/UIComponents";
+import {
+  abrirWhatsAppComMensagem,
+  extrairResumoExecucaoRoteiro,
+  montarMensagemFinalizacaoRoteiro,
+  somarPeluciasUsadasMovimentacoes,
+  somarSaldoEstoqueUsuario,
+} from "../lib/roteiroFinalizacaoWhatsApp";
 
 export function Roteiros() {
   const { usuario } = useAuth();
@@ -474,9 +481,17 @@ export function Roteiros() {
 
     const podeProsseguir = await usuarioTemPilotagemAtiva();
     if (!podeProsseguir) {
-      setError(
-        "Para iniciar ou continuar o roteiro, você deve iniciar a pilotagem de um veículo primeiro.",
-      );
+      const mensagemBloqueio =
+        "Voce precisa iniciar a pilotagem de um veiculo antes de comecar o roteiro. Voce sera redirecionado para a aba de veiculos.";
+
+      setError(mensagemBloqueio);
+      window.alert(mensagemBloqueio);
+      navigate("/veiculos", {
+        state: {
+          origem: "roteiros",
+          retornarPara: "/roteiros",
+        },
+      });
       return;
     }
 
@@ -601,6 +616,147 @@ export function Roteiros() {
     const roteiro = modalFinalizar.roteiro;
     if (!roteiro) return;
 
+    const extrairNumero = (...valores) => {
+      for (const valor of valores) {
+        const numero = Number(valor);
+        if (Number.isFinite(numero)) return numero;
+      }
+      return null;
+    };
+
+    const montarMensagemWhatsAppFinalizacao = async (finalizacaoData) => {
+      const normalizarListaResumo = (lista) => {
+        if (!Array.isArray(lista)) return [];
+
+        return Array.from(
+          new Set(
+            lista
+              .map((item) => {
+                if (typeof item === "string") return item.trim();
+                if (!item || typeof item !== "object") return "";
+
+                return String(
+                  item.nome ||
+                    item.descricao ||
+                    item.manutencaoNome ||
+                    item.maquinaNome ||
+                    "",
+                ).trim();
+              })
+              .filter(Boolean),
+          ),
+        );
+      };
+
+      const resumoExecucao = extrairResumoExecucaoRoteiro({
+        roteiro,
+        finalizacaoData,
+      });
+
+      let totalPeluciasUsadas = extrairNumero(
+        finalizacaoData?.totalPeluciasUsadas,
+        finalizacaoData?.totalPeluciasUtilizadas,
+        finalizacaoData?.peluciasUsadas,
+        finalizacaoData?.totais?.peluciasUsadas,
+      );
+
+      if (totalPeluciasUsadas === null) {
+        try {
+          const movRes = await api.get("/movimentacoes", {
+            params: {
+              roteiroId: roteiro.id,
+              limite: 5000,
+            },
+          });
+          const listaMovimentacoes = Array.isArray(movRes.data)
+            ? movRes.data
+            : movRes.data?.rows || movRes.data?.movimentacoes || [];
+          totalPeluciasUsadas = somarPeluciasUsadasMovimentacoes(
+            listaMovimentacoes,
+          );
+        } catch {
+          totalPeluciasUsadas = null;
+        }
+      }
+
+      let saldoPeluciasEstoque = extrairNumero(
+        finalizacaoData?.saldoPeluciasEstoqueUsuario,
+        finalizacaoData?.saldoEstoqueUsuario,
+        finalizacaoData?.peluciasRestantesEstoqueUsuario,
+        finalizacaoData?.totais?.saldoEstoqueUsuario,
+      );
+
+      if (saldoPeluciasEstoque === null) {
+        try {
+          const estoqueResMe = await api.get("/estoque-usuarios/me");
+          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResMe.data);
+        } catch {
+          const funcionarioDoRoteiro =
+            finalizacaoData?.funcionarioId ||
+            finalizacaoData?.funcionario?.id ||
+            roteiro?.funcionarioId;
+
+          if (funcionarioDoRoteiro) {
+            try {
+              const estoqueRes = await api.get(
+                `/estoque-usuarios/${funcionarioDoRoteiro}`,
+              );
+              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueRes.data);
+            } catch {
+              saldoPeluciasEstoque = null;
+            }
+          }
+        }
+      }
+
+      const despesaTotal = extrairNumero(
+        finalizacaoData?.despesaTotal,
+        finalizacaoData?.totalDespesas,
+        finalizacaoData?.totalGastoHoje,
+        finalizacaoData?.totais?.despesaTotal,
+        roteiro?.totalGastoHoje,
+      );
+
+      const sobraValorDespesa = extrairNumero(
+        finalizacaoData?.sobraValorDespesa,
+        finalizacaoData?.saldoDespesa,
+        finalizacaoData?.saldoGastoHoje,
+        finalizacaoData?.totais?.sobraValorDespesa,
+        roteiro?.saldoGastoHoje,
+      );
+
+      const manutencoesRealizadas = normalizarListaResumo(
+        finalizacaoData?.manutencoesRealizadas ||
+          finalizacaoData?.manutencoesConcluidas ||
+          finalizacaoData?.totais?.manutencoesRealizadas ||
+          [],
+      );
+
+      const manutencoesNaoRealizadas = normalizarListaResumo(
+        finalizacaoData?.manutencoesNaoRealizadas ||
+          finalizacaoData?.manutencoesPendentes ||
+          finalizacaoData?.pendenciasManutencao ||
+          finalizacaoData?.pendencias ||
+          [],
+      );
+
+      return montarMensagemFinalizacaoRoteiro({
+        roteiroNome: roteiro?.nome,
+        lojasFeitas: resumoExecucao.lojasFeitas,
+        lojasNaoFeitas: resumoExecucao.lojasNaoFeitas,
+        maquinasFeitas: resumoExecucao.maquinasFeitas,
+        maquinasNaoFeitas: resumoExecucao.maquinasNaoFeitas,
+        totalPeluciasUsadas,
+        saldoPeluciasEstoque,
+        despesaTotal,
+        sobraValorDespesa,
+        manutencoesRealizadas,
+        manutencoesNaoRealizadas,
+      });
+    };
+
+    const popupReservado = window.open("about:blank", "_blank");
+
     try {
       setError("");
       setSuccess("");
@@ -623,14 +779,35 @@ export function Roteiros() {
         setSuccess("Roteiro finalizado com sucesso!");
       }
 
+      const mensagemWhatsApp = await montarMensagemWhatsAppFinalizacao(
+        res?.data,
+      );
+      const abriuWhatsApp = abrirWhatsAppComMensagem(
+        mensagemWhatsApp,
+        popupReservado,
+      );
+      if (!abriuWhatsApp) {
+        setSuccess(
+          "Roteiro finalizado, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
+        );
+      }
+
       setModalFinalizar({
         aberto: false,
         etapa: 1,
         roteiro: null,
         loading: false,
       });
-      carregarDadosIniciais();
+      navigate("/veiculos", {
+        state: {
+          alertaFinalizarVeiculo:
+            "Rota finalizada! Não esqueça de finalizar o veículo que você está usando.",
+        },
+      });
     } catch (err) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
       setError(err?.response?.data?.error || "Erro ao finalizar roteiro.");
       setModalFinalizar((prev) => ({ ...prev, loading: false }));
     }

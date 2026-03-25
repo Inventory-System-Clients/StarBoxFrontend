@@ -11,6 +11,9 @@ const STATUS_CONCLUIDOS = ["feito", "concluida"];
 const statusEhConcluido = (status) =>
   STATUS_CONCLUIDOS.includes(String(status || "").toLowerCase());
 
+const manutencaoAtribuidaAoUsuario = (manutencao, usuarioId) =>
+  String(manutencao?.funcionarioId || "") === String(usuarioId || "");
+
 const abrirWhatsAppEmNovaAba = ({ whatsappUrl, popupReservado }) => {
   if (!whatsappUrl) {
     if (popupReservado && !popupReservado.closed) {
@@ -202,6 +205,8 @@ function Manutencoes() {
     status: "",
     descricao: "",
   });
+  const [manutencaoParaConcluir, setManutencaoParaConcluir] = useState(null);
+  const [observacaoConclusao, setObservacaoConclusao] = useState("");
 
   const carregarManutencoes = async () => {
     try {
@@ -397,7 +402,7 @@ function Manutencoes() {
 
     return manutencoes.filter((m) => {
       if (!isAdmin) {
-        if (m.funcionarioId !== usuario?.id) return false;
+        if (!manutencaoAtribuidaAoUsuario(m, usuario?.id)) return false;
       }
 
       const dataManutencaoMs = new Date(m.createdAt).getTime();
@@ -425,12 +430,14 @@ function Manutencoes() {
   ]);
 
   const manutencoesPersistentes = useMemo(() => {
-    if (!isAdmin) return [];
+    const manutencoesBase = isAdmin
+      ? manutencoes
+      : manutencoes.filter((m) => manutencaoAtribuidaAoUsuario(m, usuario?.id));
 
     const limiteIntervaloMs =
       INTERVALO_ALERTA_PERSISTENTE_DIAS * 24 * 60 * 60 * 1000;
 
-    const concluidas = manutencoes.filter(
+    const concluidas = manutencoesBase.filter(
       (m) => (m.status === "feito" || m.status === "concluida") && m.maquinaId,
     );
 
@@ -484,7 +491,7 @@ function Manutencoes() {
       );
 
     return persistentes;
-  }, [isAdmin, manutencoes]);
+  }, [isAdmin, manutencoes, usuario?.id]);
 
   const formatarDataHora = (valor) => {
     if (!valor) return "-";
@@ -660,16 +667,48 @@ function Manutencoes() {
     }
   };
 
-  const marcarComoFeita = async () => {
-    if (!detalhe) return;
+  const abrirConclusaoManutencao = (manutencao) => {
+    if (!manutencao?.id) return;
+
+    setError("");
+    setSuccess("");
+    setObservacaoConclusao("");
+    setManutencaoParaConcluir(manutencao);
+  };
+
+  const fecharConclusaoManutencao = () => {
+    setManutencaoParaConcluir(null);
+    setObservacaoConclusao("");
+  };
+
+  const concluirManutencao = async (manutencao) => {
+    if (!manutencao?.id) return;
+
+    const observacaoLimpa = String(observacaoConclusao || "").trim();
+    if (!observacaoLimpa) {
+      setError("Observação é obrigatória ao concluir manutenção sem peça.");
+      return;
+    }
+
+    if (observacaoLimpa.length > 100) {
+      setError("A observação deve ter no máximo 100 caracteres.");
+      return;
+    }
 
     try {
       setLoading(true);
       setError("");
       setSuccess("");
 
-      await api.put(`/manutencoes/${detalhe.id}`, { status: "feito" });
-      setDetalhe(null);
+      await api.put(`/manutencoes/${manutencao.id}/concluir`, {
+        status: "feito",
+        concluidoPorId: usuario?.id || null,
+        explicacao_sem_peca: observacaoLimpa,
+      });
+      if (detalhe?.id === manutencao.id) {
+        setDetalhe(null);
+      }
+      fecharConclusaoManutencao();
       setSuccess("Manutenção marcada como feita!");
       await carregarManutencoes();
     } catch (err) {
@@ -705,24 +744,13 @@ function Manutencoes() {
     );
   };
 
-  const concluirManutencaoDaLinha = async (manutencao) => {
-    if (!manutencao?.id) return;
+  const concluirManutencaoDaLinha = (manutencao) => {
+    abrirConclusaoManutencao(manutencao);
+  };
 
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess("");
-
-      await api.put(`/manutencoes/${manutencao.id}`, { status: "feito" });
-      setSuccess("Manutenção marcada como feita!");
-      await carregarManutencoes();
-    } catch (err) {
-      setError(
-        err?.response?.data?.error || "Erro ao marcar manutenção como feita.",
-      );
-    } finally {
-      setLoading(false);
-    }
+  const marcarComoFeita = () => {
+    if (!detalhe) return;
+    abrirConclusaoManutencao(detalhe);
   };
 
   return (
@@ -1011,7 +1039,8 @@ function Manutencoes() {
                       {formatarDataHora(m.concluidoEm)}
                     </td>
                     <td className="px-4 py-2">
-                      {m.status !== "feito" && m.status !== "concluida" ? (
+                      {(m.status !== "feito" && m.status !== "concluida") &&
+                      (isAdmin || manutencaoAtribuidaAoUsuario(m, usuario?.id)) ? (
                         <button
                           className="btn-success text-xs px-3 py-1"
                           onClick={(event) => {
@@ -1040,7 +1069,7 @@ function Manutencoes() {
           </div>
         )}
 
-        {isAdmin && manutencoesPersistentes.length > 0 && (
+        {manutencoesPersistentes.length > 0 && (
           <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
             <h3 className="text-lg font-bold text-amber-900">
               ⚠️ Manutenções persistentes
@@ -1195,7 +1224,8 @@ function Manutencoes() {
                 )}
                 {!isAdmin &&
                   detalhe.status !== "feito" &&
-                  detalhe.status !== "concluida" && (
+                  detalhe.status !== "concluida" &&
+                  manutencaoAtribuidaAoUsuario(detalhe, usuario?.id) && (
                     <button
                       className="btn-success w-full sm:w-auto"
                       onClick={marcarComoFeita}
@@ -1203,6 +1233,70 @@ function Manutencoes() {
                       Marcar como Feita
                     </button>
                   )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {manutencaoParaConcluir && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
+              <button
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                type="button"
+                onClick={fecharConclusaoManutencao}
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+
+              <h3 className="text-xl font-bold mb-3">Concluir manutenção</h3>
+
+              <p className="text-sm text-gray-600 mb-3">
+                Como esta conclusão está sendo feita sem registrar peça, informe
+                a observação obrigatória.
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Observação (obrigatória, máx. 100 caracteres)
+                </label>
+                <textarea
+                  className="input-field w-full"
+                  value={observacaoConclusao}
+                  onChange={(event) =>
+                    setObservacaoConclusao(event.target.value.slice(0, 100))
+                  }
+                  placeholder="Ex.: manutenção concluída sem uso de peça"
+                />
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick={fecharConclusaoManutencao}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn-success w-full"
+                  onClick={() => concluirManutencao(manutencaoParaConcluir)}
+                >
+                  Confirmar conclusão
+                </button>
               </div>
             </div>
           </div>

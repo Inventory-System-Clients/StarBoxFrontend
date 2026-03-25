@@ -501,13 +501,54 @@ export function Dashboard() {
           );
         }
       }
+
+      if (usuario?.role === "FUNCIONARIO_TODAS_LOJAS") {
+        try {
+          const roteirosRes = await api.get("/roteiros/com-status");
+          const roteirosLista = Array.isArray(roteirosRes.data)
+            ? roteirosRes.data
+            : [];
+
+          const roteirosDoUsuario = roteirosLista.filter(
+            (roteiro) =>
+              String(roteiro?.funcionarioId || "") === String(usuario?.id || ""),
+          );
+
+          const lojasPermitidasPorRoteiro = new Set(
+            roteirosDoUsuario
+              .flatMap((roteiro) =>
+                Array.isArray(roteiro?.lojas) ? roteiro.lojas : [],
+              )
+              .map((loja) => String(loja?.id || ""))
+              .filter(Boolean),
+          );
+
+          lojasVisiveis = lojasVisiveis.filter((loja) =>
+            lojasPermitidasPorRoteiro.has(String(loja?.id || "")),
+          );
+        } catch (err) {
+          console.error(
+            "Erro ao filtrar lojas por roteiros do funcionário:",
+            err,
+          );
+          lojasVisiveis = [];
+        }
+      }
+
+      const idsLojasVisiveis = new Set(
+        (lojasVisiveis || []).map((loja) => String(loja?.id || "")),
+      );
+      const maquinasVisiveis = (maquinasRes.data || []).filter((maquina) =>
+        idsLojasVisiveis.has(String(maquina?.lojaId || "")),
+      );
+
       setLojas(lojasVisiveis);
-      setMaquinas(maquinasRes.data || []);
+      setMaquinas(maquinasVisiveis);
       setProdutos(produtosRes.data || []);
 
       // Carregar alertas de estoque de lojas (para todos os usuários)
-      if (lojasRes.data && lojasRes.data.length > 0) {
-        carregarAlertasEstoqueLoja(lojasRes.data);
+      if (lojasVisiveis.length > 0) {
+        carregarAlertasEstoqueLoja(lojasVisiveis);
       }
 
       carregarAlertasEstoqueUsuario();

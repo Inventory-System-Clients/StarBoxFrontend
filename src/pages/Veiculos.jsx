@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import ControleVeiculos from "../components/ControleVeiculos";
 import RegistroVeiculosMovimentacao from "../components/RegistroVeiculosMovimentacao";
 import AbastecimentosVeiculos from "../components/AbastecimentosVeiculos";
@@ -22,6 +22,7 @@ const initialFormState = {
 
 export default function Veiculos() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [modalCadastro, setModalCadastro] = useState(false);
   const [mostrarAlertas, setMostrarAlertas] = useState(false);
   const [abaPrincipal, setAbaPrincipal] = useState("controle");
@@ -49,6 +50,14 @@ export default function Veiculos() {
   useEffect(() => {
     fetchVeiculos();
   }, [fetchVeiculos]);
+
+  useEffect(() => {
+    const mensagem = location.state?.alertaFinalizarVeiculo;
+    if (!mensagem) return;
+
+    alert(mensagem);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
 
   const abrirModal = () => setModalCadastro(true);
 

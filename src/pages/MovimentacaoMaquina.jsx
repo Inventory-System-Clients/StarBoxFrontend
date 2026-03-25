@@ -41,6 +41,7 @@ export default function MovimentacaoMaquina() {
   const [resumoCalculo, setResumoCalculo] = useState(null);
   const [alertaDivergencia, setAlertaDivergencia] = useState(null);
   const [isPrimeiraMovimentacao, setIsPrimeiraMovimentacao] = useState(false);
+  const [ultimaMovimentacaoData, setUltimaMovimentacaoData] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -62,6 +63,15 @@ export default function MovimentacaoMaquina() {
         const movimentacoesMaquina = Array.isArray(movRes.data)
           ? movRes.data
           : [];
+        const ultimaMovimentacao = movimentacoesMaquina[0] || null;
+        const dataUltimaMovimentacao =
+          ultimaMovimentacao?.dataColeta ||
+          ultimaMovimentacao?.createdAt ||
+          ultimaMovimentacao?.dataMovimentacao ||
+          ultimaMovimentacao?.data ||
+          null;
+
+        setUltimaMovimentacaoData(dataUltimaMovimentacao);
         const primeiraMovimentacao = movimentacoesMaquina.length === 0;
         setIsPrimeiraMovimentacao(primeiraMovimentacao);
         const capacidadePadrao = Number(
@@ -334,6 +344,9 @@ export default function MovimentacaoMaquina() {
       .toUpperCase();
     const lojaNome = maquina?.loja?.nome || "Loja sem nome";
     const dataMovimentacao = new Date().toLocaleString("pt-BR");
+    const dataUltimaMovimentacao = ultimaMovimentacaoData
+      ? new Date(ultimaMovimentacaoData).toLocaleString("pt-BR")
+      : "Sem movimentação anterior";
     const nomeUsuario = usuario?.nome || "Usuário";
     const codigoMaquina = maquina?.codigo || "-";
     const nomeMaquina = maquina?.nome || "Máquina";
@@ -371,6 +384,7 @@ export default function MovimentacaoMaquina() {
       "STAR BOX",
       `*${lojaCodigo} | ${lojaNome}*`,
       `Data: ${dataMovimentacao}`,
+      `Última movimentação da máquina: ${dataUltimaMovimentacao}`,
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
       `${codigoMaquina} | ${nomeMaquina}`,
