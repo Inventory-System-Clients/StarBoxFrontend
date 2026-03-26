@@ -535,7 +535,57 @@ export function Relatorios() {
     return totalLiquidoFluxo - gastoTotal;
   };
 
-  const calcularCustoSaidaProdutosRelatorio = (dadosRelatorio) => {
+  const obterValorUnitarioProdutoSaida = (produto, mapaPrecos = {}) => {
+    const valorDireto =
+      produto?.custoUnitario ??
+      produto?.valorUnitario ??
+      produto?.preco ??
+      null;
+
+    if (valorDireto !== null && valorDireto !== undefined && valorDireto !== "") {
+      return toNumber(valorDireto);
+    }
+
+    const produtoId = produto?.id;
+    if (produtoId !== null && produtoId !== undefined && mapaPrecos?.[produtoId]) {
+      return toNumber(
+        mapaPrecos[produtoId]?.custoUnitario ?? mapaPrecos[produtoId]?.preco,
+      );
+    }
+
+    return 0;
+  };
+
+  const calcularCustoSaidaProdutosRelatorio = (
+    dadosRelatorio,
+    mapaPrecos = {},
+  ) => {
+    const produtosSairamDireto = Array.isArray(dadosRelatorio?.produtosSairam)
+      ? dadosRelatorio.produtosSairam
+      : [];
+    const produtosSairamPorMaquina = Array.isArray(dadosRelatorio?.maquinas)
+      ? dadosRelatorio.maquinas.flatMap((maquina) =>
+          Array.isArray(maquina?.produtosSairam) ? maquina.produtosSairam : [],
+        )
+      : [];
+
+    const produtosParaCalcular =
+      produtosSairamDireto.length > 0
+        ? produtosSairamDireto
+        : produtosSairamPorMaquina;
+
+    if (produtosParaCalcular.length > 0) {
+      const custoCalculado = produtosParaCalcular.reduce((acc, produto) => {
+        const quantidade = toNumber(produto?.quantidade);
+        const valorUnitario = obterValorUnitarioProdutoSaida(produto, mapaPrecos);
+        return acc + quantidade * valorUnitario;
+      }, 0);
+
+      if (custoCalculado > 0) {
+        return custoCalculado;
+      }
+    }
+
     if (
       Array.isArray(dadosRelatorio?.maquinas) &&
       dadosRelatorio.maquinas.length
@@ -545,7 +595,83 @@ export function Relatorios() {
         0,
       );
     }
+
     return toNumber(dadosRelatorio?.totais?.gastoProdutosTotalPeriodo);
+  };
+
+  const calcularQuebraCaixaComoCusto = (fluxos = []) => {
+    return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      const temDiferencaDireta =
+        fluxo?.diferenca !== null &&
+        fluxo?.diferenca !== undefined &&
+        fluxo?.diferenca !== "";
+
+      const diferenca = temDiferencaDireta
+        ? toNumber(fluxo?.diferenca)
+        : toNumber(fluxo?.valorRetirado) -
+          toNumber(fluxo?.valorEsperado ?? fluxo?.movimentacao?.valorFaturado);
+
+      // Quebra de caixa só ocorre quando o retirado é menor que o esperado.
+      return diferenca < 0 ? acc + Math.abs(diferenca) : acc;
+    }, 0);
+  };
+
+  const carregarQuebraCaixaPorLoja = async (lojaId, inicio, fim) => {
+    try {
+      const params = new URLSearchParams();
+      if (inicio) params.append("dataInicio", inicio);
+      if (fim) params.append("dataFim", fim);
+      if (lojaId) params.append("lojaId", lojaId);
+
+      const response = await api.get(`/fluxo-caixa?${params.toString()}`);
+      const fluxos = Array.isArray(response?.data)
+        ? response.data
+        : response?.data?.rows || response?.data?.fluxos || [];
+
+      return calcularQuebraCaixaComoCusto(fluxos);
+    } catch (erroFluxo) {
+      console.warn(
+        `Não foi possível calcular quebra de caixa da loja ${lojaId}:`,
+        erroFluxo,
+      );
+      return 0;
+    }
+  };
+
+  const aplicarQuebraCaixaNoRelatorioLoja = (
+    dadosRelatorio,
+    custoQuebraCaixa = 0,
+  ) => {
+    if (!dadosRelatorio) return dadosRelatorio;
+
+    const quebra = Math.max(0, toNumber(custoQuebraCaixa));
+    const totaisAtuais = dadosRelatorio?.totais || {};
+    const gastoTotalOriginal = toNumber(totaisAtuais.gastoTotalPeriodo);
+    const lucroLiquidoConsolidadoOriginal =
+      totaisAtuais.valorLiquidoConsolidadoLojaMaquinas;
+    const lucroLiquidoTotalOriginal = totaisAtuais.lucroLiquidoTotal;
+
+    return {
+      ...dadosRelatorio,
+      totais: {
+        ...totaisAtuais,
+        custoQuebraCaixa: quebra,
+        gastoTotalPeriodo: gastoTotalOriginal + quebra,
+        ...(lucroLiquidoConsolidadoOriginal !== null &&
+        lucroLiquidoConsolidadoOriginal !== undefined
+          ? {
+              valorLiquidoConsolidadoLojaMaquinas:
+                toNumber(lucroLiquidoConsolidadoOriginal) - quebra,
+            }
+          : {}),
+        ...(lucroLiquidoTotalOriginal !== null &&
+        lucroLiquidoTotalOriginal !== undefined
+          ? {
+              lucroLiquidoTotal: toNumber(lucroLiquidoTotalOriginal) - quebra,
+            }
+          : {}),
+      },
+    };
   };
 
   const formatarMoeda = (valor) =>
@@ -699,7 +825,8 @@ export function Relatorios() {
         const nomeFallback = lojaNomePorId.get(lojaId) || `Loja ${lojaId}`;
 
         try {
-          const [relatorioResponse, gastosFixosResponse] = await Promise.all([
+          const [relatorioResponse, gastosFixosResponse, custoQuebraCaixa] =
+            await Promise.all([
             api
               .get("/relatorios/impressao", {
                 params: {
@@ -710,7 +837,8 @@ export function Relatorios() {
               })
               .catch(() => null),
             api.get(`/gastos-fixos-loja/${lojaId}`).catch(() => ({ data: [] })),
-          ]);
+            carregarQuebraCaixaPorLoja(lojaId, periodoInicio, periodoFim),
+            ]);
 
           const dadosLoja = relatorioResponse?.data;
           if (!dadosLoja) {
@@ -736,11 +864,15 @@ export function Relatorios() {
           );
 
           const gastoTotalPeriodo = toNumber(dadosLoja?.totais?.gastoTotalPeriodo);
-          const custoTotal =
+          const custoBase =
             gastoTotalPeriodo > 0
               ? gastoTotalPeriodo
               : custoProdutos + custoFixo;
-          const custoVariavel = Math.max(0, custoTotal - custoProdutos - custoFixo);
+          const custoTotal = custoBase + toNumber(custoQuebraCaixa);
+          const custoVariavel = Math.max(
+            0,
+            custoTotal - custoProdutos - custoFixo,
+          );
 
           const fichas = toNumber(dadosLoja?.totais?.fichas);
           const produtosSairam = toNumber(dadosLoja?.totais?.produtosSairam);
@@ -789,6 +921,7 @@ export function Relatorios() {
             custoVariavel,
             custoProdutos,
             custoFixo,
+            custoQuebraCaixa: toNumber(custoQuebraCaixa),
             fichas,
             produtosSairam,
             produtosEntraram,
@@ -940,6 +1073,10 @@ export function Relatorios() {
       (acc, item) => acc + toNumber(item?.custoFixo),
       0,
     );
+    const custoQuebraCaixaTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.custoQuebraCaixa),
+      0,
+    );
     const custoProdutosTotal = lojasComDadosDetalhado.reduce(
       (acc, item) => acc + toNumber(item?.custoProdutos),
       0,
@@ -1001,6 +1138,7 @@ export function Relatorios() {
         custoTotal,
         custoVariavelTotal,
         custoFixoTotal,
+        custoQuebraCaixaTotal,
         custoProdutosTotal,
         produtosSairamTotal,
         produtosEntraramTotal,
@@ -1310,7 +1448,14 @@ export function Relatorios() {
         setRelatorio({ tipo: "roteiro", ...response.data });
       } else if (lojaSelecionada) {
         // Buscar relatório de loja + dashboard + comissão + produtos em paralelo
-        const [impressaoRes, comissaoRes, lucroRes, movRes, produtosRes] =
+        const [
+          impressaoRes,
+          comissaoRes,
+          lucroRes,
+          movRes,
+          produtosRes,
+          custoQuebraCaixaPeriodo,
+        ] =
           await Promise.all([
             api.get("/relatorios/impressao", {
               params: { lojaId: lojaSelecionada, dataInicio, dataFim },
@@ -1337,6 +1482,7 @@ export function Relatorios() {
               })
               .catch(() => ({ data: null })),
             api.get("/produtos").catch(() => ({ data: [] })),
+            carregarQuebraCaixaPorLoja(lojaSelecionada, dataInicio, dataFim),
           ]);
         // Também carregar dashboard
         await carregarDashboard(lojaSelecionada, dataInicio, dataFim);
@@ -1392,7 +1538,12 @@ export function Relatorios() {
           }));
         }
 
-        setRelatorio(dados);
+        const dadosComQuebra = aplicarQuebraCaixaNoRelatorioLoja(
+          dados,
+          custoQuebraCaixaPeriodo,
+        );
+
+        setRelatorio(dadosComQuebra);
         setComissaoData(comissaoRes.data);
         setLucroData(lucroRes.data);
 
@@ -1425,7 +1576,15 @@ export function Relatorios() {
               dataFim: dataFimMesAnterior,
             },
           });
-          const relatorioMesAnterior = responseMesAnterior.data;
+          const quebraCaixaMesAnterior = await carregarQuebraCaixaPorLoja(
+            lojaSelecionada,
+            dataInicioMesAnterior,
+            dataFimMesAnterior,
+          );
+          const relatorioMesAnterior = aplicarQuebraCaixaNoRelatorioLoja(
+            responseMesAnterior.data,
+            quebraCaixaMesAnterior,
+          );
           if (relatorioMesAnterior) {
             setComparativoMensal({
               periodoAtual: { inicio: dataInicio, fim: dataFim },
@@ -1439,7 +1598,7 @@ export function Relatorios() {
                   titulo: "Lucro Líquido",
                   icone: "📉",
                   indicador: montarIndicadorComparacao(
-                    calcularLucroLiquidoRelatorio(dados),
+                    calcularLucroLiquidoRelatorio(dadosComQuebra),
                     calcularLucroLiquidoRelatorio(relatorioMesAnterior),
                     "maior",
                   ),
@@ -1469,8 +1628,21 @@ export function Relatorios() {
                   titulo: "Custo de Saída dos Produtos",
                   icone: "💸",
                   indicador: montarIndicadorComparacao(
-                    calcularCustoSaidaProdutosRelatorio(dados),
+                    calcularCustoSaidaProdutosRelatorio(
+                      dadosComQuebra,
+                      produtosPrecos,
+                    ),
                     calcularCustoSaidaProdutosRelatorio(relatorioMesAnterior),
+                    "menor",
+                  ),
+                },
+                {
+                  chave: "quebraCaixa",
+                  titulo: "Quebra de Caixa (Custo)",
+                  icone: "💥",
+                  indicador: montarIndicadorComparacao(
+                    toNumber(dadosComQuebra?.totais?.custoQuebraCaixa),
+                    toNumber(relatorioMesAnterior?.totais?.custoQuebraCaixa),
                     "menor",
                   ),
                 },
@@ -1535,10 +1707,30 @@ export function Relatorios() {
     (acc, item) => acc + item.valor,
     0,
   );
+  const custoQuebraCaixaRelatorio = toNumber(
+    relatorio?.totais?.custoQuebraCaixa,
+  );
 
-  const valorConsolidadoRelatorio =
-    calcularValorConsolidadoRelatorio(relatorio);
-  const lucroLiquidoRelatorio = calcularLucroLiquidoRelatorio(relatorio);
+  const valorConsolidadoRelatorio = calcularValorConsolidadoRelatorio(relatorio);
+  const custoProdutosRelatorio = calcularCustoSaidaProdutosRelatorio(
+    relatorio,
+    produtosPrecos,
+  );
+  const custoProdutosBaseRelatorio = calcularCustoSaidaProdutosRelatorio(relatorio);
+  const gastoTotalPeriodoRelatorio = toNumber(relatorio?.totais?.gastoTotalPeriodo);
+  const outrosCustosRelatorio = Math.max(
+    0,
+    gastoTotalPeriodoRelatorio -
+      custoProdutosBaseRelatorio -
+      custoQuebraCaixaRelatorio,
+  );
+  const custoTotalConsideradoRelatorio =
+    custoProdutosRelatorio +
+    totalGastosFixosDaLoja +
+    custoQuebraCaixaRelatorio +
+    outrosCustosRelatorio;
+  const lucroLiquidoRelatorio =
+    valorConsolidadoRelatorio - custoTotalConsideradoRelatorio;
 
   if (loadingLojas) return <PageLoader />;
 
@@ -1811,20 +2003,18 @@ export function Relatorios() {
                   <div className="text-2xl sm:text-3xl mb-2">💸</div>
                   <div className="text-xl sm:text-2xl font-bold">
                     R${" "}
-                    {(() => {
-                      let custo = 0;
-                      if (relatorio.maquinas?.length > 0) {
-                        relatorio.maquinas.forEach((m) => {
-                          custo += Number(m.totais?.custoProdutosSairam || 0);
-                        });
-                      }
-                      return custo.toLocaleString("pt-BR", {
+                    {Number(custoProdutosRelatorio || 0).toLocaleString(
+                      "pt-BR",
+                      {
                         minimumFractionDigits: 2,
-                      });
-                    })()}
+                      },
+                    )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Custo Total de Produtos
+                  </div>
+                  <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                    Fórmula: quantidade que saiu × valor unitário do produto
                   </div>
                   <div className="text-2xl sm:text-3xl mb-2 mt-3">📤</div>
                   <div className="text-xl sm:text-2xl font-bold">
@@ -1874,14 +2064,32 @@ export function Relatorios() {
                   <div className="text-2xl sm:text-3xl mb-2">🧮</div>
                   <div className="text-xl sm:text-2xl font-bold">
                     R${" "}
-                    {Number(
-                      relatorio.totais?.gastoTotalPeriodo || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    {Number(custoTotalConsideradoRelatorio || 0).toLocaleString(
+                      "pt-BR",
+                      { minimumFractionDigits: 2 },
+                    )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Gasto Total
                   </div>
                 </div>
+
+                {/* Quebra de Caixa como Custo */}
+                {custoQuebraCaixaRelatorio > 0 && (
+                  <div className="card bg-linear-to-br from-red-700 to-rose-900 text-white border-2 border-red-300">
+                    <div className="text-2xl sm:text-3xl mb-2">💥</div>
+                    <div className="text-xl sm:text-2xl font-bold">
+                      R${" "}
+                      {Number(custoQuebraCaixaRelatorio || 0).toLocaleString(
+                        "pt-BR",
+                        { minimumFractionDigits: 2 },
+                      )}
+                    </div>
+                    <div className="text-xs sm:text-sm opacity-90">
+                      Quebra de Caixa (custo)
+                    </div>
+                  </div>
+                )}
 
                 {/* Lucro Líquido */}
                 <div className="card bg-linear-to-br from-emerald-600 to-green-800 text-white">
@@ -2252,20 +2460,6 @@ export function Relatorios() {
                         </span>
                       </h4>
                       <div className="flex flex-wrap gap-4 sm:gap-6">
-                        {/* Fichas da máquina */}
-                        <div className="bg-linear-to-br from-blue-500 to-blue-600 text-white p-3 sm:p-5 rounded-xl shadow-lg">
-                          <div className="text-2xl sm:text-4xl mb-1 sm:mb-2 text-center">
-                            🎫
-                          </div>
-                          <div className="text-xl sm:text-3xl font-bold text-center">
-                            {Number(maquina.totais.fichas || 0).toLocaleString(
-                              "pt-BR",
-                            )}
-                          </div>
-                          <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
-                            Total de Fichas
-                          </div>
-                        </div>
                         {/* Dinheiro máquina */}
                         <div className="bg-linear-to-br from-yellow-400 to-yellow-600 text-white p-3 sm:p-5 rounded-xl shadow-lg">
                           <div className="text-2xl sm:text-4xl mb-1 sm:mb-2 text-center">
@@ -2283,34 +2477,6 @@ export function Relatorios() {
                             Dinheiro
                           </div>
                         </div>
-                        {/* Cartão/Pix Bruto + Líquido */}
-                        <div className="bg-linear-to-br from-cyan-400 to-cyan-600 text-white p-3 sm:p-5 rounded-xl shadow-lg">
-                          <div className="text-2xl sm:text-4xl mb-1 sm:mb-2 text-center">
-                            🟢
-                          </div>
-                          <div className="text-xl sm:text-3xl font-bold text-center">
-                            R${" "}
-                            {Number(
-                              maquina.totais.cartaoPix || 0,
-                            ).toLocaleString("pt-BR", {
-                              minimumFractionDigits: 2,
-                            })}
-                          </div>
-                          <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
-                            Cartão / Pix (Bruto)
-                          </div>
-                          <div className="text-xs sm:text-sm text-center mt-1 opacity-90 font-semibold">
-                            R${" "}
-                            {Number(
-                              maquina.totais.cartaoPixLiquido || 0,
-                            ).toLocaleString("pt-BR", {
-                              minimumFractionDigits: 2,
-                            })}
-                          </div>
-                          <div className="text-[10px] sm:text-xs text-center opacity-80">
-                            Líquido
-                          </div>
-                        </div>
                         {/* Produtos Saíram */}
                         <div className="bg-linear-to-br from-red-500 to-red-600 text-white p-3 sm:p-5 rounded-xl shadow-lg">
                           <div className="text-2xl sm:text-4xl mb-1 sm:mb-2 text-center">
@@ -2323,6 +2489,19 @@ export function Relatorios() {
                           </div>
                           <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
                             Produtos Saíram
+                          </div>
+                          <div className="text-[10px] sm:text-xs text-center mt-1 opacity-90 leading-tight">
+                            {Array.isArray(maquina.produtosSairam) &&
+                            maquina.produtosSairam.length > 0
+                              ? maquina.produtosSairam
+                                  .map((produto) =>
+                                    produto?.nome
+                                      ? `${produto.nome} (${Number(produto?.quantidade || 0).toLocaleString("pt-BR")})`
+                                      : null,
+                                  )
+                                  .filter(Boolean)
+                                  .join(" | ")
+                              : "Sem detalhamento de produto"}
                           </div>
                         </div>
                         {/* Produtos Entraram */}
@@ -2509,6 +2688,15 @@ export function Relatorios() {
                                   </div>
                                 </div>
                               ))}
+                          </div>
+                        ) : Number(maquina.totais?.produtosSairam || 0) > 0 ? (
+                          <div className="text-center py-8 bg-white rounded-lg">
+                            <p className="text-5xl mb-2">📦</p>
+                            <p className="text-gray-600 font-medium">
+                              Houve saída de produtos ({Number(
+                                maquina.totais?.produtosSairam || 0,
+                              ).toLocaleString("pt-BR")}), mas sem detalhamento por item.
+                            </p>
                           </div>
                         ) : (
                           <div className="text-center py-8 bg-white rounded-lg">

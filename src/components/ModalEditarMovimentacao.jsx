@@ -23,8 +23,6 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
     contadorIn: "",
     contadorOut: "",
     contadorMaquina: "",
-    quantidade_notas_entrada: "",
-    valor_entrada_maquininha_pix: "",
     observacoes: "",
     tipoOcorrencia: "Normal",
     dataColeta: "",
@@ -46,8 +44,6 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
         contadorIn: movimentacao.contadorIn || "",
         contadorOut: movimentacao.contadorOut || "",
         contadorMaquina: movimentacao.contadorMaquina || "",
-        quantidade_notas_entrada: movimentacao.quantidade_notas_entrada || "",
-        valor_entrada_maquininha_pix: movimentacao.valor_entrada_maquininha_pix || "",
         observacoes: movimentacao.observacoes || "",
         tipoOcorrencia: movimentacao.tipoOcorrencia || "Normal",
         dataColeta: dataFormatada,
@@ -83,12 +79,8 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
         contadorIn: formData.contadorIn ? parseInt(formData.contadorIn) : null,
         contadorOut: formData.contadorOut ? parseInt(formData.contadorOut) : null,
         contadorMaquina: formData.contadorMaquina ? parseInt(formData.contadorMaquina) : null,
-        quantidade_notas_entrada: !ocultarCamposFinanceirosEObservacoes && formData.quantidade_notas_entrada 
-          ? parseFloat(formData.quantidade_notas_entrada) 
-          : null,
-        valor_entrada_maquininha_pix: !ocultarCamposFinanceirosEObservacoes && formData.valor_entrada_maquininha_pix 
-          ? parseFloat(formData.valor_entrada_maquininha_pix) 
-          : null,
+        quantidade_notas_entrada: null,
+        valor_entrada_maquininha_pix: null,
         observacoes: !ocultarCamposFinanceirosEObservacoes
           ? formData.observacoes || null
           : null,
@@ -133,16 +125,8 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
     ? parseInt(formData.totalPre) + parseInt(formData.abastecidas) - (parseInt(formData.sairam) || 0)
     : null;
 
-  const valorFaturadoCalculado = (() => {
-    const fichasValor = (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
-    const notasValor = ocultarCamposFinanceirosEObservacoes
-      ? 0
-      : parseFloat(formData.quantidade_notas_entrada) || 0;
-    const pixValor = ocultarCamposFinanceirosEObservacoes
-      ? 0
-      : parseFloat(formData.valor_entrada_maquininha_pix) || 0;
-    return fichasValor + notasValor + pixValor;
-  })();
+  const valorFaturadoCalculado =
+    (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
 
   return (
     <Modal
@@ -287,47 +271,10 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
           </div>
 
           {!ocultarCamposFinanceirosEObservacoes && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                💰 Valores
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notas Entrada (R$)
-                  </label>
-                  <input
-                    type="number"
-                    name="quantidade_notas_entrada"
-                    value={formData.quantidade_notas_entrada}
-                    onChange={handleChange}
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    min="0"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Maquininha/PIX (R$)
-                  </label>
-                  <input
-                    type="number"
-                    name="valor_entrada_maquininha_pix"
-                    value={formData.valor_entrada_maquininha_pix}
-                    onChange={handleChange}
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    min="0"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                <span className="text-sm text-gray-600">
-                  Valor Faturado (calculado): <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
-                </span>
-              </div>
+            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+              <span className="text-sm text-gray-600">
+                Valor Faturado (calculado): <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
+              </span>
             </div>
           )}
 

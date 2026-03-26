@@ -29,8 +29,6 @@ export default function MovimentacaoMaquina() {
     origemEstoque: "usuario",
     ignoreInOut: false,
     usarContadorManual: false,
-    quantidade_notas_entrada: "",
-    valor_entrada_maquininha_pix: "",
     retiradaDinheiro: false,
   });
   const [produtos, setProdutos] = useState([]);
@@ -469,16 +467,8 @@ export default function MovimentacaoMaquina() {
         contadorOutDigital: deveIgnorarContadores
           ? null
           : contadorOutDigitalInformado,
-        quantidade_notas_entrada:
-          podeVerCamposFinanceirosEObservacao &&
-          formData.quantidade_notas_entrada
-            ? parseFloat(formData.quantidade_notas_entrada)
-            : null,
-        valor_entrada_maquininha_pix:
-          podeVerCamposFinanceirosEObservacao &&
-          formData.valor_entrada_maquininha_pix
-            ? parseFloat(formData.valor_entrada_maquininha_pix)
-            : null,
+        quantidade_notas_entrada: null,
+        valor_entrada_maquininha_pix: null,
         ignoreInOut: isFuncionarioAbastecedor
           ? true
           : Boolean(formData.ignoreInOut),
@@ -820,47 +810,6 @@ export default function MovimentacaoMaquina() {
                   </span>
                 </label>
               </div>
-              {podeVerCamposFinanceirosEObservacao && (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      💵 Valor em Notas (R$)
-                    </label>
-                    <input
-                      type="number"
-                      name="quantidade_notas_entrada"
-                      value={formData.quantidade_notas_entrada}
-                      onChange={handleChange}
-                      className="input-field"
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Valor total em dinheiro (notas) inserido na máquina
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      💳 Valor Digital (Pix/Maquininha) (R$)
-                    </label>
-                    <input
-                      type="number"
-                      name="valor_entrada_maquininha_pix"
-                      value={formData.valor_entrada_maquininha_pix}
-                      onChange={handleChange}
-                      className="input-field"
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Valor total recebido via pagamento digital
-                      (Pix/Maquininha)
-                    </p>
-                  </div>
-                </>
-              )}
             </div>
             {!isFuncionarioAbastecedor && (
               <div className="p-4 bg-linear-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-lg">
