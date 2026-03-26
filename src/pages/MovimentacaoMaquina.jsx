@@ -356,9 +356,10 @@ export default function MovimentacaoMaquina() {
         maximumFractionDigits: 2,
       },
     );
-    const linhaComissao = isPrimeiraMovimentacao
-      ? "Comissao a pagar: N/A (primeira movimentacao)"
-      : `Comissao a pagar (${percentualComissaoFormatado}%): R$${formatarMoeda((Math.max(0, Number(saldo || 0)) * percentualComissao) / 100)}`;
+
+    const linhaComissao = !isPrimeiraMovimentacao
+      ? `Comissao a pagar (${percentualComissaoFormatado}%): R$${formatarMoeda((Math.max(0, Number(saldo || 0)) * percentualComissao) / 100)}`
+      : null;
     const nomeProdutoAbastecido =
       produtoSelecionado?.nome || "Produto não informado";
     const quantidadeAbastecidaInformada =
@@ -387,14 +388,14 @@ export default function MovimentacaoMaquina() {
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
       `${codigoMaquina} | ${nomeMaquina}`,
-      `Produto abastecido: ${nomeProdutoAbastecido}${
+      `Produto abastecido: ${nomeProdutoAbastecido}$${
         quantidadeAbastecidaInformada > 0
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
           : ""
       }`,
       `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
-      linhaComissao,
+      ...(linhaComissao ? [linhaComissao] : []),
       ...blocoFinanceiro,
     ].join("\n");
 
