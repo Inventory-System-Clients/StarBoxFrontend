@@ -8,9 +8,9 @@ import ManutencaoModal from "../components/ManutencaoModal";
 import { useAuth } from "../contexts/AuthContext";
 import {
   abrirWhatsAppComMensagem,
+  extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
-  somarPeluciasUsadasMovimentacoes,
   somarSaldoEstoqueUsuario,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
@@ -107,11 +107,62 @@ export default function RoteiroExecucao() {
       const loja = roteiro.lojas?.find((l) => l.id === location.state.lojaId);
       if (loja) {
         setLojaSelecionada(loja);
-        // Limpar o state para não manter o lojaId em navegações futuras
-        navigate(location.pathname, { replace: true, state: {} });
+        // Limpar apenas o lojaId para preservar outros sinais de fluxo.
+        const proximoState = { ...(location.state || {}) };
+        delete proximoState.lojaId;
+        navigate(location.pathname, {
+          replace: true,
+          state: Object.keys(proximoState).length > 0 ? proximoState : {},
+        });
       }
     }
   }, [roteiro, location.state]);
+
+  useEffect(() => {
+    if (!roteiro || roteiro.status !== "finalizado") return;
+    if (!location.state?.origemMovimentacao) return;
+    if (location.state?.pilotagemFinalizada) return;
+
+    const mensagemBloqueio =
+      "Roteiro concluído automaticamente. Finalize primeiro a pilotagem do veículo para concluir o fechamento da rota.";
+
+    setSuccess(
+      "Roteiro concluído automaticamente. Você será redirecionado para finalizar o veículo.",
+    );
+
+    navigate("/veiculos", {
+      state: {
+        origem: "roteiros-finalizacao",
+        retornarPara: `/roteiros/${id}/executar`,
+        roteiroIdParaFinalizar: id,
+        alertaFinalizarVeiculo: mensagemBloqueio,
+        alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
+        fluxoFinalizacaoAutomatica: true,
+      },
+    });
+  }, [id, location.state, navigate, roteiro]);
+
+  useEffect(() => {
+    const roteiroIdState = String(location.state?.roteiroIdParaFinalizar || "");
+    if (!location.state?.pilotagemFinalizada || roteiroIdState !== String(id)) {
+      return;
+    }
+
+    setSuccess(
+      "Veículo finalizado com sucesso. Confirme a finalização da rota para enviar o resumo no WhatsApp.",
+    );
+    setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+
+    const proximoState = { ...(location.state || {}) };
+    delete proximoState.pilotagemFinalizada;
+    delete proximoState.roteiroIdParaFinalizar;
+    delete proximoState.fluxoFinalizacaoAutomatica;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(proximoState).length > 0 ? proximoState : {},
+    });
+  }, [id, location.pathname, location.state, navigate]);
 
   const carregarRoteiro = async () => {
     try {
@@ -188,7 +239,7 @@ export default function RoteiroExecucao() {
 
   const confirmarSelecaoComJustificativa = async () => {
     if (!modalJustificativa.justificativa.trim()) {
-      setError("Por favor, informe o motivo de pular a loja anterior.");
+      setError("Por favor, informe o motivo de pular o ponto anterior.");
       return;
     }
 
@@ -399,7 +450,7 @@ export default function RoteiroExecucao() {
       navigate("/veiculos", {
         state: {
           origem: "roteiros-finalizacao",
-          retornarPara: "/roteiros",
+          retornarPara: `/roteiros/${id}/executar`,
           roteiroIdParaFinalizar: id,
           alertaFinalizarVeiculo: mensagemBloqueio,
           alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
@@ -452,32 +503,6 @@ export default function RoteiroExecucao() {
         finalizacaoData?.totais?.peluciasUsadas,
       );
 
-      const podeConsultarMovimentacoesResumo = [
-        "ADMIN",
-        "GERENCIADOR",
-        "CONTROLADOR_ESTOQUE",
-      ].includes(usuario?.role);
-
-      if (podeConsultarMovimentacoesResumo) {
-        try {
-          const movRes = await api.get("/movimentacoes", {
-            params: {
-              roteiroId: id,
-              limite: 5000,
-            },
-          });
-          const listaMovimentacoes = Array.isArray(movRes.data)
-            ? movRes.data
-            : movRes.data?.rows || movRes.data?.movimentacoes || [];
-          totalPeluciasUsadas = somarPeluciasUsadasMovimentacoes(
-            listaMovimentacoes,
-            usuario?.id,
-          );
-        } catch {
-          totalPeluciasUsadas = totalPeluciasUsadas ?? null;
-        }
-      }
-
       let saldoPeluciasEstoque = extrairNumero(
         finalizacaoData?.saldoPeluciasEstoqueUsuario,
         finalizacaoData?.saldoEstoqueUsuario,
@@ -506,6 +531,29 @@ export default function RoteiroExecucao() {
             }
           }
         }
+      }
+
+      const saldoPeluciasInicial = extrairNumero(
+        finalizacaoData?.saldoPeluciasInicialUsuario,
+        finalizacaoData?.saldoInicialEstoqueUsuario,
+        finalizacaoData?.peluciasIniciaisRoteiro,
+        finalizacaoData?.peluciasInicioRoteiro,
+        finalizacaoData?.estoqueInicialUsuario,
+        finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
+        finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
+        finalizacaoData?.totais?.peluciasIniciaisRoteiro,
+        roteiro?.saldoPeluciasInicialUsuario,
+        roteiro?.saldoInicialEstoqueUsuario,
+        roteiro?.peluciasIniciaisRoteiro,
+        roteiro?.peluciasInicioRoteiro,
+        roteiro?.estoqueInicialUsuario,
+      );
+
+      if (saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null) {
+        totalPeluciasUsadas = Math.max(
+          0,
+          saldoPeluciasInicial - saldoPeluciasEstoque,
+        );
       }
 
       const despesaTotal = extrairNumero(
@@ -539,8 +587,52 @@ export default function RoteiroExecucao() {
           [],
       );
 
+      let kmInicialVeiculo = extrairNumero(
+        finalizacaoData?.kmInicialVeiculo,
+        finalizacaoData?.kmInicial,
+        finalizacaoData?.quilometragemInicial,
+        finalizacaoData?.totais?.kmInicialVeiculo,
+      );
+
+      let kmFinalVeiculo = extrairNumero(
+        finalizacaoData?.kmFinalVeiculo,
+        finalizacaoData?.kmFinal,
+        finalizacaoData?.quilometragemFinal,
+        finalizacaoData?.totais?.kmFinalVeiculo,
+      );
+
+      if (kmInicialVeiculo === null || kmFinalVeiculo === null) {
+        try {
+          const movVeiculoRes = await api.get("/movimentacao-veiculos", {
+            params: {
+              roteiroId: id,
+            },
+          });
+
+          const listaMovimentacoesVeiculo = Array.isArray(movVeiculoRes.data)
+            ? movVeiculoRes.data
+            : movVeiculoRes.data?.rows || movVeiculoRes.data?.movimentacoes || [];
+
+          const resumoKm = extrairKmMovimentacoesRoteiro(
+            listaMovimentacoesVeiculo,
+            {
+              usuarioId: usuario?.id,
+              veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id,
+            },
+          );
+
+          kmInicialVeiculo = kmInicialVeiculo ?? resumoKm.kmInicial;
+          kmFinalVeiculo = kmFinalVeiculo ?? resumoKm.kmFinal;
+        } catch {
+          kmInicialVeiculo = kmInicialVeiculo ?? null;
+          kmFinalVeiculo = kmFinalVeiculo ?? null;
+        }
+      }
+
       return montarMensagemFinalizacaoRoteiro({
         roteiroNome: roteiro?.nome,
+        kmInicialVeiculo,
+        kmFinalVeiculo,
         lojasFeitas: resumoExecucao.lojasFeitas,
         lojasNaoFeitas: resumoExecucao.lojasNaoFeitas,
         maquinasFeitas: resumoExecucao.maquinasFeitas,
@@ -560,6 +652,25 @@ export default function RoteiroExecucao() {
       setError("");
       setSuccess("");
       setModalFinalizar((prev) => ({ ...prev, loading: true }));
+
+      if (roteiro?.status === "finalizado") {
+        const mensagemWhatsApp = await montarMensagemWhatsAppFinalizacao(roteiro);
+        const abriuWhatsApp = abrirWhatsAppComMensagem(
+          mensagemWhatsApp,
+          popupReservado,
+        );
+        if (!abriuWhatsApp) {
+          setSuccess(
+            "Roteiro já finalizado. O navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
+          );
+        } else {
+          setSuccess("Resumo do roteiro enviado para confirmação no WhatsApp.");
+        }
+
+        setModalFinalizar({ aberto: false, etapa: 1, loading: false });
+        await carregarRoteiro();
+        return;
+      }
 
       const res = await api.post(`/roteiros/${id}/finalizar`);
       const pendencias = res?.data?.pendencias || [];
@@ -650,7 +761,7 @@ export default function RoteiroExecucao() {
         navigate("/veiculos", {
           state: {
             origem: "roteiros-finalizacao",
-            retornarPara: "/roteiros",
+            retornarPara: `/roteiros/${id}/executar`,
             roteiroIdParaFinalizar: id,
             alertaFinalizarVeiculo: mensagemBloqueio,
             alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
@@ -961,7 +1072,7 @@ export default function RoteiroExecucao() {
               className={`w-full p-3 border rounded-lg bg-white resize-y ${
                 observacaoObrigatoriaPendente ? "border-red-400" : ""
               }`}
-              placeholder="Ex: Uber entre lojas"
+              placeholder="Ex: Uber entre pontos"
               value={gastoForm.observacao}
               onChange={(e) =>
                 setGastoForm((prev) => ({
@@ -1230,7 +1341,7 @@ export default function RoteiroExecucao() {
               <textarea
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 rows="4"
-                placeholder="Ex: A loja estava fechada, problema de acesso, etc."
+                placeholder="Ex: O ponto estava fechado, problema de acesso, etc."
                 value={modalJustificativa.justificativa}
                 onChange={(e) =>
                   setModalJustificativa((prev) => ({

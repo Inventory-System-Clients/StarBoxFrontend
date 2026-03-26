@@ -1056,7 +1056,7 @@ export function Relatorios() {
     }
 
     if (!lojaSelecionada && !roteiroSelecionado) {
-      setError("Selecione uma loja (ou roteiro) para gerar o relatório");
+      setError("Selecione um ponto (ou roteiro) para gerar o relatório");
       return;
     }
 
@@ -1065,7 +1065,7 @@ export function Relatorios() {
       lojasSelecionadasConsolidado.length === 0
     ) {
       setError(
-        "Selecione pelo menos uma loja para gerar o consolidado manual",
+        "Selecione pelo menos um ponto para gerar o consolidado manual",
       );
       return;
     }
@@ -1549,7 +1549,7 @@ export function Relatorios() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="📄 Relatório de Impressão"
-          subtitle="Gere relatórios detalhados de movimentações por loja"
+          subtitle="Gere relatórios detalhados de movimentações por ponto"
           icon="📊"
         />
 

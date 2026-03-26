@@ -166,7 +166,7 @@ export function Maquinas() {
     },
     {
       key: "loja",
-      label: "Loja",
+      label: "Ponto",
       render: (maquina) => {
         console.log("Buscando loja para máquina:", maquina.lojaId, "em", lojas);
         const loja = lojas.find((l) => l.id === maquina.lojaId);
@@ -188,7 +188,7 @@ export function Maquinas() {
     },
     {
       key: "comissaoLojaPercentual",
-      label: "Comissão Loja",
+      label: "Comissão Ponto",
       render: (maquina) => {
         const percentual = parseFloat(maquina.comissaoLojaPercentual);
         return !isNaN(percentual) ? `${percentual.toFixed(2)}%` : "-";
@@ -215,7 +215,7 @@ export function Maquinas() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="Máquinas"
-          subtitle="Gerencie as máquinas de pelúcia das lojas"
+          subtitle="Gerencie as máquinas de pelúcia dos pontos"
           icon="🎰"
           action={
             usuario?.role === "ADMIN"
@@ -297,7 +297,7 @@ export function Maquinas() {
               title="Nenhuma máquina encontrada"
               message={
                 filtroLoja || filtroCodigo
-                  ? "Nenhuma máquina corresponde aos filtros informados. Ajuste a loja ou o código pesquisado."
+                  ? "Nenhuma máquina corresponde aos filtros informados. Ajuste o ponto ou o código pesquisado."
                   : "Cadastre sua primeira máquina para começar!"
               }
               action={{

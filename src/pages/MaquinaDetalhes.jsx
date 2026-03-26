@@ -241,7 +241,7 @@ export function MaquinaDetalhes() {
                   : maquina.valorFicha || "-"}
               </p>
               <p>
-                <strong>Comissão da Loja:</strong>{" "}
+                <strong>Comissão do Ponto:</strong>{" "}
                 {maquina.comissaoLojaPercentual !== null &&
                 maquina.comissaoLojaPercentual !== undefined &&
                 maquina.comissaoLojaPercentual !== ""

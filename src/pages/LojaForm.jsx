@@ -327,7 +327,7 @@ export function LojaForm() {
     try {
       // Validação
       if (!formData.nome || formData.nome.trim() === "") {
-        setError("Por favor, informe o nome da loja");
+        setError("Por favor, informe o nome do ponto");
         setLoading(false);
         return;
       }
@@ -361,8 +361,8 @@ export function LojaForm() {
 
       setSuccess(
         isEdit
-          ? "Loja e gastos fixos atualizados com sucesso!"
-          : "Loja e gastos fixos criados com sucesso!",
+          ? "Ponto e gastos fixos atualizados com sucesso!"
+          : "Ponto e gastos fixos criados com sucesso!",
       );
 
       setTimeout(() => navigate("/lojas"), 1500);
@@ -487,11 +487,11 @@ export function LojaForm() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
-          title={isEdit ? "Editar Loja" : "Nova Loja"}
+          title={isEdit ? "Editar Ponto" : "Novo Ponto"}
           subtitle={
             isEdit
-              ? "Atualize as informações da loja"
-              : "Cadastre uma nova loja no sistema"
+              ? "Atualize as informações do ponto"
+              : "Cadastre um novo ponto no sistema"
           }
           icon="🏪"
         />
@@ -613,7 +613,7 @@ export function LojaForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Nome da Loja *
+                    Nome do Ponto *
                   </label>
                   <input
                     type="text"
@@ -621,7 +621,7 @@ export function LojaForm() {
                     value={formData.nome}
                     onChange={handleChange}
                     className="input-field"
-                    placeholder="Ex: Loja Shopping Center"
+                    placeholder="Ex: Ponto Shopping Center"
                     required
                   />
                 </div>
@@ -665,7 +665,7 @@ export function LojaForm() {
                       className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-sm font-semibold text-gray-700">
-                      Loja Ativa
+                      Ponto Ativo
                     </span>
                   </label>
                 </div>
@@ -835,7 +835,7 @@ export function LojaForm() {
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                   <p className="text-sm text-gray-600">
                     💡 Configure aqui o estoque de produtos disponíveis no
-                    depósito desta loja. Estes produtos podem ser transferidos
+                    depósito deste ponto. Estes produtos podem ser transferidos
                     para as máquinas.
                   </p>
                 </div>
@@ -1015,7 +1015,7 @@ export function LojaForm() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    {isEdit ? "Atualizar Loja" : "Criar Loja"}
+                    {isEdit ? "Atualizar Ponto" : "Criar Ponto"}
                   </span>
                 )}
               </button>

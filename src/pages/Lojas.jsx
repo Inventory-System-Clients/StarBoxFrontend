@@ -214,8 +214,8 @@ export function Lojas() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
-          title="Lojas"
-          subtitle="Gerencie as lojas do sistema"
+          title="Pontos"
+          subtitle="Gerencie os pontos do sistema"
           icon="🏪"
           action={
             usuario?.role === "ADMIN" ? (
@@ -319,7 +319,7 @@ export function Lojas() {
             type="text"
             value={filtroNome}
             onChange={(e) => setFiltroNome(e.target.value)}
-            placeholder="Digite o nome da loja"
+            placeholder="Digite o nome do ponto"
             className="input-field"
           />
         </div>
@@ -329,8 +329,8 @@ export function Lojas() {
           data={lojasFiltradas}
           emptyMessage={
             filtroNome
-              ? "Nenhuma loja encontrada para o nome pesquisado."
-              : "Nenhuma loja cadastrada. Clique em 'Nova Loja' para começar."
+              ? "Nenhum ponto encontrado para o nome pesquisado."
+              : "Nenhum ponto cadastrado. Clique em 'Novo Ponto' para começar."
           }
         />
       </div>
@@ -339,8 +339,8 @@ export function Lojas() {
         isOpen={deleteDialog.open}
         onClose={() => setDeleteDialog({ open: false, lojaId: null })}
         onConfirm={() => handleDelete(deleteDialog.lojaId)}
-        title="Excluir Loja"
-        message="Tem certeza que deseja excluir esta loja? Esta ação não pode ser desfeita e todas as máquinas associadas também serão removidas."
+        title="Excluir Ponto"
+        message="Tem certeza que deseja excluir este ponto? Esta ação não pode ser desfeita e todas as máquinas associadas também serão removidas."
         confirmText="Sim, excluir"
         cancelText="Cancelar"
         type="danger"

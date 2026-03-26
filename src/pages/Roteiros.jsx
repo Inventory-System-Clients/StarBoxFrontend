@@ -7,9 +7,9 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { Modal, AlertBox } from "../components/UIComponents";
 import {
   abrirWhatsAppComMensagem,
+  extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
-  somarPeluciasUsadasMovimentacoes,
   somarSaldoEstoqueUsuario,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
@@ -601,7 +601,7 @@ export function Roteiros() {
       isRoteiroFinalizado(roteiroDestino)
     ) {
       setError(
-        "Roteiro finalizado não permite adicionar, remover ou mover lojas.",
+        "Roteiro finalizado não permite adicionar, remover ou mover pontos.",
       );
       return;
     }
@@ -614,14 +614,14 @@ export function Roteiros() {
       });
       carregarDadosIniciais();
     } catch (err) {
-      setError("Erro ao mover loja.");
+      setError("Erro ao mover ponto.");
     }
   };
 
   const handleReordenarLoja = async (roteiroId, lojaId, novaOrdem) => {
     const roteiro = getRoteiroById(roteiroId);
     if (isRoteiroFinalizado(roteiro)) {
-      setError("Roteiro finalizado não permite reordenar lojas.");
+      setError("Roteiro finalizado não permite reordenar pontos.");
       return;
     }
 
@@ -632,7 +632,7 @@ export function Roteiros() {
       });
       carregarDadosIniciais();
     } catch (err) {
-      setError("Erro ao reordenar loja.");
+      setError("Erro ao reordenar ponto.");
     }
   };
 
@@ -695,32 +695,6 @@ export function Roteiros() {
         finalizacaoData?.totais?.peluciasUsadas,
       );
 
-      const podeConsultarMovimentacoesResumo = [
-        "ADMIN",
-        "GERENCIADOR",
-        "CONTROLADOR_ESTOQUE",
-      ].includes(usuario?.role);
-
-      if (podeConsultarMovimentacoesResumo) {
-        try {
-          const movRes = await api.get("/movimentacoes", {
-            params: {
-              roteiroId: roteiro.id,
-              limite: 5000,
-            },
-          });
-          const listaMovimentacoes = Array.isArray(movRes.data)
-            ? movRes.data
-            : movRes.data?.rows || movRes.data?.movimentacoes || [];
-          totalPeluciasUsadas = somarPeluciasUsadasMovimentacoes(
-            listaMovimentacoes,
-            usuario?.id,
-          );
-        } catch {
-          totalPeluciasUsadas = totalPeluciasUsadas ?? null;
-        }
-      }
-
       let saldoPeluciasEstoque = extrairNumero(
         finalizacaoData?.saldoPeluciasEstoqueUsuario,
         finalizacaoData?.saldoEstoqueUsuario,
@@ -749,6 +723,29 @@ export function Roteiros() {
             }
           }
         }
+      }
+
+      const saldoPeluciasInicial = extrairNumero(
+        finalizacaoData?.saldoPeluciasInicialUsuario,
+        finalizacaoData?.saldoInicialEstoqueUsuario,
+        finalizacaoData?.peluciasIniciaisRoteiro,
+        finalizacaoData?.peluciasInicioRoteiro,
+        finalizacaoData?.estoqueInicialUsuario,
+        finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
+        finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
+        finalizacaoData?.totais?.peluciasIniciaisRoteiro,
+        roteiro?.saldoPeluciasInicialUsuario,
+        roteiro?.saldoInicialEstoqueUsuario,
+        roteiro?.peluciasIniciaisRoteiro,
+        roteiro?.peluciasInicioRoteiro,
+        roteiro?.estoqueInicialUsuario,
+      );
+
+      if (saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null) {
+        totalPeluciasUsadas = Math.max(
+          0,
+          saldoPeluciasInicial - saldoPeluciasEstoque,
+        );
       }
 
       const despesaTotal = extrairNumero(
@@ -782,8 +779,52 @@ export function Roteiros() {
           [],
       );
 
+      let kmInicialVeiculo = extrairNumero(
+        finalizacaoData?.kmInicialVeiculo,
+        finalizacaoData?.kmInicial,
+        finalizacaoData?.quilometragemInicial,
+        finalizacaoData?.totais?.kmInicialVeiculo,
+      );
+
+      let kmFinalVeiculo = extrairNumero(
+        finalizacaoData?.kmFinalVeiculo,
+        finalizacaoData?.kmFinal,
+        finalizacaoData?.quilometragemFinal,
+        finalizacaoData?.totais?.kmFinalVeiculo,
+      );
+
+      if (kmInicialVeiculo === null || kmFinalVeiculo === null) {
+        try {
+          const movVeiculoRes = await api.get("/movimentacao-veiculos", {
+            params: {
+              roteiroId: roteiro.id,
+            },
+          });
+
+          const listaMovimentacoesVeiculo = Array.isArray(movVeiculoRes.data)
+            ? movVeiculoRes.data
+            : movVeiculoRes.data?.rows || movVeiculoRes.data?.movimentacoes || [];
+
+          const resumoKm = extrairKmMovimentacoesRoteiro(
+            listaMovimentacoesVeiculo,
+            {
+              usuarioId: usuario?.id,
+              veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id,
+            },
+          );
+
+          kmInicialVeiculo = kmInicialVeiculo ?? resumoKm.kmInicial;
+          kmFinalVeiculo = kmFinalVeiculo ?? resumoKm.kmFinal;
+        } catch {
+          kmInicialVeiculo = kmInicialVeiculo ?? null;
+          kmFinalVeiculo = kmFinalVeiculo ?? null;
+        }
+      }
+
       return montarMensagemFinalizacaoRoteiro({
         roteiroNome: roteiro?.nome,
+        kmInicialVeiculo,
+        kmFinalVeiculo,
         lojasFeitas: resumoExecucao.lojasFeitas,
         lojasNaoFeitas: resumoExecucao.lojasNaoFeitas,
         maquinasFeitas: resumoExecucao.maquinasFeitas,
@@ -923,7 +964,7 @@ export function Roteiros() {
       isRoteiroFinalizado(roteiroDestino)
     ) {
       setError(
-        "Roteiro finalizado não permite adicionar, remover ou mover lojas.",
+        "Roteiro finalizado não permite adicionar, remover ou mover pontos.",
       );
       setDraggedLoja(null);
       setDraggedFromRoteiro(null);
@@ -1268,11 +1309,11 @@ export function Roteiros() {
                 )}
               </div>
 
-              {/* Lista de Lojas */}
+              {/* Lista de Pontos */}
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-gray-400">
-                    LOJAS NO DIA
+                    PONTOS NO DIA
                   </span>
                   {isGestorRoteiro &&
                     !isRoteiroFinalizado(roteiro) && (
@@ -1475,12 +1516,12 @@ export function Roteiros() {
         </div>
       )}
 
-      {/* MODAL ADICIONAR LOJA (Simplificado) */}
+      {/* MODAL ADICIONAR PONTO (Simplificado) */}
       {showModalAdicionarLoja && roteiroParaAdicionar && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] flex flex-col">
             <h2 className="text-xl font-bold mb-4">
-              Adicionar Loja a {roteiroParaAdicionar.nome}
+              Adicionar Ponto a {roteiroParaAdicionar.nome}
             </h2>
             <div className="mb-3">
               <input
@@ -1488,11 +1529,11 @@ export function Roteiros() {
                 type="text"
                 value={filtroLojaAdicionar}
                 onChange={(e) => setFiltroLojaAdicionar(e.target.value)}
-                placeholder="Buscar loja por nome, cidade, bairro ou código..."
+                placeholder="Buscar ponto por nome, cidade, bairro ou código..."
                 className="w-full p-3 border rounded-xl text-sm focus:ring-2 focus:ring-[#24094E] outline-none"
               />
               <p className="text-xs text-gray-500 mt-1">
-                {lojasFiltradasParaAdicionar.length} loja
+                {lojasFiltradasParaAdicionar.length} ponto
                 {lojasFiltradasParaAdicionar.length === 1 ? "" : "s"} disponível
                 {lojasFiltradasParaAdicionar.length === 1 ? "" : "is"} para
                 adicionar
@@ -1500,7 +1541,7 @@ export function Roteiros() {
             </div>
             {isRoteiroFinalizado(roteiroParaAdicionar) && (
               <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                Esta rota está finalizada. Não é permitido adicionar lojas.
+                Esta rota está finalizada. Não é permitido adicionar pontos.
               </div>
             )}
             <div className="overflow-y-auto space-y-2 mb-4">
@@ -1526,8 +1567,8 @@ export function Roteiros() {
               ) : (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
                   {filtroLojaAdicionar
-                    ? "Nenhuma loja encontrada para este filtro."
-                    : "Todas as lojas já foram adicionadas a este roteiro."}
+                    ? "Nenhum ponto encontrado para este filtro."
+                    : "Todos os pontos já foram adicionados a este roteiro."}
                 </div>
               )}
             </div>

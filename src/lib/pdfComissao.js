@@ -38,7 +38,7 @@ export function gerarPdfComissao({
   doc.setFontSize(12);
   doc.setTextColor(80, 80, 80);
   y += 10;
-  doc.text(`Loja: ${loja.nome}`, LEFT, y);
+  doc.text(`Ponto: ${loja.nome}`, LEFT, y);
   y += 7;
   doc.text(`Data: ${data}`, LEFT, y);
 
@@ -77,7 +77,7 @@ export function gerarPdfComissao({
   doc.text("(−) Custo dos Produtos", LEFT + 4, y);
   doc.text(`R$ ${fmt(custoProdutos)}`, RIGHT_VAL, y, { align: "right" });
   y += 6;
-  doc.text("(−) Comissão da Loja", LEFT + 4, y);
+  doc.text("(−) Comissão do Ponto", LEFT + 4, y);
   doc.text(`R$ ${fmt(comissaoTotal)}`, RIGHT_VAL, y, { align: "right" });
   y += 6;
   doc.text("(−) Custos Fixos", LEFT + 4, y);

@@ -135,7 +135,7 @@ export function Dashboard() {
         title: "Erro ao gerar relatório",
         text:
           err?.response?.status === 400
-            ? "Selecione uma loja."
+            ? "Selecione um ponto."
             : err?.message || "Não foi possível buscar os dados.",
         confirmButtonColor: "#fbbf24",
       });
@@ -758,7 +758,7 @@ export function Dashboard() {
             // Buscar a máquina e depois a loja
             const maquina =
               maquinasData.find((m) => m.id === mov.maquinaId) || mov.maquina;
-            let lojaNome = "Loja não identificada";
+            let lojaNome = "Ponto não identificado";
 
             if (maquina) {
               // Se a máquina tem loja como objeto
@@ -969,7 +969,7 @@ export function Dashboard() {
         <body>
           <div class="header">
             <h1>📦 Relatório de Estoque</h1>
-            <p><strong>Loja:</strong> ${loja.nome}</p>
+            <p><strong>Ponto:</strong> ${loja.nome}</p>
             <p><strong>Endereço:</strong> ${
               loja.endereco || "Não informado"
             }</p>
@@ -1206,7 +1206,7 @@ export function Dashboard() {
             <p><strong>Tipos de Produtos:</strong> ${
               produtosNecessarios.length
             }</p>
-            <p><strong>Lojas Atendidas:</strong> ${lojasComEstoque.length}</p>
+            <p><strong>Pontos Atendidos:</strong> ${lojasComEstoque.length}</p>
           </div>
 
           ${
@@ -1218,7 +1218,7 @@ export function Dashboard() {
                 <tr>
                   <th>Produto</th>
                   <th>Total a Comprar</th>
-                  <th>Distribuição por Loja</th>
+                  <th>Distribuição por Ponto</th>
                 </tr>
               </thead>
               <tbody>
@@ -1239,7 +1239,7 @@ export function Dashboard() {
                           <table class="sub-table" style="width: 100%;">
                             <thead>
                               <tr>
-                                <th>Loja</th>
+                                <th>Ponto</th>
                                 <th>Atual</th>
                                 <th>Mínimo</th>
                                 <th>Enviar</th>
@@ -1272,7 +1272,7 @@ export function Dashboard() {
               </tbody>
             </table>
           `
-              : '<p style="text-align: center; color: #28a745; font-size: 18px; padding: 20px;">✅ Todas as lojas estão com estoque adequado!</p>'
+              : '<p style="text-align: center; color: #28a745; font-size: 18px; padding: 20px;">✅ Todos os pontos estão com estoque adequado!</p>'
           }
 
           <div class="footer">
@@ -1514,7 +1514,7 @@ export function Dashboard() {
                     Atenção
                   </p>
                   <p className="text-sm text-blue-800">
-                    Ao adicionar estoque em uma loja (Entrada), os produtos
+                    Ao adicionar estoque em um ponto (Entrada), os produtos
                     serão{" "}
                     <strong>
                       automaticamente descontados do Depósito Principal
@@ -1562,7 +1562,7 @@ export function Dashboard() {
               {/* Campo para selecionar a loja */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Loja de destino
+                  Ponto de destino
                 </label>
                 <select
                   className="input-field w-full"
@@ -1570,7 +1570,7 @@ export function Dashboard() {
                   onChange={(e) => setMovimentacaoLojaId(e.target.value)}
                   required
                 >
-                  <option value="">Selecione a loja</option>
+                  <option value="">Selecione o ponto</option>
                   {(lojas || []).map((loja) => (
                     <option key={loja.id} value={loja.id}>
                       {loja.nome}
@@ -1929,7 +1929,7 @@ export function Dashboard() {
                 </p>
                 <p className="text-xs opacity-75 mt-1">
                   ⚠️ {stats.alertas.length} máquinas · 🏪{" "}
-                  {alertasEstoqueLoja.length} lojas
+                  {alertasEstoqueLoja.length} pontos
                 </p>
               </div>
             </div>
@@ -2414,7 +2414,7 @@ export function Dashboard() {
                     Total de Produtos Vendidos
                   </h2>
                   <p className="text-gray-600 text-sm sm:text-base">
-                    Soma de todas as lojas no período
+                    Soma de todos os pontos no período
                   </p>
                 </div>
                 <div className="text-left sm:text-right mt-4 sm:mt-0">
@@ -2433,8 +2433,8 @@ export function Dashboard() {
                   <p className="text-xs sm:text-sm text-gray-500 mt-2">
                     📊 {stats.balanco.distribuicaoLojas.length}{" "}
                     {stats.balanco.distribuicaoLojas.length === 1
-                      ? "loja"
-                      : "lojas"}{" "}
+                      ? "ponto"
+                      : "pontos"}{" "}
                     ativas
                   </p>
                   <button className="mt-2 text-xs text-pink-600 font-semibold hover:text-pink-700 flex items-center gap-1">
@@ -2474,10 +2474,10 @@ export function Dashboard() {
                             </span>
                           </div>
 
-                          {/* Vendas por Loja */}
+                          {/* Vendas por Ponto */}
                           <div className="mt-3 pl-10">
                             <p className="text-sm font-semibold text-gray-700 mb-2">
-                              📍 Vendas por loja:
+                              📍 Vendas por ponto:
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                               {Object.entries(produto.vendasPorLoja).map(
@@ -2516,7 +2516,7 @@ export function Dashboard() {
         {/* Estoque dos Depósitos - Apenas para ADMIN */}
         {isAdminLike && lojasComEstoque.length > 0 && (
           <>
-            {/* Botão para ir para busca de lojas */}
+            {/* Botão para ir para busca de pontos */}
             <div className="mb-6 flex justify-center">
               <button
                 onClick={() => {
@@ -2540,7 +2540,7 @@ export function Dashboard() {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-                Ir para Busca de Lojas e Máquinas
+                Ir para Busca de Pontos e Máquinas
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -2565,15 +2565,15 @@ export function Dashboard() {
                     Estoque dos Depósitos
                   </h2>
                   <p className="text-gray-600 mt-1">
-                    Visualização rápida do estoque em cada loja
+                    Visualização rápida do estoque em cada ponto
                   </p>
-                  {/* Campo de busca por nome da loja */}
+                  {/* Campo de busca por nome do ponto */}
                   <div className="relative mt-4">
                     <input
                       type="text"
                       value={filtroEstoqueLoja}
                       onChange={(e) => setFiltroEstoqueLoja(e.target.value)}
-                      placeholder="Buscar loja pelo nome..."
+                      placeholder="Buscar ponto pelo nome..."
                       className="w-full md:w-96 input-field pl-10 text-sm"
                     />
                     <svg
@@ -2875,12 +2875,12 @@ export function Dashboard() {
           </>
         )}
 
-        {/* Busca de Lojas e Máquinas */}
+        {/* Busca de Pontos e Máquinas */}
         {!isFuncionario && (
           <div ref={buscaLojasRef} className="card-gradient mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <span className="text-3xl">🔍</span>
-              Buscar Lojas e Máquinas
+              Buscar Pontos e Máquinas
             </h2>
 
             {/* Breadcrumb de Navegação */}
@@ -2925,7 +2925,7 @@ export function Dashboard() {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Digite o nome da loja ou endereço..."
+                  placeholder="Digite o nome do ponto ou endereço..."
                   className="w-full input-field pl-12 text-lg"
                 />
                 <svg
@@ -2998,8 +2998,8 @@ export function Dashboard() {
                     <p className="text-6xl mb-4">🔍</p>
                     <p className="text-gray-600">
                       {searchTerm
-                        ? "Nenhuma loja encontrada"
-                        : "Digite para buscar lojas"}
+                        ? "Nenhum ponto encontrado"
+                        : "Digite para buscar pontos"}
                     </p>
                   </div>
                 )}
@@ -3070,7 +3070,7 @@ export function Dashboard() {
                   <div className="text-center py-12">
                     <p className="text-6xl mb-4">🎰</p>
                     <p className="text-gray-600">
-                      Nenhuma máquina cadastrada nesta loja
+                      Nenhuma máquina cadastrada neste ponto
                     </p>
                   </div>
                 )}
@@ -3589,7 +3589,7 @@ export function Dashboard() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <span className="bg-orange-100 p-2 rounded-lg">🏪</span>
-                Alertas de Estoque nas Lojas
+                Alertas de Estoque nos Pontos
               </h2>
               <span className="badge bg-orange-100 text-orange-700 border-orange-300">
                 {alertasEstoqueLoja.length}{" "}
@@ -3673,7 +3673,7 @@ export function Dashboard() {
                 to="/lojas"
                 className="block mt-6 text-center bg-linear-to-r from-orange-500/10 to-orange-600/10 hover:from-orange-500/20 hover:to-orange-600/20 text-orange-700 font-bold py-3 rounded-xl transition-all duration-200"
               >
-                Ver todos os alertas de lojas ({alertasEstoqueLoja.length})
+                Ver todos os alertas de pontos ({alertasEstoqueLoja.length})
               </Link>
             )}
           </div>
@@ -3697,13 +3697,13 @@ export function Dashboard() {
                     />
                   </svg>
                 </span>
-                Performance por Loja
+                Performance por Ponto
               </h2>
               <span className="badge badge-info">
                 {stats.balanco.distribuicaoLojas.length}{" "}
                 {stats.balanco.distribuicaoLojas.length === 1
-                  ? "loja"
-                  : "lojas"}
+                  ? "ponto"
+                  : "pontos"}
               </span>
             </div>
             <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -3723,7 +3723,7 @@ export function Dashboard() {
                             clipRule="evenodd"
                           />
                         </svg>
-                        Loja
+                        Ponto
                       </div>
                     </th>
                     <th>

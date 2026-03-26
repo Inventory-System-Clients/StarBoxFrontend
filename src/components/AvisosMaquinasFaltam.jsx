@@ -63,7 +63,7 @@ export default function AvisosMaquinasFaltam({ lojas }) {
       <h2 className="text-lg font-bold mb-2">
         Aviso de Máquinas sem Movimentação
       </h2>
-      <label className="block mb-2 font-semibold">Escolha a loja:</label>
+      <label className="block mb-2 font-semibold">Escolha o ponto:</label>
       <select
         className="w-full px-3 py-2 rounded-lg border border-yellow-200 bg-yellow-100 font-medium text-yellow-900 text-base mb-4"
         value={lojaSelecionada}
@@ -98,7 +98,7 @@ export default function AvisosMaquinasFaltam({ lojas }) {
             </div>
           ) : null}
           <h3 className="font-semibold mb-2 text-[#24094E]">
-            Máquinas da loja:
+            Máquinas do ponto:
           </h3>
           <ul className="mb-4">
             {maquinas.map((m) => (

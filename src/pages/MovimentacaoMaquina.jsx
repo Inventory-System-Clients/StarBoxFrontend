@@ -342,7 +342,7 @@ export default function MovimentacaoMaquina() {
     const lojaCodigo = String(maquina?.loja?.id || lojaId || "")
       .slice(0, 8)
       .toUpperCase();
-    const lojaNome = maquina?.loja?.nome || "Loja sem nome";
+    const lojaNome = maquina?.loja?.nome || "Ponto sem nome";
     const dataMovimentacao = new Date().toLocaleString("pt-BR");
     const dataUltimaMovimentacao = ultimaMovimentacaoData
       ? new Date(ultimaMovimentacaoData).toLocaleString("pt-BR")
@@ -522,7 +522,7 @@ export default function MovimentacaoMaquina() {
           .join("\n");
 
         const confirmar = window.confirm(
-          `Voce possui saldo no estoque pessoal para alguns produtos:\n\n${resumoDetalhes}\n\nDeseja retirar do estoque da loja mesmo assim?`,
+          `Voce possui saldo no estoque pessoal para alguns produtos:\n\n${resumoDetalhes}\n\nDeseja retirar do estoque do ponto mesmo assim?`,
         );
 
         if (!confirmar) {
@@ -537,7 +537,7 @@ export default function MovimentacaoMaquina() {
       setTimeout(() => {
         navigate(`/roteiros/${roteiroId}/executar`, {
           replace: true,
-          state: { lojaId: lojaId },
+          state: { lojaId: lojaId, origemMovimentacao: true },
         });
       }, 1200);
     } catch (err) {
@@ -816,7 +816,7 @@ export default function MovimentacaoMaquina() {
                     className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                   />
                   <span className="text-xs text-green-700">
-                    Devolver retirada para o estoque da loja
+                    Devolver retirada para o estoque do ponto
                   </span>
                 </label>
               </div>
@@ -916,10 +916,10 @@ export default function MovimentacaoMaquina() {
                 className="select-field"
               >
                 <option value="usuario">Meu estoque</option>
-                <option value="loja">Estoque da loja</option>
+                <option value="loja">Estoque do ponto</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Ao escolher estoque da loja, pode ser solicitada confirmação.
+                Ao escolher estoque do ponto, pode ser solicitada confirmação.
               </p>
             </div>
             {podeVerCamposFinanceirosEObservacao && (

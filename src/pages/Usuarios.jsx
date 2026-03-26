@@ -187,7 +187,7 @@ export function Usuarios() {
                             : usuario.role === "GERENCIADOR"
                               ? "Gerenciador"
                               : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
-                                ? "Funcionário (todas as lojas)"
+                                ? "Funcionário (todos os pontos)"
                                 : "Funcionário Abastecedor"}
                       </span>
                     </td>

@@ -185,7 +185,7 @@ export function MaquinaForm() {
       ); // Debug
 
       if (!formData.loja_id || formData.loja_id === "") {
-        setError("Por favor, selecione uma loja");
+        setError("Por favor, selecione um ponto");
         setLoading(false);
         return;
       }
@@ -309,7 +309,7 @@ export function MaquinaForm() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Loja *
+                    Ponto *
                   </label>
                   <select
                     name="loja_id"
@@ -318,7 +318,7 @@ export function MaquinaForm() {
                     className="select-field"
                     required
                   >
-                    <option value="">Selecione uma loja...</option>
+                    <option value="">Selecione um ponto...</option>
                     {lojas.map((loja) => (
                       <option key={loja.id} value={loja.id}>
                         {loja.nome}
@@ -446,7 +446,7 @@ export function MaquinaForm() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Comissão da Loja (%)
+                    Comissão do Ponto (%)
                   </label>
                   <input
                     type="number"
@@ -460,7 +460,7 @@ export function MaquinaForm() {
                     step="0.01"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Percentual de comissão da loja para esta máquina
+                    Percentual de comissão do ponto para esta máquina
                   </p>
                 </div>
 
@@ -598,7 +598,7 @@ export function MaquinaForm() {
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Localização na Loja
+                    Localização no Ponto
                   </label>
                   <textarea
                     name="localizacao"
@@ -609,7 +609,7 @@ export function MaquinaForm() {
                     placeholder="Ex: Entrada principal, lado direito próximo ao balcão..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Descrição da localização da máquina na loja
+                    Descrição da localização da máquina no ponto
                   </p>
                 </div>
               </div>

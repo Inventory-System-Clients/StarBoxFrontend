@@ -106,7 +106,7 @@ export function UsuarioForm() {
       formData.role === "FUNCIONARIO" &&
       formData.lojasPermitidas.length === 0
     ) {
-      setError("Funcionários devem ter acesso a pelo menos uma loja");
+      setError("Funcionários devem ter acesso a pelo menos um ponto");
       return;
     }
 
@@ -292,7 +292,7 @@ export function UsuarioForm() {
                 >
                   <option value="FUNCIONARIO">Funcionário Abastecedor</option>
                   <option value="FUNCIONARIO_TODAS_LOJAS">
-                    Funcionário (todas as lojas)
+                    Funcionário (todos os pontos)
                   </option>
                   <option value="CONTROLADOR_ESTOQUE">
                     Controlador de Estoque
@@ -304,22 +304,22 @@ export function UsuarioForm() {
                   {formData.role === "ADMIN"
                     ? "Administradores têm acesso total ao sistema"
                     : formData.role === "CONTROLADOR_ESTOQUE"
-                      ? "Controlador de estoque acessa todas as lojas, gerencia estoques de usuários e pode operar movimentações."
+                      ? "Controlador de estoque acessa todos os pontos, gerencia estoques de usuários e pode operar movimentações."
                       : formData.role === "GERENCIADOR"
                         ? "Gerenciador possui perfil administrativo operacional, mas sem acesso a financeiro, relatórios, fluxo de caixa e valores de faturamento de máquina."
                         : formData.role === "FUNCIONARIO_TODAS_LOJAS"
-                          ? "Funcionários deste perfil visualizam todas as lojas, mas seguem com acesso operacional de funcionário."
-                            : "Funcionário Abastecedor tem acesso operacional limitado às lojas autorizadas"}
+                          ? "Funcionários deste perfil visualizam todos os pontos, mas seguem com acesso operacional de funcionário."
+                            : "Funcionário Abastecedor tem acesso operacional limitado aos pontos autorizados"}
                 </p>
               </div>
             </div>
 
-            {/* Lojas Permitidas (para Funcionários e Controlador de Estoque) */}
+            {/* Pontos Permitidos (para Funcionários e Controlador de Estoque) */}
             {(formData.role === "FUNCIONARIO" ||
               formData.role === "CONTROLADOR_ESTOQUE") && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Lojas Autorizadas *
+                  Pontos Autorizados *
                 </h2>
 
                 <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-300 rounded-lg p-4">

@@ -108,7 +108,7 @@ export default function ManutencaoModal({
       "STAR BOX",
       "*Atualização de Manutenção*",
       `Data/Hora: ${dataHora}`,
-      `Loja: ${lojaNome}`,
+      `Ponto: ${lojaNome}`,
       `Máquina: ${maquinaCodigo} - ${maquinaNome}`,
       `Usuário: ${usuarioAcao}`,
       "___________________________________",
@@ -322,7 +322,7 @@ export default function ManutencaoModal({
           <>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="font-bold text-yellow-800 mb-2">
-                Esta loja tem uma manutenção pendente:
+                Este ponto tem uma manutenção pendente:
               </p>
               <p className="text-sm text-gray-700">
                 <strong>Descrição:</strong> {manutencao.descricao}
@@ -331,7 +331,7 @@ export default function ManutencaoModal({
                 <strong>Máquina:</strong> {manutencao.maquina?.nome || "-"}
               </p>
               <p className="text-sm text-gray-700">
-                <strong>Loja:</strong> {manutencao.loja?.nome || "-"}
+                <strong>Ponto:</strong> {manutencao.loja?.nome || "-"}
               </p>
             </div>
 

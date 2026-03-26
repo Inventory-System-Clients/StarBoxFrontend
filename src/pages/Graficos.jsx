@@ -101,7 +101,7 @@ export function Graficos() {
       }
     } catch (error) {
       console.error("Erro ao carregar lojas:", error);
-      setErro("Erro ao carregar lista de lojas.");
+      setErro("Erro ao carregar lista de pontos.");
     }
   };
 

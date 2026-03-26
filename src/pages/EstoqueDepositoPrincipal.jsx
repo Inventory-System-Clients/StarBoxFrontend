@@ -32,7 +32,7 @@ export function EstoqueDepositoPrincipal() {
 
       if (!deposito) {
         setError(
-          "Nenhuma loja está configurada como Depósito Principal. Configure uma loja como depósito principal no banco de dados.",
+          "Nenhum ponto está configurado como Depósito Principal. Configure um ponto como depósito principal no banco de dados.",
         );
         setLoading(false);
         return;
@@ -119,7 +119,7 @@ export function EstoqueDepositoPrincipal() {
                     d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                   />
                 </svg>
-                Ver Detalhes da Loja
+                Ver Detalhes do Ponto
               </button>
             )
           }
@@ -141,7 +141,7 @@ export function EstoqueDepositoPrincipal() {
                   </h3>
                   <p className="text-sm text-gray-700 mb-2">
                     Este é o <strong>estoque central</strong> do sistema. Todo
-                    estoque adicionado em outras lojas ou funcionários é
+                    estoque adicionado em outros pontos ou funcionários é
                     automaticamente descontado daqui.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">

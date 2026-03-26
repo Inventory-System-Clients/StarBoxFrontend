@@ -32,7 +32,7 @@ export default function TabelaMovimentacoesEstoqueDeLoja({
         <thead>
           <tr className="bg-[#62A1D9] text-white">
             <th className="px-4 py-2">Data/Hora</th>
-            <th className="px-4 py-2">Loja de Destino</th>
+            <th className="px-4 py-2">Ponto de Destino</th>
             <th className="px-4 py-2">Responsável</th>
             <th className="px-4 py-2">Produtos Enviados</th>
             <th className="px-4 py-2">Editar</th>

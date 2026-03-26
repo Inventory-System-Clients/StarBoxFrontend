@@ -396,7 +396,7 @@ export function Movimentacoes() {
           .join("\n");
 
         const confirmar = window.confirm(
-          `Voce possui saldo no estoque pessoal para alguns produtos:\n\n${resumoDetalhes}\n\nDeseja retirar do estoque da loja mesmo assim?`,
+          `Voce possui saldo no estoque pessoal para alguns produtos:\n\n${resumoDetalhes}\n\nDeseja retirar do estoque do ponto mesmo assim?`,
         );
 
         if (!confirmar) {
@@ -548,11 +548,11 @@ export function Movimentacoes() {
 
     try {
       await api.delete(`/movimentacao-estoque-loja/${excluindoEstoqueLoja.id}`);
-      setSuccess("Movimentação de estoque de loja excluída com sucesso!");
+      setSuccess("Movimentação de estoque de ponto excluída com sucesso!");
       carregarMovimentacoesEstoqueLoja(); // Recarrega a lista
     } catch (err) {
       console.error("Erro ao excluir:", err);
-      setError("Erro ao excluir movimentação de loja.");
+      setError("Erro ao excluir movimentação de ponto.");
     } finally {
       setExcluindoEstoqueLoja(null); // Fecha o modal
     }
@@ -574,13 +574,13 @@ export function Movimentacoes() {
         })),
       });
 
-      setSuccess("Movimentação de loja atualizada!");
+      setSuccess("Movimentação de ponto atualizada!");
       carregarMovimentacoesEstoqueLoja();
       if (typeof carregarDados === "function") carregarDados();
       setEditandoEstoqueLoja(null);
     } catch (err) {
       console.error("Erro ao editar:", err);
-      setError("Erro ao atualizar movimentação de loja.");
+      setError("Erro ao atualizar movimentação de ponto.");
     }
   };
 
@@ -964,7 +964,7 @@ export function Movimentacoes() {
 
         <AvisosMaquinasFaltam lojas={lojas} />
 
-        {/* Filtro por Loja - Apenas para ADMIN */}
+        {/* Filtro por Ponto - Apenas para ADMIN */}
         {usuario?.role === "ADMIN" && (
           <div className="card-gradient mb-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -974,14 +974,14 @@ export function Movimentacoes() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  🏪 Filtrar por Loja
+                  🏪 Filtrar por Ponto
                 </label>
                 <select
                   value={filtroLojaListagem}
                   onChange={(e) => setFiltroLojaListagem(e.target.value)}
                   className="input-field"
                 >
-                  <option value="">Todas as lojas</option>
+                  <option value="">Todos os pontos</option>
                   {lojas.map((loja) => (
                     <option key={loja.id} value={loja.id}>
                       {loja.nome}
@@ -1236,7 +1236,7 @@ export function Movimentacoes() {
                       className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
                     <span className="text-xs text-green-700">
-                      Devolver retirada para o estoque da loja
+                      Devolver retirada para o estoque do ponto
                     </span>
                   </label>
                 </div>
@@ -1305,7 +1305,7 @@ export function Movimentacoes() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Loja *
+                    Ponto *
                   </label>
                   <select
                     value={filtroLojaForm}
@@ -1316,7 +1316,7 @@ export function Movimentacoes() {
                     className="select-field"
                     required
                   >
-                    <option value="">Selecione uma loja...</option>
+                    <option value="">Selecione um ponto...</option>
                     {lojas
                       .filter((l) => l.ativo)
                       .map((loja) => (
@@ -1342,7 +1342,7 @@ export function Movimentacoes() {
                     <option value="">
                       {filtroLojaForm
                         ? "Selecione uma máquina..."
-                        : "Primeiro selecione uma loja"}
+                        : "Primeiro selecione um ponto"}
                     </option>
                     {maquinas
                       .filter(
@@ -1356,7 +1356,7 @@ export function Movimentacoes() {
                   </select>
                   {filtroLojaForm && (
                     <p className="text-xs text-gray-500 mt-1">
-                      💡 Mostrando apenas máquinas da loja selecionada
+                      💡 Mostrando apenas máquinas do ponto selecionado
                     </p>
                   )}
                 </div>
@@ -1391,10 +1391,10 @@ export function Movimentacoes() {
                     className="select-field"
                   >
                     <option value="usuario">Meu estoque</option>
-                    <option value="loja">Estoque da loja</option>
+                    <option value="loja">Estoque do ponto</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Ao escolher estoque da loja, pode ser solicitada
+                    Ao escolher estoque do ponto, pode ser solicitada
                     confirmação.
                   </p>
                 </div>
@@ -1523,7 +1523,7 @@ export function Movimentacoes() {
                 }
                 message={
                   filtroLojaListagem
-                    ? "Não há movimentações para a loja selecionada."
+                    ? "Não há movimentações para o ponto selecionado."
                     : "Registre sua primeira movimentação para começar o controle de estoque!"
                 }
                 action={{

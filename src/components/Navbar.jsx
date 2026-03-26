@@ -9,6 +9,9 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isPerfilFuncionario =
+    usuario?.role === "FUNCIONARIO" ||
+    usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const isAdminLike =
     usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
 
@@ -91,9 +94,9 @@ export default function Navbar() {
                     🎮 Máquinas
                   </NavLink>
                 )}
-                {!isFuncionario && (
+                {!isPerfilFuncionario && (
                   <NavLink to="/lojas" active={isActive("/lojas")}>
-                    🏪 Lojas
+                    🏪 Pontos
                   </NavLink>
                 )}
 
@@ -173,7 +176,7 @@ export default function Navbar() {
                     : usuario?.role === "GERENCIADOR"
                       ? "🧩 Gerenciador"
                       : usuario?.role === "FUNCIONARIO_TODAS_LOJAS"
-                        ? "👤 Funcionário (todas as lojas)"
+                        ? "👤 Funcionário (todos os pontos)"
                         : usuario?.role === "MANUTENCAO"
                           ? "🛠️ Manutenção"
                           : "👤 Funcionário Abastecedor"}
@@ -216,13 +219,13 @@ export default function Navbar() {
                 🎮 Máquinas
               </MobileNavLink>
             )}
-            {!isFuncionario && (
+            {!isPerfilFuncionario && (
               <MobileNavLink
                 to="/lojas"
                 active={isActive("/lojas")}
                 onClick={closeMenu}
               >
-                🏪 Lojas
+                🏪 Pontos
               </MobileNavLink>
             )}
             <MobileNavLink

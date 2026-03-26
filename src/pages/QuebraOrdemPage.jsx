@@ -47,7 +47,7 @@ export function QuebraOrdemPage() {
 
         return {
           ...mov,
-          lojaNome: loja?.nome || "Loja não encontrada",
+          lojaNome: loja?.nome || "Ponto não encontrado",
           lojaEsperadaNome: lojaEsperada?.nome || null,
           roteiroNome: roteiro?.nome || "Sem roteiro",
           roteiroId: roteiro?.id || null,
@@ -91,7 +91,7 @@ export function QuebraOrdemPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="Quebras de Ordem do Roteiro"
-          subtitle="Histórico de lojas visitadas fora da ordem estabelecida"
+          subtitle="Histórico de pontos visitados fora da ordem estabelecida"
           icon="⚠️"
           action={{
             label: "← Voltar ao Dashboard",
@@ -120,7 +120,7 @@ export function QuebraOrdemPage() {
             <div className="text-2xl font-bold text-gray-900">
               {new Set(quebrasOrdem.map((q) => q.lojaId)).size}
             </div>
-            <div className="text-sm text-gray-600">Lojas Diferentes</div>
+            <div className="text-sm text-gray-600">Pontos Diferentes</div>
           </div>
 
           <div className="stat-card bg-linear-to-br from-purple-500/10 to-purple-500/5">
@@ -143,13 +143,13 @@ export function QuebraOrdemPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filtrar por Loja
+                Filtrar por Ponto
               </label>
               <input
                 type="text"
                 value={filtroLoja}
                 onChange={(e) => setFiltroLoja(e.target.value)}
-                placeholder="Digite o nome da loja..."
+                placeholder="Digite o nome do ponto..."
                 className="input-field w-full"
               />
             </div>
@@ -222,7 +222,7 @@ export function QuebraOrdemPage() {
                     <p className="text-blue-800">{quebra.roteiroNome}</p>
                   </div>
 
-                  {/* Ordem - Loja Esperada vs Loja Visitada */}
+                  {/* Ordem - Ponto Esperado vs Ponto Visitado */}
                   <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg">
                     <p className="text-sm font-bold text-yellow-900 mb-3 flex items-center gap-2">
                       <span>🔄</span> Alteração de Ordem
@@ -232,7 +232,7 @@ export function QuebraOrdemPage() {
                         <span className="text-lg">❌</span>
                         <div>
                           <p className="text-xs font-semibold text-gray-600">
-                            Loja Pulada (Esperada):
+                            Ponto Pulado (Esperado):
                           </p>
                           <p className="text-sm font-bold text-red-700">
                             {quebra.lojaEsperadaNome || "Não registrada"}
@@ -243,7 +243,7 @@ export function QuebraOrdemPage() {
                         <span className="text-lg">✅</span>
                         <div>
                           <p className="text-xs font-semibold text-gray-600">
-                            Loja Visitada:
+                            Ponto Visitado:
                           </p>
                           <p className="text-sm font-bold text-green-700">
                             {quebra.lojaNome}
@@ -299,7 +299,7 @@ export function QuebraOrdemPage() {
                       onClick={() => navigate(`/lojas/${quebra.lojaId}`)}
                       className="btn-secondary text-sm"
                     >
-                      Ver Loja
+                      Ver Ponto
                     </button>
                     {quebra.roteiroId && (
                       <button

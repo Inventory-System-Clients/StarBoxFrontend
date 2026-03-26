@@ -64,7 +64,7 @@ const montarMensagemDetalhesManutencao = (detalhe) => {
     `Responsável: ${funcionarioNome}`,
     `Concluída por: ${concluidaPor}`,
     `Concluída em: ${concluidaEm}`,
-    `Loja: ${lojaNome}`,
+    `Ponto: ${lojaNome}`,
     `Máquina: ${maquinaCodigo} - ${maquinaNome}`,
   ].join("\n");
 };
@@ -479,7 +479,7 @@ function Manutencoes() {
         return {
           maquinaId: ordenadas[0].maquinaId,
           maquinaNome: ordenadas[0].maquina?.codigo || "Máquina sem código",
-          lojaNome: ordenadas[0].loja?.nome || "Loja não informada",
+          lojaNome: ordenadas[0].loja?.nome || "Ponto não informado",
           dataAtual: ordenadas[0].concluidoEm || ordenadas[0].createdAt,
           dataUltima: ordenadas[1].concluidoEm || ordenadas[1].createdAt,
         };
@@ -538,7 +538,7 @@ function Manutencoes() {
     event.preventDefault();
 
     if (!novaManutencao.lojaId) {
-      setError("Selecione uma loja válida na lista.");
+      setError("Selecione um ponto válido na lista.");
       return;
     }
 
@@ -876,7 +876,7 @@ function Manutencoes() {
               <div className="space-y-4">
                 <CampoSelectDigitavel
                   id="nova-manutencao-loja"
-                  label="Loja"
+                  label="Ponto"
                   value={novaManutencao.lojaId}
                   options={opcoesLojas}
                   onValueChange={(lojaId) => {
@@ -887,7 +887,7 @@ function Manutencoes() {
                     }));
                     carregarDestinatariosWhatsApp(lojaId);
                   }}
-                  placeholder="Digite o nome da loja"
+                  placeholder="Digite o nome do ponto"
                   required
                 />
 

@@ -19,7 +19,7 @@ const RegistrarDinheiro = ({ lojas, maquinas, onSubmit }) => {
     e.preventDefault();
     // Garantir que campos obrigatórios estejam preenchidos corretamente
     if (!lojaSelecionada || !inicio || !fim) {
-      alert("Preencha todos os campos obrigatórios: loja, início e fim.");
+      alert("Preencha todos os campos obrigatórios: ponto, início e fim.");
       return;
     }
     await onSubmit({
@@ -67,7 +67,7 @@ const RegistrarDinheiro = ({ lojas, maquinas, onSubmit }) => {
         Registrar Dinheiro
       </h2>
       <div style={{ marginBottom: 18 }}>
-        <label style={{ fontWeight: 600, color: "#a67c52" }}>Loja:</label>
+        <label style={{ fontWeight: 600, color: "#a67c52" }}>Ponto:</label>
         <select
           value={lojaSelecionada}
           onChange={handleLojaChange}
@@ -84,7 +84,7 @@ const RegistrarDinheiro = ({ lojas, maquinas, onSubmit }) => {
             fontSize: 16,
           }}
         >
-          <option value="">Selecione a loja</option>
+          <option value="">Selecione o ponto</option>
           {lojas &&
             lojas.map((loja) => (
               <option key={loja.id} value={loja.id}>
@@ -111,7 +111,7 @@ const RegistrarDinheiro = ({ lojas, maquinas, onSubmit }) => {
             htmlFor="registrarTotalLoja"
             style={{ fontSize: 15, color: "#a67c52" }}
           >
-            Registrar valor total da loja (não selecionar máquina)
+            Registrar valor total do ponto (não selecionar máquina)
           </label>
         </div>
       </div>
@@ -305,12 +305,12 @@ const RegistrarDinheiro = ({ lojas, maquinas, onSubmit }) => {
         }}
       >
         <ul style={{ paddingLeft: 18, margin: 0 }}>
-          <li>Se marcar valor total da loja, não selecione máquina.</li>
+          <li>Se marcar valor total do ponto, não selecione máquina.</li>
           <li>
             O lançamento do dinheiro de cada máquina não soma no dinheiro total
-            da loja.
+            do ponto.
           </li>
-          <li>O dinheiro das fichas não soma mais no valor inteiro da loja.</li>
+          <li>O dinheiro das fichas não soma mais no valor inteiro do ponto.</li>
         </ul>
       </div>
       <button

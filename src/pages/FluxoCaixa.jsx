@@ -196,14 +196,14 @@ export default function FluxoCaixa() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Loja
+                Ponto
               </label>
               <select
                 value={filtros.lojaId}
                 onChange={(e) => setFiltros(prev => ({ ...prev, lojaId: e.target.value }))}
                 className="select-field"
               >
-                <option value="">Todas as lojas</option>
+                <option value="">Todos os pontos</option>
                 {lojas.map(loja => (
                   <option key={loja.id} value={loja.id}>{loja.nome}</option>
                 ))}
@@ -269,7 +269,7 @@ export default function FluxoCaixa() {
                       Data
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Loja / Máquina
+                      Ponto / Máquina
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Funcionário

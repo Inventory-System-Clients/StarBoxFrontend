@@ -155,6 +155,60 @@ export const somarSaldoEstoqueUsuario = (estoqueUsuarioData) => {
   }, 0);
 };
 
+export const extrairKmMovimentacoesRoteiro = (
+  movimentacoes,
+  { usuarioId = null, veiculoId = null } = {},
+) => {
+  const usuarioNormalizado =
+    usuarioId === null || usuarioId === undefined ? null : String(usuarioId);
+  const veiculoNormalizado =
+    veiculoId === null || veiculoId === undefined ? null : String(veiculoId);
+
+  const listaFiltrada = toArray(movimentacoes).filter((mov) => {
+    const tipo = normalizarTexto(mov?.tipo).toLowerCase();
+    if (tipo !== "retirada" && tipo !== "devolucao") return false;
+
+    const movUsuarioId = String(
+      mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+    );
+    const movVeiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+
+    if (usuarioNormalizado && movUsuarioId !== usuarioNormalizado) return false;
+    if (veiculoNormalizado && movVeiculoId !== veiculoNormalizado) return false;
+
+    return true;
+  });
+
+  const listaOrdenada = [...listaFiltrada].sort((a, b) => {
+    const dataA = new Date(
+      a?.dataHora || a?.createdAt || a?.updatedAt || 0,
+    ).getTime();
+    const dataB = new Date(
+      b?.dataHora || b?.createdAt || b?.updatedAt || 0,
+    ).getTime();
+
+    if (dataA !== dataB) return dataA - dataB;
+    return Number(a?.id || 0) - Number(b?.id || 0);
+  });
+
+  const primeiraRetirada = listaOrdenada.find(
+    (mov) => normalizarTexto(mov?.tipo).toLowerCase() === "retirada",
+  );
+  const ultimaDevolucao = [...listaOrdenada]
+    .reverse()
+    .find((mov) => normalizarTexto(mov?.tipo).toLowerCase() === "devolucao");
+
+  const parseKm = (mov) => {
+    const numero = Number(mov?.km ?? mov?.quilometragem ?? mov?.odometro);
+    return Number.isFinite(numero) ? numero : null;
+  };
+
+  return {
+    kmInicial: parseKm(primeiraRetirada),
+    kmFinal: parseKm(ultimaDevolucao),
+  };
+};
+
 const formatarLista = (itens) => {
   const lista = toArray(itens).filter(Boolean);
   if (lista.length === 0) return "Nenhum";
@@ -172,6 +226,8 @@ const formatarMoedaBRL = (valor) => {
 
 export const montarMensagemFinalizacaoRoteiro = ({
   roteiroNome,
+  kmInicialVeiculo,
+  kmFinalVeiculo,
   lojasFeitas,
   lojasNaoFeitas,
   maquinasFeitas,
@@ -189,14 +245,22 @@ export const montarMensagemFinalizacaoRoteiro = ({
   const saldoEstoque = Number.isFinite(Number(saldoPeluciasEstoque))
     ? Number(saldoPeluciasEstoque)
     : null;
+  const kmInicial = Number.isFinite(Number(kmInicialVeiculo))
+    ? Number(kmInicialVeiculo)
+    : null;
+  const kmFinal = Number.isFinite(Number(kmFinalVeiculo))
+    ? Number(kmFinalVeiculo)
+    : null;
 
   return [
     "STAR BOX",
     "*Resumo de Finalizacao de Roteiro*",
     "___________________________________",
     `Roteiro: ${normalizarTexto(roteiroNome) || "-"}`,
-    `Lojas feitas: ${formatarLista(lojasFeitas)}`,
-    `Lojas nao feitas: ${formatarLista(lojasNaoFeitas)}`,
+    `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
+    `KM final (devolucao): ${kmFinal !== null ? kmFinal : "Nao informado"}`,
+    `Pontos feitos: ${formatarLista(lojasFeitas)}`,
+    `Pontos nao feitos: ${formatarLista(lojasNaoFeitas)}`,
     `Maquinas feitas: ${formatarLista(maquinasFeitas)}`,
     `Maquinas nao feitas: ${formatarLista(maquinasNaoFeitas)}`,
     `Total de pelucias usadas na rota: ${totalUsadas !== null ? totalUsadas : "Nao informado"}`,

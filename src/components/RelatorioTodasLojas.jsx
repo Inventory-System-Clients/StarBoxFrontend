@@ -182,18 +182,18 @@ export function RelatorioTodasLojas({ relatorio }) {
     <div className="space-y-6">
       <div className="card bg-linear-to-r from-indigo-50 to-blue-100 border-2 border-indigo-200">
         <h3 className="text-2xl font-bold text-gray-900 mb-2">
-          🏬 Consolidado de Todas as Lojas
+          🏬 Consolidado de Todos os Pontos
         </h3>
         <p className="text-gray-700">
           Período: <strong>{relatorio?.periodo?.inicio}</strong> até{" "}
           <strong>{relatorio?.periodo?.fim}</strong>
         </p>
         <p className="text-gray-700 mt-1">
-          Lojas com dados: <strong>{relatorio?.lojasComDados || 0}</strong>
+          Pontos com dados: <strong>{relatorio?.lojasComDados || 0}</strong>
         </p>
         {!!relatorio?.lojasSemDados?.length && (
           <p className="text-amber-700 mt-2 text-sm">
-            Lojas sem dados no período: {relatorio.lojasSemDados.join(", ")}
+            Pontos sem dados no período: {relatorio.lojasSemDados.join(", ")}
           </p>
         )}
       </div>
@@ -412,7 +412,7 @@ export function RelatorioTodasLojas({ relatorio }) {
                   : "bg-white text-indigo-700 border border-indigo-300"
               }`}
             >
-              Ranking por Loja
+              Ranking por Ponto
             </button>
           </div>
         </div>
@@ -451,7 +451,7 @@ export function RelatorioTodasLojas({ relatorio }) {
           </div>
         ) : (
           <GraficoBarras
-            titulo="🏆 Ranking de Ticket por Prêmio por Loja"
+            titulo="🏆 Ranking de Ticket por Prêmio por Ponto"
             itens={rankingTicketPremioLojas}
             chaveNome="lojaNome"
             chaveValor="ticketPorPremio"
@@ -464,7 +464,7 @@ export function RelatorioTodasLojas({ relatorio }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="card border border-green-200 bg-green-50">
-          <div className="text-sm text-gray-700">Loja que mais lucrou</div>
+          <div className="text-sm text-gray-700">Ponto que mais lucrou</div>
           <div className="font-bold text-green-800 mt-1">
             {destaques.lojaMaiorLucro?.lojaNome || "-"}
           </div>
@@ -473,7 +473,7 @@ export function RelatorioTodasLojas({ relatorio }) {
           </div>
         </div>
         <div className="card border border-red-200 bg-red-50">
-          <div className="text-sm text-gray-700">Loja com maior gasto</div>
+          <div className="text-sm text-gray-700">Ponto com maior gasto</div>
           <div className="font-bold text-red-800 mt-1">
             {destaques.lojaMaiorGasto?.lojaNome || "-"}
           </div>
@@ -519,7 +519,7 @@ export function RelatorioTodasLojas({ relatorio }) {
         />
 
         <GraficoBarras
-          titulo="📊 Ranking: lojas com maior lucro líquido"
+          titulo="📊 Ranking: pontos com maior lucro líquido"
           itens={graficos.rankingLucroLojas || []}
           chaveNome="lojaNome"
           chaveValor="lucroLiquido"
@@ -529,7 +529,7 @@ export function RelatorioTodasLojas({ relatorio }) {
         />
 
         <GraficoBarras
-          titulo="📊 Ranking: lojas com maior gasto"
+          titulo="📊 Ranking: pontos com maior gasto"
           itens={graficos.rankingGastoLojas || []}
           chaveNome="lojaNome"
           chaveValor="custoTotal"
@@ -539,23 +539,23 @@ export function RelatorioTodasLojas({ relatorio }) {
         />
 
         <GraficoBarras
-          titulo="📊 Ranking: lojas com maior gasto fixo"
+          titulo="📊 Ranking: pontos com maior gasto fixo"
           itens={gastosFixosPorLoja || []}
           chaveNome="lojaNome"
           chaveValor="custoFixo"
           classeBarra="bg-linear-to-r from-violet-500 to-purple-800"
           formatter={formatarMoeda}
-          vazio="Sem dados de gastos fixos por loja."
+          vazio="Sem dados de gastos fixos por ponto."
         />
 
         <GraficoBarras
-          titulo="📊 Participação percentual por loja"
+          titulo="📊 Participação percentual por ponto"
           itens={graficos.participacaoLojas || []}
           chaveNome="lojaNome"
           chaveValor="participacaoLucroBruto"
           classeBarra="bg-linear-to-r from-indigo-500 to-blue-700"
           formatter={formatarPercentual}
-          vazio="Sem dados de participação por loja."
+          vazio="Sem dados de participação por ponto."
         />
 
         <GraficoBarras

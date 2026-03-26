@@ -280,7 +280,7 @@ export function LojaDetalhes() {
         error:
           escopo === "selecionada"
             ? "Nenhuma movimentação encontrada para a máquina selecionada."
-            : "Nenhuma movimentação encontrada para esta loja.",
+            : "Nenhuma movimentação encontrada para este ponto.",
       };
     }
 
@@ -471,13 +471,13 @@ export function LojaDetalhes() {
     const escopoLabel =
       escopo === "selecionada"
         ? `Máquina selecionada: ${maquinaSelecionada?.nome || maquinaSelecionada?.codigo || "-"}`
-        : "Todas as máquinas da loja";
+        : "Todas as máquinas do ponto";
     const lojaCodigo = String(loja?.id || id || "")
       .slice(0, 8)
       .toUpperCase();
     const texto = [
       "STAR BOX",
-      `*${lojaCodigo} | ${loja?.nome || "Loja"}*`,
+      `*${lojaCodigo} | ${loja?.nome || "Ponto"}*`,
       `Periodo: ${formatarPeriodoSelecionado()}`,
       `Escopo: ${escopoLabel}`,
       "___________________________________",
@@ -508,7 +508,7 @@ export function LojaDetalhes() {
       .toLowerCase();
 
     return {
-      titulo: `Relatório de Movimentações - ${loja?.nome || "Loja"}`,
+      titulo: `Relatório de Movimentações - ${loja?.nome || "Ponto"}`,
       subtitulo: [escopoLabel, `Período: ${formatarPeriodoSelecionado()}`],
       texto,
       nomeArquivo: `relatorio-${nomeLoja || "loja"}-${nomeEscopo}.pdf`,
@@ -589,7 +589,7 @@ export function LojaDetalhes() {
       <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <AlertBox type="error" message={error || "Loja não encontrada"} />
+          <AlertBox type="error" message={error || "Ponto não encontrado"} />
         </div>
         <Footer />
       </div>
@@ -618,15 +618,15 @@ export function LojaDetalhes() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title={loja.nome}
-          subtitle="Detalhes da loja e suas máquinas"
+          subtitle="Detalhes do ponto e suas máquinas"
           icon="🏪"
           action={{
-            label: "Editar Loja",
+            label: "Editar Ponto",
             onClick: () => navigate(`/lojas/${id}/editar`),
           }}
         />
 
-        {/* Informações da Loja */}
+        {/* Informações do Ponto */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 card-gradient">
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -641,7 +641,7 @@ export function LojaDetalhes() {
                   clipRule="evenodd"
                 />
               </svg>
-              Informações da Loja
+              Informações do Ponto
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -743,7 +743,7 @@ export function LojaDetalhes() {
                 <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z" />
                 <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z" />
               </svg>
-              Máquinas da Loja ({maquinas.length})
+              Máquinas do Ponto ({maquinas.length})
             </h3>
             <button
               onClick={() => navigate("/maquinas/nova")}
@@ -831,7 +831,7 @@ export function LojaDetalhes() {
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Comissão Loja:</span>
+                          <span className="text-gray-600">Comissão Ponto:</span>
                           <span className="font-semibold">
                             {maquina.comissaoLojaPercentual !== null &&
                             maquina.comissaoLojaPercentual !== undefined &&
@@ -891,7 +891,7 @@ export function LojaDetalhes() {
                   <p className="text-sm text-gray-600">
                     {maquinaSelecionada
                       ? `Máquina selecionada: ${maquinaSelecionada.nome}`
-                      : "Sem máquina selecionada. Você ainda pode gerar o consolidado de toda a loja."}
+                      : "Sem máquina selecionada. Você ainda pode gerar o consolidado de todo o ponto."}
                   </p>
                 </div>
 
@@ -1159,7 +1159,7 @@ export function LojaDetalhes() {
             <EmptyState
               icon="🎰"
               title="Nenhuma máquina cadastrada"
-              message="Esta loja ainda não possui máquinas cadastradas. Adicione a primeira máquina!"
+              message="Este ponto ainda não possui máquinas cadastradas. Adicione a primeira máquina!"
               action={{
                 label: "Nova Máquina",
                 onClick: () => navigate("/maquinas/nova"),
