@@ -27,9 +27,111 @@ export function Graficos() {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [dadosDashboard, setDadosDashboard] = useState(null);
+  const [dadosRelatorio, setDadosRelatorio] = useState(null);
   const [erro, setErro] = useState("");
   const [custosExtras, setCustosExtras] = useState(0);
-  const [produtosPrecos, setProdutosPrecos] = useState({});
+  const [custoQuebraCaixa, setCustoQuebraCaixa] = useState(0);
+  const toNumber = (valor) => Number(valor || 0);
+
+  const calcularQuebraCaixaComoCusto = (fluxos = []) => {
+    return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      const temDiferencaDireta =
+        fluxo?.diferenca !== null &&
+        fluxo?.diferenca !== undefined &&
+        fluxo?.diferenca !== "";
+
+      const diferenca = temDiferencaDireta
+        ? toNumber(fluxo?.diferenca)
+        : toNumber(fluxo?.valorRetirado) -
+          toNumber(fluxo?.valorEsperado ?? fluxo?.movimentacao?.valorFaturado);
+
+      return diferenca < 0 ? acc + Math.abs(diferenca) : acc;
+    }, 0);
+  };
+
+  const normalizarProdutoSaida = (produto = {}) => {
+    const produtoIdOriginal =
+      produto?.produtoId ?? produto?.produtoNaMaquinaId ?? produto?.id;
+    const produtoId =
+      produtoIdOriginal === null || produtoIdOriginal === undefined
+        ? ""
+        : String(produtoIdOriginal);
+
+    return {
+      produtoId: produtoId || null,
+      nome:
+        produtoId === "__SEM_DETALHE__"
+          ? "Produto não detalhado (legado)"
+          : String(produto?.nome || "").trim() || "Produto sem nome",
+      codigo: String(produto?.codigo || "").trim() || "S/C",
+      quantidade: toNumber(produto?.quantidade),
+      valorUnitario: toNumber(
+        produto?.valorUnitario ?? produto?.custoUnitario ?? produto?.preco,
+      ),
+      valorTotal: toNumber(produto?.valorTotal),
+    };
+  };
+
+  const calcularResumoProdutos = (produtosSairam = [], totais = {}) => {
+    const itens = (Array.isArray(produtosSairam) ? produtosSairam : []).map(
+      normalizarProdutoSaida,
+    );
+
+    return {
+      itens,
+      totalQuantidadeItens: itens.reduce(
+        (acc, item) => acc + toNumber(item?.quantidade),
+        0,
+      ),
+      custoTotalItens: itens.reduce(
+        (acc, item) => acc + toNumber(item?.valorTotal),
+        0,
+      ),
+      totalQuantidadeDeclarado: toNumber(totais?.produtosSairam),
+      custoTotalDeclarado: toNumber(totais?.custoProdutosSairam),
+    };
+  };
+
+  const resumoProdutosGraficos = useMemo(() => {
+    const produtosDireto = Array.isArray(dadosRelatorio?.produtosSairam)
+      ? dadosRelatorio.produtosSairam
+      : [];
+
+    const produtosPorMaquina = Array.isArray(dadosRelatorio?.maquinas)
+      ? dadosRelatorio.maquinas.flatMap((maquina) =>
+          Array.isArray(maquina?.produtosSairam) ? maquina.produtosSairam : [],
+        )
+      : [];
+
+    const produtos =
+      produtosDireto.length > 0 ? produtosDireto : produtosPorMaquina;
+
+    return calcularResumoProdutos(produtos, {
+      produtosSairam:
+        dadosRelatorio?.totais?.produtosSairam ?? dadosDashboard?.totais?.saidas,
+      custoProdutosSairam: dadosRelatorio?.totais?.custoProdutosSairam,
+    });
+  }, [dadosRelatorio, dadosDashboard]);
+
+  const topProdutosVendidos = useMemo(() => {
+    const mapa = new Map();
+
+    resumoProdutosGraficos.itens.forEach((item) => {
+      const chave = item?.produtoId || item?.nome;
+      const atual = mapa.get(chave) || {
+        nome: item?.nome || "Produto",
+        quantidade: 0,
+      };
+
+      atual.quantidade += toNumber(item?.quantidade);
+      mapa.set(chave, atual);
+    });
+
+    return Array.from(mapa.values())
+      .filter((item) => item.quantidade > 0)
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 10);
+  }, [resumoProdutosGraficos]);
 
   // Faturamento real — usa o valor que o backend calcula diretamente
   const faturamentoReal = useMemo(() => {
@@ -37,49 +139,55 @@ export function Graficos() {
     return parseFloat(dadosDashboard.totais.faturamento || 0);
   }, [dadosDashboard]);
 
-  // Custo produtos saídos = totais.saidas × preço médio dos produtos
+  // Custo de produtos saídos alinhado ao relatório: soma de valorTotal dos itens.
   const custoProdutos = useMemo(() => {
-    const totalSairam = parseInt(dadosDashboard?.totais?.saidas || 0);
-    if (totalSairam === 0) return 0;
-    const lista = Object.values(produtosPrecos);
-    if (lista.length === 0) return 0;
-    const getPreco = (p) => Number(p.preco || p.custoUnitario || 0);
-    const somaPrecos = lista.reduce((s, p) => s + getPreco(p), 0);
-    const precoMedio = somaPrecos / lista.length;
-    return totalSairam * precoMedio;
-  }, [dadosDashboard, produtosPrecos]);
+    if (resumoProdutosGraficos.itens.length > 0) {
+      return resumoProdutosGraficos.custoTotalItens;
+    }
+
+    return resumoProdutosGraficos.custoTotalDeclarado;
+  }, [resumoProdutosGraficos]);
 
   // Custo total = produtos saídos + custos fixos/variáveis digitados pelo usuário
   const custoTotal = useMemo(() => {
-    return custoProdutos + custosExtras;
-  }, [custoProdutos, custosExtras]);
+    return custoProdutos + custosExtras + custoQuebraCaixa;
+  }, [custoProdutos, custosExtras, custoQuebraCaixa]);
 
   // Lucro Líquido = faturamento − custo produtos (saidas × preço médio) − fixos/variáveis digitados
   const lucroTotal = useMemo(() => {
-    return faturamentoReal - custoProdutos - custosExtras;
-  }, [faturamentoReal, custoProdutos, custosExtras]);
+    return faturamentoReal - custoProdutos - custosExtras - custoQuebraCaixa;
+  }, [faturamentoReal, custoProdutos, custosExtras, custoQuebraCaixa]);
 
   // Dados do gráfico com custos extras incorporados (NUNCA altera faturamento) + lucro por dia
   const graficoComCustosExtras = useMemo(() => {
-    if (!dadosDashboard?.graficoFinanceiro || dadosDashboard.graficoFinanceiro.length === 0) return [];
-    if (custosExtras <= 0) {
-      // Calcular lucro = faturamento - custo por dia
-      return dadosDashboard.graficoFinanceiro.map(d => {
-        const fatDia = parseFloat(d.faturamento) || 0;
-        const custoDia = parseFloat(d.custo) || 0;
-        return { ...d, lucro: Math.max(0, fatDia - custoDia) };
-      });
-    }
-    // Adicionar custos extras distribuídos proporcionalmente, preservando faturamento
-    const totalFat = dadosDashboard.graficoFinanceiro.reduce((s, d) => s + (parseFloat(d.faturamento) || 0), 0);
-    return dadosDashboard.graficoFinanceiro.map(d => {
+    if (
+      !dadosDashboard?.graficoFinanceiro ||
+      dadosDashboard.graficoFinanceiro.length === 0
+    )
+      return [];
+
+    const totalFat = dadosDashboard.graficoFinanceiro.reduce(
+      (s, d) => s + (parseFloat(d.faturamento) || 0),
+      0,
+    );
+
+    return dadosDashboard.graficoFinanceiro.map((d) => {
       const fatDia = parseFloat(d.faturamento) || 0;
-      const proporcao = totalFat > 0 ? (fatDia / totalFat) : (1 / dadosDashboard.graficoFinanceiro.length);
-      // IMPORTANTE: Preservar faturamento explicitamente ao somar custosExtras ao custo
-      const custoDia = (parseFloat(d.custo) || 0) + (custosExtras * proporcao);
-      return { ...d, faturamento: fatDia, custo: custoDia, lucro: Math.max(0, fatDia - custoDia) };
+      const proporcao =
+        totalFat > 0 ? fatDia / totalFat : 1 / dadosDashboard.graficoFinanceiro.length;
+      const custoDia =
+        custoProdutos * proporcao +
+        custosExtras * proporcao +
+        custoQuebraCaixa * proporcao;
+
+      return {
+        ...d,
+        faturamento: fatDia,
+        custo: custoDia,
+        lucro: Math.max(0, fatDia - custoDia),
+      };
     });
-  }, [dadosDashboard, custosExtras]);
+  }, [dadosDashboard, custoProdutos, custosExtras, custoQuebraCaixa]);
 
   // Configuração inicial de datas (últimos 30 dias)
   useEffect(() => {
@@ -113,54 +221,41 @@ export function Graficos() {
     setLoading(true);
 
     try {
-      // Dashboard → faturamento/gráfico/totais (período). Produtos → preços para custo médio.
-      const [response, produtosRes] = await Promise.all([
+      const [responseDashboard, responseRelatorio] = await Promise.all([
         api.get("/relatorios/dashboard", {
           params: { lojaId: lojaSelecionada, dataInicio, dataFim },
         }),
-        api.get("/produtos").catch(() => ({ data: [] })),
+        api
+          .get("/relatorios/impressao", {
+            params: { lojaId: lojaSelecionada, dataInicio, dataFim },
+          })
+          .catch(() => ({ data: null })),
       ]);
 
-      const dados = response.data;
-
-      // Salvar mapa de preços dos produtos
-      const produtosList = Array.isArray(produtosRes.data)
-        ? produtosRes.data
-        : (produtosRes.data?.produtos || produtosRes.data?.rows || []);
-      const pMap = {};
-      produtosList.forEach(p => {
-        pMap[p.id] = { nome: p.nome || '', preco: Number(p.preco || 0), custoUnitario: Number(p.custoUnitario || 0) };
-      });
-      setProdutosPrecos(pMap);
-
-      console.log("Graficos - Totais:", JSON.stringify(dados.totais));
-      console.log("Graficos - produtosPrecos:", pMap);
-
-      // Custo do período para injetar no gráfico: saidas × preço médio
-      const lista = Object.values(pMap);
-      const getPreco = (p) => Number(p.preco || p.custoUnitario || 0);
-      const precoMedio = lista.length > 0
-        ? lista.reduce((s, p) => s + getPreco(p), 0) / lista.length
-        : 0;
-      const custoProdutosPeriodo = parseInt(dados.totais?.saidas || 0) * precoMedio;
-
-      // Injetar coluna "custo" no graficoFinanceiro proporcional ao custoProdutos do período
-      if (dados.graficoFinanceiro?.length > 0 && custoProdutosPeriodo > 0) {
-        const totalFatGrafico = dados.graficoFinanceiro.reduce(
-          (s, d) => s + (parseFloat(d.faturamento) || 0), 0
-        );
-        dados.graficoFinanceiro = dados.graficoFinanceiro.map(d => {
-          const fatDia = parseFloat(d.faturamento) || 0;
-          const prop = totalFatGrafico > 0 ? fatDia / totalFatGrafico : 1 / dados.graficoFinanceiro.length;
-          return { ...d, custo: custoProdutosPeriodo * prop };
+      let quebraPeriodo = 0;
+      try {
+        const fluxoResponse = await api.get("/fluxo-caixa", {
+          params: { lojaId: lojaSelecionada, dataInicio, dataFim },
         });
+
+        const fluxos = Array.isArray(fluxoResponse?.data)
+          ? fluxoResponse.data
+          : fluxoResponse?.data?.rows || fluxoResponse?.data?.fluxos || [];
+
+        quebraPeriodo = calcularQuebraCaixaComoCusto(fluxos);
+      } catch {
+        quebraPeriodo = 0;
       }
 
-      setDadosDashboard(dados);
+      setDadosDashboard(responseDashboard.data);
+      setDadosRelatorio(responseRelatorio.data);
+      setCustoQuebraCaixa(quebraPeriodo);
     } catch (error) {
       console.error("Erro ao carregar dashboard:", error);
       setErro("Não foi possível carregar os dados do painel.");
       setDadosDashboard(null);
+      setDadosRelatorio(null);
+      setCustoQuebraCaixa(0);
     } finally {
       setLoading(false);
     }
@@ -215,14 +310,6 @@ export function Graficos() {
                 onChange={(e) => setLojaSelecionada(e.target.value)}
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
               >
-        // LOG DETALHADO DOS DADOS RECEBIDOS
-        console.log("--- DADOS RECEBIDOS DO BACKEND ---");
-        console.log("Totais:", dados.totais);
-        console.log("GraficoFinanceiro:", dados.graficoFinanceiro);
-        console.log("RankingProdutos:", dados.rankingProdutos);
-        console.log("ComparacaoLucro:", dados.comparacaoLucro);
-        console.log("Precos dos produtos:", pMap);
-        console.log("-----------------------------------");
                 {lojas.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
@@ -329,6 +416,9 @@ export function Graficos() {
                     </h3>
                     <div className="flex flex-col gap-0.5 mt-2 text-xs text-gray-500">
                       <span>🧸 Produtos saídos: {formatMoney(custoProdutos)}</span>
+                      {custoQuebraCaixa > 0 && (
+                        <span>💥 Quebra de caixa: {formatMoney(custoQuebraCaixa)}</span>
+                      )}
                       {custosExtras > 0 && <span>📋 Fixos/Variáveis: {formatMoney(custosExtras)}</span>}
                     </div>
                   </div>
@@ -352,11 +442,14 @@ export function Graficos() {
                       Margem: {calcularMargem(lucroTotal, faturamentoReal)}%
                     </p>
                     {/* Breakdown custos simples */}
-                    {(custoProdutos > 0 || custosExtras > 0) && (
+                    {(custoProdutos > 0 || custosExtras > 0 || custoQuebraCaixa > 0) && (
                       <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-0.5 text-xs text-gray-500">
                         <span className="font-semibold text-gray-700">Composição dos custos:</span>
                         {custoProdutos > 0 && (
                           <span>🧸 Produtos saídos: <strong className="text-red-600">{formatMoney(custoProdutos)}</strong></span>
+                        )}
+                        {custoQuebraCaixa > 0 && (
+                          <span>💥 Quebra de caixa: <strong className="text-red-600">{formatMoney(custoQuebraCaixa)}</strong></span>
                         )}
                         {custosExtras > 0 && (
                           <span>📋 Fixos/Variáveis: <strong className="text-red-600">{formatMoney(custosExtras)}</strong></span>
@@ -378,7 +471,13 @@ export function Graficos() {
                       Prêmios Entregues
                     </p>
                     <h3 className="text-2xl font-bold text-gray-900 mt-1">
-                      {dadosDashboard.totais.saidas}
+                      {Number(
+                        resumoProdutosGraficos.itens.length > 0
+                          ? resumoProdutosGraficos.totalQuantidadeItens
+                          : resumoProdutosGraficos.totalQuantidadeDeclarado ||
+                              dadosDashboard?.totais?.saidas ||
+                              0,
+                      ).toLocaleString("pt-BR")}
                     </h3>
                   </div>
                   <span className="p-2 bg-orange-100 text-orange-600 rounded-lg text-xl">
@@ -409,6 +508,7 @@ export function Graficos() {
                 <div className="text-sm text-gray-600">
                   <p className="font-semibold mb-1">Composição dos Custos:</p>
                   <p>🧸 Produtos saídos: <strong>{formatMoney(custoProdutos)}</strong></p>
+                  <p>💥 Quebra de caixa: <strong>{formatMoney(custoQuebraCaixa)}</strong></p>
                   <p>📋 Fixos/Variáveis: <strong>{formatMoney(custosExtras)}</strong></p>
                   <p className="mt-1 pt-1 border-t font-bold">Total: {formatMoney(custoTotal)}</p>
                 </div>
@@ -632,13 +732,13 @@ export function Graficos() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {(dadosDashboard.rankingProdutos || []).map((prod, idx) => (
+                      {topProdutosVendidos.map((prod, idx) => (
                         <tr key={idx} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm text-gray-900 font-medium">
                             {idx + 1}. {prod.nome}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                            {prod.quantidade}
+                            {Number(prod.quantidade || 0).toLocaleString("pt-BR")}
                           </td>
                           <td className="px-4 py-3">
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -647,7 +747,8 @@ export function Graficos() {
                                 style={{
                                   width: `${Math.min(
                                     (prod.quantidade /
-                                      ((dadosDashboard.rankingProdutos?.[0]?.quantidade) || 1)) * 100,
+                                      (topProdutosVendidos?.[0]?.quantidade || 1)) *
+                                      100,
                                     100,
                                   )}%`,
                                 }}
@@ -656,6 +757,16 @@ export function Graficos() {
                           </td>
                         </tr>
                       ))}
+                      {topProdutosVendidos.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="px-4 py-4 text-sm text-gray-500 text-center"
+                          >
+                            Sem quantidade de produtos saídos no período.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

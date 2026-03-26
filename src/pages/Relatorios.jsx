@@ -121,6 +121,15 @@ export function Relatorios() {
 
   const toNumber = (valor) => Number(valor || 0);
 
+  const pickNumber = (...valores) => {
+    for (const valor of valores) {
+      if (valor === null || valor === undefined || valor === "") continue;
+      const numero = Number(valor);
+      if (!Number.isNaN(numero)) return numero;
+    }
+    return null;
+  };
+
   const normalizarTexto = (texto) =>
     String(texto || "")
       .trim()
@@ -535,68 +544,94 @@ export function Relatorios() {
     return totalLiquidoFluxo - gastoTotal;
   };
 
-  const obterValorUnitarioProdutoSaida = (produto, mapaPrecos = {}) => {
-    const valorDireto =
-      produto?.custoUnitario ??
-      produto?.valorUnitario ??
-      produto?.preco ??
-      null;
+  const normalizarProdutoSaida = (produto = {}) => {
+    const produtoIdOriginal =
+      produto?.produtoId ?? produto?.produtoNaMaquinaId ?? produto?.id;
+    const produtoId =
+      produtoIdOriginal === null || produtoIdOriginal === undefined
+        ? ""
+        : String(produtoIdOriginal);
 
-    if (valorDireto !== null && valorDireto !== undefined && valorDireto !== "") {
-      return toNumber(valorDireto);
-    }
-
-    const produtoId = produto?.id;
-    if (produtoId !== null && produtoId !== undefined && mapaPrecos?.[produtoId]) {
-      return toNumber(
-        mapaPrecos[produtoId]?.custoUnitario ?? mapaPrecos[produtoId]?.preco,
-      );
-    }
-
-    return 0;
+    return {
+      produtoId: produtoId || null,
+      produtoNaMaquinaId:
+        produto?.produtoNaMaquinaId !== null &&
+        produto?.produtoNaMaquinaId !== undefined
+          ? String(produto.produtoNaMaquinaId)
+          : null,
+      nome:
+        produtoId === "__SEM_DETALHE__"
+          ? "Produto não detalhado (legado)"
+          : String(produto?.nome || "").trim() || "Produto sem nome",
+      codigo: String(produto?.codigo || "").trim(),
+      quantidade: toNumber(produto?.quantidade),
+      valorUnitario: toNumber(
+        produto?.valorUnitario ?? produto?.custoUnitario ?? produto?.preco,
+      ),
+      valorTotal: toNumber(produto?.valorTotal),
+      emoji: produto?.emoji || "📦",
+    };
   };
 
-  const calcularCustoSaidaProdutosRelatorio = (
-    dadosRelatorio,
-    mapaPrecos = {},
-  ) => {
-    const produtosSairamDireto = Array.isArray(dadosRelatorio?.produtosSairam)
-      ? dadosRelatorio.produtosSairam
-      : [];
+  const calcularResumoProdutos = (produtosSairam = [], totais = {}) => {
+    const itens = (Array.isArray(produtosSairam) ? produtosSairam : []).map(
+      normalizarProdutoSaida,
+    );
+
+    const totalQuantidadeItens = itens.reduce(
+      (acc, item) => acc + toNumber(item?.quantidade),
+      0,
+    );
+    const custoTotalItens = itens.reduce(
+      (acc, item) => acc + toNumber(item?.valorTotal),
+      0,
+    );
+
+    const totalQuantidadeDeclarado = toNumber(totais?.produtosSairam);
+    const custoTotalDeclarado = toNumber(totais?.custoProdutosSairam);
+    const tolerancia = 0.01;
+
+    return {
+      itens,
+      totalQuantidadeItens,
+      custoTotalItens,
+      totalQuantidadeDeclarado,
+      custoTotalDeclarado,
+      quantidadeItensSemDetalhe: itens.filter(
+        (item) => item?.produtoId === "__SEM_DETALHE__",
+      ).length,
+      divergenciaQuantidade:
+        Math.abs(totalQuantidadeItens - totalQuantidadeDeclarado) > tolerancia,
+      divergenciaCusto:
+        Math.abs(custoTotalItens - custoTotalDeclarado) > tolerancia,
+    };
+  };
+
+  const calcularCustoSaidaProdutosRelatorio = (dadosRelatorio) => {
+    const resumoConsolidado = calcularResumoProdutos(
+      dadosRelatorio?.produtosSairam,
+      dadosRelatorio?.totais,
+    );
+
+    if (resumoConsolidado.itens.length > 0) {
+      return resumoConsolidado.custoTotalItens;
+    }
+
+    if (resumoConsolidado.totalQuantidadeDeclarado === 0) {
+      return 0;
+    }
+
     const produtosSairamPorMaquina = Array.isArray(dadosRelatorio?.maquinas)
       ? dadosRelatorio.maquinas.flatMap((maquina) =>
           Array.isArray(maquina?.produtosSairam) ? maquina.produtosSairam : [],
         )
       : [];
 
-    const produtosParaCalcular =
-      produtosSairamDireto.length > 0
-        ? produtosSairamDireto
-        : produtosSairamPorMaquina;
-
-    if (produtosParaCalcular.length > 0) {
-      const custoCalculado = produtosParaCalcular.reduce((acc, produto) => {
-        const quantidade = toNumber(produto?.quantidade);
-        const valorUnitario = obterValorUnitarioProdutoSaida(produto, mapaPrecos);
-        return acc + quantidade * valorUnitario;
-      }, 0);
-
-      if (custoCalculado > 0) {
-        return custoCalculado;
-      }
+    if (produtosSairamPorMaquina.length > 0) {
+      return calcularResumoProdutos(produtosSairamPorMaquina).custoTotalItens;
     }
 
-    if (
-      Array.isArray(dadosRelatorio?.maquinas) &&
-      dadosRelatorio.maquinas.length
-    ) {
-      return dadosRelatorio.maquinas.reduce(
-        (acc, maquina) => acc + toNumber(maquina?.totais?.custoProdutosSairam),
-        0,
-      );
-    }
-
-    return toNumber(dadosRelatorio?.totais?.gastoProdutosTotalPeriodo);
+    return toNumber(dadosRelatorio?.totais?.custoProdutosSairam);
   };
 
   const calcularQuebraCaixaComoCusto = (fluxos = []) => {
@@ -616,17 +651,61 @@ export function Relatorios() {
     }, 0);
   };
 
+  const deduplicarFluxosCaixa = (fluxos = []) => {
+    const mapa = new Map();
+    const duplicados = [];
+
+    (Array.isArray(fluxos) ? fluxos : []).forEach((fluxo, idx) => {
+      const chave = String(
+        fluxo?.id ??
+          fluxo?.movimentacaoId ??
+          fluxo?.movimentacao?.id ??
+          `fluxo-${idx}`,
+      );
+
+      if (!mapa.has(chave)) {
+        mapa.set(chave, fluxo);
+      } else {
+        duplicados.push({
+          chave,
+          atual: fluxo,
+          existente: mapa.get(chave),
+        });
+      }
+    });
+
+    if (duplicados.length > 0) {
+      console.log("[Relatorios][Quebra][Dedup] Duplicados encontrados:", {
+        totalRecebido: Array.isArray(fluxos) ? fluxos.length : 0,
+        totalUnicos: mapa.size,
+        totalDuplicados: duplicados.length,
+        chavesDuplicadas: duplicados.map((d) => d.chave),
+      });
+    }
+
+    return Array.from(mapa.values());
+  };
+
+  const carregarFluxosCaixa = async (filtros = {}) => {
+    const params = new URLSearchParams();
+    const { inicio, fim, lojaId, roteiroId } = filtros;
+
+    if (inicio) params.append("dataInicio", inicio);
+    if (fim) params.append("dataFim", fim);
+    if (lojaId) params.append("lojaId", lojaId);
+    if (roteiroId) params.append("roteiroId", roteiroId);
+
+    const response = await api.get(`/fluxo-caixa?${params.toString()}`);
+    const fluxos = Array.isArray(response?.data)
+      ? response.data
+      : response?.data?.rows || response?.data?.fluxos || [];
+
+    return deduplicarFluxosCaixa(fluxos);
+  };
+
   const carregarQuebraCaixaPorLoja = async (lojaId, inicio, fim) => {
     try {
-      const params = new URLSearchParams();
-      if (inicio) params.append("dataInicio", inicio);
-      if (fim) params.append("dataFim", fim);
-      if (lojaId) params.append("lojaId", lojaId);
-
-      const response = await api.get(`/fluxo-caixa?${params.toString()}`);
-      const fluxos = Array.isArray(response?.data)
-        ? response.data
-        : response?.data?.rows || response?.data?.fluxos || [];
+      const fluxos = await carregarFluxosCaixa({ inicio, fim, lojaId });
 
       return calcularQuebraCaixaComoCusto(fluxos);
     } catch (erroFluxo) {
@@ -636,6 +715,72 @@ export function Relatorios() {
       );
       return 0;
     }
+  };
+
+  const carregarQuebraCaixaRoteiro = async (roteiroId, inicio, fim) => {
+    try {
+      const fluxos = await carregarFluxosCaixa({ inicio, fim, roteiroId });
+
+      return calcularQuebraCaixaComoCusto(fluxos);
+    } catch (erroFluxoRoteiro) {
+      console.warn(
+        `Não foi possível calcular quebra de caixa do roteiro ${roteiroId}:`,
+        erroFluxoRoteiro,
+      );
+      return 0;
+    }
+  };
+
+  const aplicarQuebraCaixaNoResumoRoteiro = (
+    resumoRoteiro,
+    custoQuebraCaixa = 0,
+  ) => {
+    if (!resumoRoteiro) return resumoRoteiro;
+
+    const quebra = Math.max(0, toNumber(custoQuebraCaixa));
+    if (quebra <= 0) return resumoRoteiro;
+
+    const totaisAtuais = resumoRoteiro?.totais || {};
+    const custoFixo = toNumber(
+      totaisAtuais?.custoFixoTotal ?? totaisAtuais?.gastoFixoTotal,
+    );
+    const custoProdutos = toNumber(
+      totaisAtuais?.custoProdutosTotal ?? totaisAtuais?.custoProdutosSairam,
+    );
+    const custoVariavel = toNumber(
+      totaisAtuais?.custoVariavelTotal ?? totaisAtuais?.gastoVariavelTotal,
+    );
+    const custoTotalAtual = toNumber(
+      totaisAtuais?.custoTotal ?? totaisAtuais?.gastoTotalPeriodo,
+    );
+    const quebraAtual = toNumber(
+      totaisAtuais?.custoQuebraCaixaTotal ?? totaisAtuais?.custoQuebraCaixa,
+    );
+
+    const custoTotalSemQuebra =
+      custoTotalAtual > 0
+        ? Math.max(0, custoTotalAtual - quebraAtual)
+        : custoFixo + custoProdutos + custoVariavel;
+    const novoCustoTotal = custoTotalSemQuebra + quebra;
+
+    const lucroBrutoBase = toNumber(
+      totaisAtuais?.lucroBrutoTotal ??
+        totaisAtuais?.valorBrutoConsolidadoLojaMaquinas ??
+        totaisAtuais?.valorTotalLojaBruto ??
+        totaisAtuais?.faturamentoBrutoTotal,
+    );
+
+    return {
+      ...resumoRoteiro,
+      totais: {
+        ...totaisAtuais,
+        custoQuebraCaixaTotal: quebra,
+        custoQuebraCaixa: quebra,
+        custoTotal: novoCustoTotal,
+        gastoTotalPeriodo: novoCustoTotal,
+        lucroLiquidoTotal: lucroBrutoBase - novoCustoTotal,
+      },
+    };
   };
 
   const aplicarQuebraCaixaNoRelatorioLoja = (
@@ -679,6 +824,104 @@ export function Relatorios() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+
+  const renderTabelaProdutosSaidos = ({
+    resumoProdutos,
+    contexto = "consolidado",
+    exibirConferencia = true,
+  }) => {
+    if (!resumoProdutos) return null;
+
+    if (resumoProdutos.itens.length === 0) {
+      if (resumoProdutos.totalQuantidadeDeclarado > 0) {
+        return (
+          <div className="text-center py-8 bg-white rounded-lg border border-amber-300">
+            <p className="text-4xl mb-2">📦</p>
+            <p className="text-gray-700 font-medium">
+              Totais indicam saída ({resumoProdutos.totalQuantidadeDeclarado.toLocaleString("pt-BR")}), mas produtosSairam[] não veio no payload.
+            </p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="text-center py-8 bg-white rounded-lg">
+          <p className="text-4xl mb-2">📭</p>
+          <p className="text-gray-600">Nenhum produto saiu</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {resumoProdutos.quantidadeItensSemDetalhe > 0 && (
+          <div className="bg-amber-100 border border-amber-300 text-amber-900 text-xs rounded-lg px-3 py-2">
+            Aviso: há item(ns) legado sem detalhamento histórico em {contexto}.
+          </div>
+        )}
+
+        <div className="overflow-x-auto bg-white rounded-lg border border-red-200">
+          <table className="min-w-full text-sm">
+            <thead className="bg-red-50 text-red-800">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold">Nome</th>
+                <th className="px-3 py-2 text-left font-semibold">Código</th>
+                <th className="px-3 py-2 text-right font-semibold">Quantidade</th>
+                <th className="px-3 py-2 text-right font-semibold">Valor unitário</th>
+                <th className="px-3 py-2 text-right font-semibold">Valor total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resumoProdutos.itens
+                .sort((a, b) => b.quantidade - a.quantidade)
+                .map((produto) => {
+                  const chaveLinha =
+                    produto.produtoNaMaquinaId ||
+                    produto.produtoId ||
+                    `${produto.nome}-${produto.codigo || "sem-codigo"}`;
+
+                  return (
+                    <tr key={chaveLinha} className="border-t border-red-100">
+                      <td className="px-3 py-2 text-gray-900">
+                        <div className="font-semibold">{produto.nome}</div>
+                        {produto.produtoId === "__SEM_DETALHE__" && (
+                          <div className="text-xs text-amber-800">
+                            Sem detalhamento histórico deste item.
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-700 font-mono">
+                        {produto.codigo || "S/C"}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-800 font-semibold">
+                        {Number(produto.quantidade || 0).toLocaleString("pt-BR")}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-800">
+                        R$ {formatarMoeda(produto.valorUnitario || 0)}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-900 font-bold">
+                        R$ {formatarMoeda(produto.valorTotal || 0)}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+
+        {exibirConferencia && resumoProdutos.divergenciaQuantidade && (
+          <p className="text-xs text-amber-700 mt-2">
+            Divergência: soma das quantidades ({resumoProdutos.totalQuantidadeItens.toLocaleString("pt-BR")}) diferente de totais.produtosSairam ({resumoProdutos.totalQuantidadeDeclarado.toLocaleString("pt-BR")}).
+          </p>
+        )}
+        {exibirConferencia && resumoProdutos.divergenciaCusto && (
+          <p className="text-xs text-amber-700">
+            Divergência: soma de valorTotal (R$ {formatarMoeda(resumoProdutos.custoTotalItens)}) diferente de totais.custoProdutosSairam (R$ {formatarMoeda(resumoProdutos.custoTotalDeclarado)}).
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const formatarPercentualComparacao = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
@@ -777,6 +1020,7 @@ export function Relatorios() {
         fim: periodoFim,
       },
       lojasComDados: 0,
+      lojasResumo: [],
       lojasSemDados: lojasSelecionadas
         .map((loja) => loja?.nome)
         .filter(Boolean),
@@ -853,7 +1097,6 @@ export function Relatorios() {
           const fluxo = obterTotaisFluxoCaixaRelatorio(dadosLoja);
           const lucroBruto = calcularValorConsolidadoRelatorio(dadosLoja);
           const lucroLiquido = calcularLucroLiquidoRelatorio(dadosLoja);
-          const custoProdutos = calcularCustoSaidaProdutosRelatorio(dadosLoja);
 
           const gastosFixosLista = extrairListaGastosFixos(
             gastosFixosResponse?.data,
@@ -861,37 +1104,6 @@ export function Relatorios() {
           const custoFixo = gastosFixosLista.reduce(
             (acc, item) => acc + toNumber(item?.valor),
             0,
-          );
-
-          const gastoTotalPeriodo = toNumber(dadosLoja?.totais?.gastoTotalPeriodo);
-          const custoBase =
-            gastoTotalPeriodo > 0
-              ? gastoTotalPeriodo
-              : custoProdutos + custoFixo;
-          const custoTotal = custoBase + toNumber(custoQuebraCaixa);
-          const custoVariavel = Math.max(
-            0,
-            custoTotal - custoProdutos - custoFixo,
-          );
-
-          const fichas = toNumber(dadosLoja?.totais?.fichas);
-          const produtosSairam = toNumber(dadosLoja?.totais?.produtosSairam);
-          const produtosEntraram = toNumber(dadosLoja?.totais?.produtosEntraram);
-
-          const faturamentoBrutoTicket =
-            toNumber(dadosLoja?.totais?.faturamentoBrutoTicketTotal) ||
-            toNumber(dadosLoja?.totais?.valorTotalLojaBruto) ||
-            lucroBruto;
-          const saidasPremio =
-            toNumber(dadosLoja?.totais?.saidasPremioTotal) || produtosSairam;
-          const ticketPorPremio =
-            toNumber(dadosLoja?.totais?.ticketPorPremioTotal) ||
-            (saidasPremio > 0 ? faturamentoBrutoTicket / saidasPremio : 0);
-
-          const taxaDeCartao = Math.max(
-            0,
-            toNumber(fluxo.cartaoPixFluxoBruto) -
-              toNumber(fluxo.cartaoPixFluxoLiquido),
           );
 
           const produtosSairamDireto = Array.isArray(dadosLoja?.produtosSairam)
@@ -909,6 +1121,40 @@ export function Relatorios() {
             produtosSairamDireto.length > 0
               ? produtosSairamDireto
               : produtosSairamPorMaquina;
+          const resumoProdutosSairam = calcularResumoProdutos(
+            produtosSairamLista,
+            dadosLoja?.totais,
+          );
+          const custoProdutos = resumoProdutosSairam.custoTotalItens;
+          const gastoTotalPeriodo = toNumber(dadosLoja?.totais?.gastoTotalPeriodo);
+          const custoBase =
+            gastoTotalPeriodo > 0
+              ? gastoTotalPeriodo
+              : custoProdutos + custoFixo;
+          const custoTotal = custoBase + toNumber(custoQuebraCaixa);
+          const custoVariavel = Math.max(
+            0,
+            custoTotal - custoProdutos - custoFixo,
+          );
+          const fichas = toNumber(dadosLoja?.totais?.fichas);
+          const produtosSairam = resumoProdutosSairam.totalQuantidadeItens;
+          const produtosEntraram = toNumber(dadosLoja?.totais?.produtosEntraram);
+
+          const faturamentoBrutoTicket =
+            toNumber(dadosLoja?.totais?.faturamentoBrutoTicketTotal) ||
+            toNumber(dadosLoja?.totais?.valorTotalLojaBruto) ||
+            lucroBruto;
+          const saidasPremio =
+            toNumber(dadosLoja?.totais?.saidasPremioTotal) || produtosSairam;
+          const ticketPorPremio =
+            toNumber(dadosLoja?.totais?.ticketPorPremioTotal) ||
+            (saidasPremio > 0 ? faturamentoBrutoTicket / saidasPremio : 0);
+
+          const taxaDeCartao = Math.max(
+            0,
+            toNumber(fluxo.cartaoPixFluxoBruto) -
+              toNumber(fluxo.cartaoPixFluxoLiquido),
+          );
 
           return {
             lojaId,
@@ -1015,16 +1261,20 @@ export function Relatorios() {
     const mapaProdutos = new Map();
 
     lojasComDadosDetalhado.forEach((item) => {
-      (item.produtosSairamLista || []).forEach((produto) => {
+      const resumoProdutosItem = calcularResumoProdutos(
+        item.produtosSairamLista || [],
+      );
+
+      resumoProdutosItem.itens.forEach((produto) => {
         const chaveProduto =
-          produto?.id !== undefined && produto?.id !== null
-            ? `id:${produto.id}`
+          produto?.produtoId !== undefined && produto?.produtoId !== null
+            ? `id:${produto.produtoId}`
             : `nome:${normalizarTexto(produto?.nome)}`;
 
         if (!chaveProduto || chaveProduto === "nome:") return;
 
         const atual = mapaProdutos.get(chaveProduto) || {
-          id: produto?.id,
+          id: produto?.produtoId,
           nome: produto?.nome || "Produto",
           emoji: produto?.emoji || "📦",
           codigo: produto?.codigo,
@@ -1131,6 +1381,14 @@ export function Relatorios() {
         fim: periodoFim,
       },
       lojasComDados: lojasComDadosDetalhado.length,
+      lojasResumo: lojasComDadosDetalhado.map((item) => ({
+        lojaId: item?.lojaId,
+        lojaNome: item?.lojaNome,
+        lucroBruto: toNumber(item?.lucroBruto),
+        lucroLiquido: toNumber(item?.lucroLiquido),
+        custoTotal: toNumber(item?.custoTotal),
+        produtosSairam: toNumber(item?.produtosSairam),
+      })),
       lojasSemDados,
       totais: {
         lucroBrutoTotal,
@@ -1442,10 +1700,208 @@ export function Relatorios() {
         });
       } else if (roteiroSelecionado) {
         // Buscar relatório de roteiro inteiro
-        const response = await api.get("/relatorios/roteiro", {
-          params: { roteiroId: roteiroSelecionado, dataInicio, dataFim },
+        const [response, custoQuebraCaixaRoteiroFluxo] = await Promise.all([
+          api.get("/relatorios/roteiro", {
+            params: { roteiroId: roteiroSelecionado, dataInicio, dataFim },
+          }),
+          carregarQuebraCaixaRoteiro(roteiroSelecionado, dataInicio, dataFim),
+        ]);
+        const dadosRoteiro = response.data || {};
+        const resumoRoteiroBackend =
+          dadosRoteiro?.resumoRoteiroConsolidado ||
+          dadosRoteiro?.resumoConsolidadoRoteiro ||
+          null;
+        const roteiroSelecionadoMeta = (Array.isArray(roteiros)
+          ? roteiros
+          : []
+        ).find((r) => String(r?.id) === String(roteiroSelecionado));
+
+        const nomesLojasRoteiro = new Set(
+          [
+            ...(Array.isArray(dadosRoteiro?.lojas) ? dadosRoteiro.lojas : []),
+            ...(Array.isArray(roteiroSelecionadoMeta?.lojas)
+              ? roteiroSelecionadoMeta.lojas
+              : []),
+          ]
+            .map((loja) =>
+              normalizarTexto(
+                loja?.nome || loja?.lojaNome || loja?.loja?.nome || "",
+              ),
+            )
+            .filter(Boolean),
+        );
+
+        const idsLojasRoteiro = Array.from(
+          new Set(
+            [
+              ...(Array.isArray(dadosRoteiro?.lojas) ? dadosRoteiro.lojas : []),
+              ...(Array.isArray(dadosRoteiro?.maquinas)
+                ? dadosRoteiro.maquinas.map((maquina) =>
+                    maquina?.loja || { id: maquina?.lojaId },
+                  )
+                : []),
+              ...(Array.isArray(roteiroSelecionadoMeta?.lojas)
+                ? roteiroSelecionadoMeta.lojas
+                : []),
+              ...(Array.isArray(roteiroSelecionadoMeta?.pontos)
+                ? roteiroSelecionadoMeta.pontos
+                : []),
+              ...(Array.isArray(roteiroSelecionadoMeta?.lojaIds)
+                ? roteiroSelecionadoMeta.lojaIds.map((id) => ({ id }))
+                : []),
+            ]
+              .map((loja) =>
+                String(loja?.id ?? loja?.lojaId ?? loja?.loja?.id ?? "").trim(),
+              )
+              .filter(Boolean),
+          ),
+        );
+
+        if (idsLojasRoteiro.length === 0 && nomesLojasRoteiro.size > 0) {
+          const idsPorNome = (Array.isArray(lojas) ? lojas : [])
+            .filter((loja) => nomesLojasRoteiro.has(normalizarTexto(loja?.nome)))
+            .map((loja) => String(loja?.id))
+            .filter(Boolean);
+
+          idsLojasRoteiro.push(...idsPorNome);
+        }
+
+        let custoQuebraCaixaRoteiroPorLojas = 0;
+        if (idsLojasRoteiro.length > 0) {
+          const fluxosPorLoja = await Promise.all(
+            idsLojasRoteiro.map((lojaId) =>
+              carregarFluxosCaixa({
+                lojaId,
+                inicio: dataInicio,
+                fim: dataFim,
+              }).catch(() => []),
+            ),
+          );
+
+          const resumoFluxosPorLoja = idsLojasRoteiro.map((lojaId, idx) => {
+            const fluxosLoja = Array.isArray(fluxosPorLoja[idx])
+              ? fluxosPorLoja[idx]
+              : [];
+            const quebraLoja = calcularQuebraCaixaComoCusto(fluxosLoja);
+
+            return {
+              lojaId,
+              totalFluxos: fluxosLoja.length,
+              quebraLoja,
+              idsFluxos: fluxosLoja.map((f) =>
+                String(f?.id ?? f?.movimentacaoId ?? f?.movimentacao?.id ?? ""),
+              ),
+            };
+          });
+
+          const fluxosUnicosRoteiro = deduplicarFluxosCaixa(
+            fluxosPorLoja.flat(),
+          );
+          custoQuebraCaixaRoteiroPorLojas = calcularQuebraCaixaComoCusto(
+            fluxosUnicosRoteiro,
+          );
+
+          console.log("[Relatorios][Quebra][Roteiro] Consolidação por lojas:", {
+            roteiroId: roteiroSelecionado,
+            periodo: { inicio: dataInicio, fim: dataFim },
+            idsLojasRoteiro,
+            porLoja: resumoFluxosPorLoja,
+            totalFluxosSomadosSemDedup: fluxosPorLoja.flat().length,
+            totalFluxosUnicosAposDedup: fluxosUnicosRoteiro.length,
+            quebraTotalAposDedup: custoQuebraCaixaRoteiroPorLojas,
+          });
+        }
+
+        let resumoRoteiroConsolidado = resumoRoteiroBackend;
+        let resumoRoteiroCalculado = null;
+        if (idsLojasRoteiro.length > 0) {
+          try {
+            resumoRoteiroCalculado = await construirConsolidadoManualPorLojas(
+              idsLojasRoteiro,
+              dataInicio,
+              dataFim,
+            );
+
+            resumoRoteiroConsolidado = resumoRoteiroConsolidado
+              ? {
+                  ...resumoRoteiroConsolidado,
+                  ...resumoRoteiroCalculado,
+                  totais: {
+                    ...(resumoRoteiroBackend?.totais || {}),
+                    ...(resumoRoteiroCalculado?.totais || {}),
+                  },
+                  graficos: {
+                    ...(resumoRoteiroBackend?.graficos || {}),
+                    ...(resumoRoteiroCalculado?.graficos || {}),
+                  },
+                }
+              : resumoRoteiroCalculado;
+          } catch (erroResumoRota) {
+            console.warn(
+              "Não foi possível consolidar custos e resultados do roteiro:",
+              erroResumoRota,
+            );
+          }
+        }
+
+        const quebraAtualResumoRoteiro = toNumber(
+          pickNumber(
+            resumoRoteiroConsolidado?.totais?.custoQuebraCaixaTotal,
+            resumoRoteiroConsolidado?.totais?.custoQuebraCaixa,
+          ) || 0,
+        );
+
+        const quebraCalculadaPorLojas = toNumber(custoQuebraCaixaRoteiroPorLojas);
+        const quebraCalculadaPorFluxo = toNumber(custoQuebraCaixaRoteiroFluxo);
+
+        // Prioriza cálculos deduplicados no frontend; usa resumo backend apenas como fallback.
+        const quebraConfiavelRoteiro =
+          quebraCalculadaPorLojas > 0
+            ? quebraCalculadaPorLojas
+            : quebraCalculadaPorFluxo > 0
+              ? quebraCalculadaPorFluxo
+              : quebraAtualResumoRoteiro;
+
+        if (
+          quebraAtualResumoRoteiro > 0 &&
+          quebraConfiavelRoteiro > 0 &&
+          Math.abs(quebraAtualResumoRoteiro - quebraConfiavelRoteiro) > 0.01
+        ) {
+          console.warn(
+            "[Relatorios][Quebra][Roteiro] Resumo backend divergente; usando valor deduplicado.",
+            {
+              roteiroId: roteiroSelecionado,
+              quebraResumoBackend: quebraAtualResumoRoteiro,
+              quebraDeduplicadaEscolhida: quebraConfiavelRoteiro,
+            },
+          );
+        }
+
+        console.log("[Relatorios][Quebra][Roteiro] Escolha da quebra:", {
+          roteiroId: roteiroSelecionado,
+          quebraAtualResumoRoteiro,
+          custoQuebraCaixaRoteiroPorLojas,
+          custoQuebraCaixaRoteiroFluxo,
+          quebraConfiavelRoteiro,
         });
-        setRelatorio({ tipo: "roteiro", ...response.data });
+
+        if (toNumber(quebraConfiavelRoteiro) > 0 && resumoRoteiroConsolidado) {
+          resumoRoteiroConsolidado = aplicarQuebraCaixaNoResumoRoteiro(
+            resumoRoteiroConsolidado,
+            quebraConfiavelRoteiro,
+          );
+
+          console.log("[Relatorios][Quebra][Roteiro] Totais após aplicar quebra:", {
+            roteiroId: roteiroSelecionado,
+            totais: resumoRoteiroConsolidado?.totais,
+          });
+        }
+
+        setRelatorio({
+          tipo: "roteiro",
+          ...dadosRoteiro,
+          resumoRoteiroConsolidado,
+        });
       } else if (lojaSelecionada) {
         // Buscar relatório de loja + dashboard + comissão + produtos em paralelo
         const [
@@ -1506,6 +1962,7 @@ export function Relatorios() {
         if (dados.produtosSairam) {
           dados.produtosSairam = dados.produtosSairam.map((p) => ({
             ...p,
+            produtoNaMaquinaId: p.produtoNaMaquinaId ?? null,
             preco: p.preco || produtosMap[p.id]?.preco || 0,
             custoUnitario:
               p.custoUnitario || produtosMap[p.id]?.custoUnitario || 0,
@@ -1524,6 +1981,7 @@ export function Relatorios() {
             produtosSairam:
               m.produtosSairam?.map((p) => ({
                 ...p,
+                produtoNaMaquinaId: p.produtoNaMaquinaId ?? null,
                 preco: p.preco || produtosMap[p.id]?.preco || 0,
                 custoUnitario:
                   p.custoUnitario || produtosMap[p.id]?.custoUnitario || 0,
@@ -1628,24 +2086,28 @@ export function Relatorios() {
                   titulo: "Custo de Saída dos Produtos",
                   icone: "💸",
                   indicador: montarIndicadorComparacao(
-                    calcularCustoSaidaProdutosRelatorio(
-                      dadosComQuebra,
-                      produtosPrecos,
-                    ),
+                    calcularCustoSaidaProdutosRelatorio(dadosComQuebra),
                     calcularCustoSaidaProdutosRelatorio(relatorioMesAnterior),
                     "menor",
                   ),
                 },
-                {
-                  chave: "quebraCaixa",
-                  titulo: "Quebra de Caixa (Custo)",
-                  icone: "💥",
-                  indicador: montarIndicadorComparacao(
-                    toNumber(dadosComQuebra?.totais?.custoQuebraCaixa),
-                    toNumber(relatorioMesAnterior?.totais?.custoQuebraCaixa),
-                    "menor",
-                  ),
-                },
+                ...(toNumber(dadosComQuebra?.totais?.custoQuebraCaixa) > 0 ||
+                toNumber(relatorioMesAnterior?.totais?.custoQuebraCaixa) > 0
+                  ? [
+                      {
+                        chave: "quebraCaixa",
+                        titulo: "Quebra de Caixa (Custo)",
+                        icone: "💥",
+                        indicador: montarIndicadorComparacao(
+                          toNumber(dadosComQuebra?.totais?.custoQuebraCaixa),
+                          toNumber(
+                            relatorioMesAnterior?.totais?.custoQuebraCaixa,
+                          ),
+                          "menor",
+                        ),
+                      },
+                    ]
+                  : []),
               ],
             });
           }
@@ -1710,12 +2172,13 @@ export function Relatorios() {
   const custoQuebraCaixaRelatorio = toNumber(
     relatorio?.totais?.custoQuebraCaixa,
   );
+  const resumoProdutosConsolidado = calcularResumoProdutos(
+    relatorio?.produtosSairam,
+    relatorio?.totais,
+  );
 
   const valorConsolidadoRelatorio = calcularValorConsolidadoRelatorio(relatorio);
-  const custoProdutosRelatorio = calcularCustoSaidaProdutosRelatorio(
-    relatorio,
-    produtosPrecos,
-  );
+  const custoProdutosRelatorio = calcularCustoSaidaProdutosRelatorio(relatorio);
   const custoProdutosBaseRelatorio = calcularCustoSaidaProdutosRelatorio(relatorio);
   const gastoTotalPeriodoRelatorio = toNumber(relatorio?.totais?.gastoTotalPeriodo);
   const outrosCustosRelatorio = Math.max(
@@ -1731,6 +2194,283 @@ export function Relatorios() {
     outrosCustosRelatorio;
   const lucroLiquidoRelatorio =
     valorConsolidadoRelatorio - custoTotalConsideradoRelatorio;
+
+  const isRelatorioRoteiro = relatorio?.tipo === "roteiro";
+  const resumoRoteiroConsolidado =
+    relatorio?.resumoRoteiroConsolidado ||
+    relatorio?.resumoConsolidadoRoteiro ||
+    null;
+  const totaisRoteiroConsolidado =
+    resumoRoteiroConsolidado?.totais || relatorio?.totais || {};
+
+  const rendimentoBrutoRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.lucroBrutoTotal,
+      totaisRoteiroConsolidado?.valorBrutoConsolidadoLojaMaquinas,
+      totaisRoteiroConsolidado?.valorTotalLojaBruto,
+      totaisRoteiroConsolidado?.faturamentoBrutoTotal,
+    ) || 0,
+  );
+
+  const produtosSairamRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.produtosSairamTotal,
+      totaisRoteiroConsolidado?.produtosSairam,
+      totaisRoteiroConsolidado?.saidasPremioTotal,
+    ) || 0,
+  );
+
+  const custoFixoRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.custoFixoTotal,
+      totaisRoteiroConsolidado?.gastoFixoTotal,
+    ) || 0,
+  );
+  const custoQuebraRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.custoQuebraCaixaTotal,
+      totaisRoteiroConsolidado?.custoQuebraCaixa,
+    ) || 0,
+  );
+  const custoProdutosRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.custoProdutosTotal,
+      totaisRoteiroConsolidado?.custoProdutosSairam,
+    ) || 0,
+  );
+  const custoVariavelRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.custoVariavelTotal,
+      totaisRoteiroConsolidado?.gastoVariavelTotal,
+    ) || 0,
+  );
+  const custoTotalRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.custoTotal,
+      totaisRoteiroConsolidado?.gastoTotalPeriodo,
+    ) ||
+      custoFixoRoteiro +
+        custoQuebraRoteiro +
+        custoProdutosRoteiro +
+        custoVariavelRoteiro,
+  );
+
+  const lucroLiquidoRoteiro = rendimentoBrutoRoteiro - custoTotalRoteiro;
+
+  const outrosCustosRoteiro = Math.max(
+    0,
+    custoTotalRoteiro -
+      custoFixoRoteiro -
+      custoQuebraRoteiro -
+      custoProdutosRoteiro -
+      custoVariavelRoteiro,
+  );
+
+  const resumoLojasRoteiro = (() => {
+    if (!isRelatorioRoteiro) return [];
+
+    const lojasResumoDireto = Array.isArray(resumoRoteiroConsolidado?.lojasResumo)
+      ? resumoRoteiroConsolidado.lojasResumo
+      : [];
+
+    if (lojasResumoDireto.length > 0) {
+      const diasPorLoja = new Map(
+        (Array.isArray(relatorio?.lojas) ? relatorio.lojas : []).map((loja) => [
+          String(loja?.id ?? loja?.lojaId ?? loja?.loja?.id ?? loja?.nome ?? ""),
+          Array.isArray(loja?.diasSemMovimentacao)
+            ? loja.diasSemMovimentacao.length
+            : 0,
+        ]),
+      );
+
+      return lojasResumoDireto
+        .map((item, idx) => {
+          const chave = String(
+            item?.lojaId ?? item?.id ?? item?.lojaNome ?? item?.nome ?? idx,
+          );
+
+          return {
+            lojaId: item?.lojaId ?? item?.id ?? null,
+            lojaNome: item?.lojaNome || item?.nome || `Ponto ${idx + 1}`,
+            lucroBruto: toNumber(item?.lucroBruto),
+            lucroLiquido: toNumber(item?.lucroLiquido),
+            custoTotal: toNumber(item?.custoTotal),
+            produtosSairam: toNumber(item?.produtosSairam),
+            diasSemMovimentacao: toNumber(diasPorLoja.get(chave) || 0),
+          };
+        })
+        .sort((a, b) =>
+          String(a.lojaNome || "").localeCompare(
+            String(b.lojaNome || ""),
+            "pt-BR",
+          ),
+        );
+    }
+
+    const mapa = new Map();
+    const graficos = resumoRoteiroConsolidado?.graficos || {};
+
+    const atualizarCampo = (registro, campo, ...candidatos) => {
+      const valor = pickNumber(...candidatos);
+      if (valor === null) return;
+
+      if (toNumber(registro[campo]) === 0 || valor !== 0) {
+        registro[campo] = toNumber(valor);
+      }
+    };
+
+    const aplicarValoresDaLoja = (registro, origem = {}) => {
+      const totaisOrigem = origem?.totais || {};
+
+      atualizarCampo(
+        registro,
+        "lucroBruto",
+        origem?.lucroBruto,
+        origem?.rendimento,
+        origem?.valorBruto,
+        origem?.faturamentoBruto,
+        totaisOrigem?.lucroBruto,
+        totaisOrigem?.lucroBrutoTotal,
+        totaisOrigem?.valorTotalLojaBruto,
+        totaisOrigem?.faturamentoBruto,
+      );
+
+      atualizarCampo(
+        registro,
+        "produtosSairam",
+        origem?.produtosSairam,
+        origem?.saidasPremio,
+        origem?.quantidadeSaidas,
+        totaisOrigem?.produtosSairam,
+        totaisOrigem?.produtosSairamTotal,
+        totaisOrigem?.saidasPremioTotal,
+      );
+
+      atualizarCampo(
+        registro,
+        "custoTotal",
+        origem?.custoTotal,
+        origem?.gastoTotal,
+        origem?.despesaTotal,
+        totaisOrigem?.custoTotal,
+        totaisOrigem?.gastoTotalPeriodo,
+      );
+
+      atualizarCampo(
+        registro,
+        "lucroLiquido",
+        origem?.lucroLiquido,
+        origem?.valorLiquido,
+        totaisOrigem?.lucroLiquido,
+        totaisOrigem?.lucroLiquidoTotal,
+        totaisOrigem?.valorLiquidoConsolidadoLojaMaquinas,
+      );
+
+      const diasSemMov = pickNumber(
+        Array.isArray(origem?.diasSemMovimentacao)
+          ? origem.diasSemMovimentacao.length
+          : null,
+        origem?.diasSemMovimentacao,
+        origem?.totalDiasSemMovimentacao,
+      );
+
+      if (diasSemMov !== null) {
+        registro.diasSemMovimentacao = toNumber(diasSemMov);
+      }
+    };
+
+    const garantirLoja = (lojaId, lojaNome = "Ponto") => {
+      const chave = String(lojaId || lojaNome || "").trim();
+      if (!chave) return null;
+
+      if (!mapa.has(chave)) {
+        mapa.set(chave, {
+          lojaId: lojaId || null,
+          lojaNome: lojaNome || "Ponto",
+          lucroBruto: 0,
+          lucroLiquido: 0,
+          custoTotal: 0,
+          produtosSairam: 0,
+          diasSemMovimentacao: 0,
+        });
+      }
+
+      return mapa.get(chave);
+    };
+
+    const listasLojas = [
+      relatorio?.lojas,
+      resumoRoteiroConsolidado?.lojas,
+      resumoRoteiroConsolidado?.lojasDetalhado,
+      resumoRoteiroConsolidado?.detalhamentoLojas,
+    ];
+
+    listasLojas.forEach((lista) => {
+      (Array.isArray(lista) ? lista : []).forEach((loja, idx) => {
+        const lojaId =
+          loja?.id ?? loja?.lojaId ?? loja?.loja?.id ?? `loja-${idx}`;
+        const lojaNome =
+          loja?.nome ?? loja?.lojaNome ?? loja?.loja?.nome ?? `Ponto ${idx + 1}`;
+        const registro = garantirLoja(lojaId, lojaNome);
+        if (registro) aplicarValoresDaLoja(registro, loja);
+      });
+    });
+
+    (graficos?.rankingLucroBrutoLojas || []).forEach((item) => {
+      const registro = garantirLoja(item?.lojaId, item?.lojaNome);
+      if (registro) aplicarValoresDaLoja(registro, item);
+    });
+
+    (graficos?.rankingLucroLojas || []).forEach((item) => {
+      const registro = garantirLoja(item?.lojaId, item?.lojaNome);
+      if (registro) aplicarValoresDaLoja(registro, item);
+    });
+
+    (graficos?.rankingGastoLojas || []).forEach((item) => {
+      const registro = garantirLoja(item?.lojaId, item?.lojaNome);
+      if (registro) aplicarValoresDaLoja(registro, item);
+    });
+
+    (graficos?.rankingTicketPremioLojas || []).forEach((item) => {
+      const registro = garantirLoja(item?.lojaId, item?.lojaNome);
+      if (registro) aplicarValoresDaLoja(registro, item);
+    });
+
+    // Fallback: quando vierem apenas máquinas com dados de loja, agrega por loja.
+    (Array.isArray(relatorio?.maquinas) ? relatorio.maquinas : []).forEach(
+      (maquina, idx) => {
+        const lojaId =
+          maquina?.lojaId ?? maquina?.loja?.id ?? `loja-maquina-${idx}`;
+        const lojaNome =
+          maquina?.loja?.nome ?? maquina?.lojaNome ?? `Ponto ${idx + 1}`;
+        const registro = garantirLoja(lojaId, lojaNome);
+        if (!registro) return;
+
+        const totaisMaquina = maquina?.totais || {};
+        registro.lucroBruto += toNumber(
+          pickNumber(
+            totaisMaquina?.faturamentoBruto,
+            totaisMaquina?.valorTotalLojaBruto,
+          ) || 0,
+        );
+        registro.lucroLiquido += toNumber(totaisMaquina?.lucroLiquido || 0);
+        registro.produtosSairam += toNumber(
+          pickNumber(totaisMaquina?.produtosSairam, totaisMaquina?.saidasPremio) ||
+            0,
+        );
+      },
+    );
+
+    Array.from(mapa.values()).forEach((registro) => {
+      if (toNumber(registro.lucroLiquido) === 0) {
+        registro.lucroLiquido = toNumber(registro.lucroBruto) - toNumber(registro.custoTotal);
+      }
+    });
+
+    return Array.from(mapa.values()).sort((a, b) =>
+      String(a.lojaNome || "").localeCompare(String(b.lojaNome || ""), "pt-BR"),
+    );
+  })();
 
   if (loadingLojas) return <PageLoader />;
 
@@ -1936,6 +2676,91 @@ export function Relatorios() {
 
         {relatorio && !loading && relatorio.tipo !== "todas-lojas" && (
           <div className="space-y-6">
+            {isRelatorioRoteiro && (resumoRoteiroConsolidado || relatorio?.totais) && (
+              <div className="card bg-linear-to-r from-sky-50 to-indigo-100 border-2 border-indigo-300">
+                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl sm:text-3xl">🧭</span>
+                  Resumo Geral da Rota (Todas as Lojas do Roteiro)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="card bg-linear-to-br from-blue-600 to-indigo-700 text-white">
+                    <div className="text-2xl mb-2">💰</div>
+                    <div className="text-xl sm:text-2xl font-bold">
+                      R${" "}
+                      {rendimentoBrutoRoteiro.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </div>
+                    <div className="text-xs sm:text-sm opacity-90">
+                      Rendimento Total da Rota
+                    </div>
+                  </div>
+
+                  <div className="card bg-linear-to-br from-red-500 to-rose-700 text-white">
+                    <div className="text-2xl mb-2">📤</div>
+                    <div className="text-xl sm:text-2xl font-bold">
+                      {produtosSairamRoteiro.toLocaleString("pt-BR")}
+                    </div>
+                    <div className="text-xs sm:text-sm opacity-90">
+                      Produtos Saíram (Rota)
+                    </div>
+                  </div>
+
+                  <div className="card bg-linear-to-br from-rose-500 to-red-700 text-white">
+                    <div className="text-2xl mb-2">🧮</div>
+                    <div className="text-xl sm:text-2xl font-bold">
+                      R${" "}
+                      {custoTotalRoteiro.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </div>
+                    <div className="text-xs sm:text-sm opacity-90">
+                      Custos Totais da Rota
+                    </div>
+                    <div className="text-[10px] sm:text-xs opacity-85 mt-2 space-y-1">
+                      <div>
+                        Produtos: R${" "}
+                        {custoProdutosRoteiro.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </div>
+                      <div>
+                        Fixos: R${" "}
+                        {custoFixoRoteiro.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </div>
+                      <div>
+                        Quebra de caixa: R${" "}
+                        {custoQuebraRoteiro.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </div>
+                      <div>
+                        Outros: R${" "}
+                        {outrosCustosRoteiro.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card bg-linear-to-br from-emerald-600 to-green-800 text-white">
+                    <div className="text-2xl mb-2">📉</div>
+                    <div className="text-xl sm:text-2xl font-bold">
+                      R${" "}
+                      {lucroLiquidoRoteiro.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </div>
+                    <div className="text-xs sm:text-sm opacity-90">
+                      Lucro Líquido Geral da Rota
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Aviso de diferença de fichas */}
             {relatorio.avisoFichas && (
               <div className="p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 rounded mb-4">
@@ -1943,7 +2768,29 @@ export function Relatorios() {
               </div>
             )}
 
+            {isRelatorioRoteiro && resumoLojasRoteiro.length > 0 && (
+              <div className="card bg-linear-to-r from-cyan-50 to-blue-100 border-2 border-cyan-300">
+                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl sm:text-3xl">🏬</span>
+                  Lojas que fazem parte do roteiro
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {resumoLojasRoteiro.map((lojaResumo) => (
+                    <div
+                      key={String(lojaResumo.lojaId || lojaResumo.lojaNome)}
+                      className="bg-white rounded-lg border border-cyan-200 px-4 py-3 shadow-sm"
+                    >
+                      <div className="font-semibold text-gray-900 truncate">
+                        {lojaResumo.lojaNome}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Cards de Totais Gerais - Resumo Geral da Loja */}
+            {!isRelatorioRoteiro && (
             <div className="card bg-linear-to-r from-purple-50 to-purple-100 border-2 border-purple-300">
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <span className="text-2xl sm:text-3xl">📊</span>
@@ -2014,17 +2861,27 @@ export function Relatorios() {
                     Custo Total de Produtos
                   </div>
                   <div className="text-[10px] sm:text-xs opacity-80 mt-1">
-                    Fórmula: quantidade que saiu × valor unitário do produto
+                    Fórmula: soma do valorTotal dos itens em produtosSairam[]
                   </div>
                   <div className="text-2xl sm:text-3xl mb-2 mt-3">📤</div>
                   <div className="text-xl sm:text-2xl font-bold">
-                    {(relatorio.totais?.produtosSairam || 0).toLocaleString(
+                    {resumoProdutosConsolidado.totalQuantidadeItens.toLocaleString(
                       "pt-BR",
                     )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Produtos Saíram
                   </div>
+                  {resumoProdutosConsolidado.divergenciaQuantidade && (
+                    <div className="text-[10px] sm:text-xs opacity-90 mt-1">
+                      Conferência: itens ({resumoProdutosConsolidado.totalQuantidadeItens.toLocaleString("pt-BR")}) diferente de totais.produtosSairam ({resumoProdutosConsolidado.totalQuantidadeDeclarado.toLocaleString("pt-BR")})
+                    </div>
+                  )}
+                  {resumoProdutosConsolidado.divergenciaCusto && (
+                    <div className="text-[10px] sm:text-xs opacity-90 mt-1">
+                      Conferência: soma valorTotal (R$ {formatarMoeda(resumoProdutosConsolidado.custoTotalItens)}) diferente de totais.custoProdutosSairam (R$ {formatarMoeda(resumoProdutosConsolidado.custoTotalDeclarado)})
+                    </div>
+                  )}
                 </div>
 
                 {/* Gastos Fixos da Loja (Detalhado) */}
@@ -2075,7 +2932,7 @@ export function Relatorios() {
                 </div>
 
                 {/* Quebra de Caixa como Custo */}
-                {custoQuebraCaixaRelatorio > 0 && (
+                {Boolean(relatorio?.loja?.id) && custoQuebraCaixaRelatorio > 0 && (
                   <div className="card bg-linear-to-br from-red-700 to-rose-900 text-white border-2 border-red-300">
                     <div className="text-2xl sm:text-3xl mb-2">💥</div>
                     <div className="text-xl sm:text-2xl font-bold">
@@ -2107,6 +2964,7 @@ export function Relatorios() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Comparativo com Mês Passado */}
             {comparativoMensal && (
@@ -2419,7 +3277,13 @@ export function Relatorios() {
                   </p>
                 </div>
 
-                {relatorio.maquinas.map((maquina, index) => (
+                {relatorio.maquinas.map((maquina, index) => {
+                  const resumoProdutosMaquina = calcularResumoProdutos(
+                    maquina?.produtosSairam,
+                    maquina?.totais,
+                  );
+
+                  return (
                   <div
                     key={maquina.maquina.id}
                     className="card border-4 border-indigo-300 shadow-2xl page-break-before"
@@ -2484,16 +3348,15 @@ export function Relatorios() {
                           </div>
                           <div className="text-xl sm:text-3xl font-bold text-center">
                             {Number(
-                              maquina.totais.produtosSairam || 0,
+                              resumoProdutosMaquina.totalQuantidadeItens || 0,
                             ).toLocaleString("pt-BR")}
                           </div>
                           <div className="text-xs sm:text-sm text-center mt-1 sm:mt-2 opacity-90">
                             Produtos Saíram
                           </div>
                           <div className="text-[10px] sm:text-xs text-center mt-1 opacity-90 leading-tight">
-                            {Array.isArray(maquina.produtosSairam) &&
-                            maquina.produtosSairam.length > 0
-                              ? maquina.produtosSairam
+                            {resumoProdutosMaquina.itens.length > 0
+                              ? resumoProdutosMaquina.itens
                                   .map((produto) =>
                                     produto?.nome
                                       ? `${produto.nome} (${Number(produto?.quantidade || 0).toLocaleString("pt-BR")})`
@@ -2538,7 +3401,7 @@ export function Relatorios() {
                           <div className="text-xl sm:text-3xl font-bold text-center">
                             R${" "}
                             {Number(
-                              maquina.totais.custoProdutosSairam || 0,
+                              resumoProdutosMaquina.custoTotalItens || 0,
                             ).toLocaleString("pt-BR", {
                               minimumFractionDigits: 2,
                             })}
@@ -2608,7 +3471,7 @@ export function Relatorios() {
                             Faturamento Bruto ÷ Produtos Saíram
                           </div>
                           <div className="text-[10px] sm:text-xs text-center mt-1 opacity-80">
-                            {`R$ ${Number(maquina.totais.faturamentoBruto || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} / ${Number(maquina.totais.produtosSairam || 0).toLocaleString("pt-BR")} saídas`}
+                            {`R$ ${Number(maquina.totais.faturamentoBruto || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} / ${Number(resumoProdutosMaquina.totalQuantidadeItens || 0).toLocaleString("pt-BR")} saídas`}
                           </div>
                         </div>
                       </div>
@@ -2624,88 +3487,15 @@ export function Relatorios() {
                             Produtos que SAÍRAM
                           </span>
                           <span className="ml-auto bg-white text-red-500 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold">
-                            {maquina.totais.produtosSairam}
+                            {resumoProdutosMaquina.totalQuantidadeItens.toLocaleString(
+                              "pt-BR",
+                            )}
                           </span>
                         </h4>
-                        {maquina.produtosSairam &&
-                        maquina.produtosSairam.length > 0 ? (
-                          <div className="space-y-2 sm:space-y-3">
-                            {maquina.produtosSairam
-                              .sort((a, b) => b.quantidade - a.quantidade)
-                              .map((produto) => (
-                                <div
-                                  key={produto.id}
-                                  className="bg-white p-3 sm:p-4 rounded-lg border-2 border-red-300 shadow-md"
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                      <span className="text-2xl sm:text-4xl shrink-0">
-                                        {produto.emoji || "📦"}
-                                      </span>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="font-bold text-sm sm:text-lg text-gray-900 truncate">
-                                          {produto.nome}
-                                        </div>
-                                        <div className="text-xs sm:text-sm text-gray-600 truncate">
-                                          📋 Cód:{" "}
-                                          <span className="font-mono">
-                                            {produto.codigo || "S/C"}
-                                          </span>
-                                        </div>
-                                        {/* Custo unitário e total do produto */}
-                                        {produto.custoUnitario !== undefined &&
-                                          Number(produto.custoUnitario) > 0 && (
-                                            <div className="text-xs text-gray-700 mt-1">
-                                              💲 Custo unitário: R${" "}
-                                              {Number(
-                                                produto.custoUnitario,
-                                              ).toLocaleString("pt-BR", {
-                                                minimumFractionDigits: 2,
-                                              })}{" "}
-                                              | Custo total:{" "}
-                                              <span className="font-bold">
-                                                R${" "}
-                                                {(
-                                                  Number(
-                                                    produto.custoUnitario,
-                                                  ) *
-                                                  Number(
-                                                    produto.quantidade || 0,
-                                                  )
-                                                ).toLocaleString("pt-BR", {
-                                                  minimumFractionDigits: 2,
-                                                })}
-                                              </span>
-                                            </div>
-                                          )}
-                                      </div>
-                                    </div>
-                                    <div className="bg-red-500 text-white px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-xl shrink-0">
-                                      {produto.quantidade.toLocaleString(
-                                        "pt-BR",
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        ) : Number(maquina.totais?.produtosSairam || 0) > 0 ? (
-                          <div className="text-center py-8 bg-white rounded-lg">
-                            <p className="text-5xl mb-2">📦</p>
-                            <p className="text-gray-600 font-medium">
-                              Houve saída de produtos ({Number(
-                                maquina.totais?.produtosSairam || 0,
-                              ).toLocaleString("pt-BR")}), mas sem detalhamento por item.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 bg-white rounded-lg">
-                            <p className="text-6xl mb-2">📭</p>
-                            <p className="text-gray-500 font-medium">
-                              Nenhum produto saiu
-                            </p>
-                          </div>
-                        )}
+                        {renderTabelaProdutosSaidos({
+                          resumoProdutos: resumoProdutosMaquina,
+                          contexto: `máquina ${maquina?.maquina?.codigo || ""}`,
+                        })}
                       </div>
 
                       {/* Produtos que Entraram */}
@@ -2775,7 +3565,8 @@ export function Relatorios() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -2902,43 +3693,11 @@ export function Relatorios() {
                     <span className="text-2xl">📤</span>
                     Produtos que Saíram (Total Geral)
                   </h4>
-                  {relatorio.produtosSairam &&
-                  relatorio.produtosSairam.length > 0 ? (
-                    <div className="space-y-2">
-                      {relatorio.produtosSairam
-                        .sort((a, b) => b.quantidade - a.quantidade)
-                        .map((produto) => (
-                          <div
-                            key={produto.id}
-                            className="p-3 bg-white border-2 border-red-200 rounded-lg"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xl">
-                                  {produto.emoji || "📦"}
-                                </span>
-                                <div>
-                                  <div className="font-bold text-gray-900">
-                                    {produto.nome}
-                                  </div>
-                                  <div className="text-xs text-gray-600">
-                                    Cód: {produto.codigo || "S/C"}
-                                  </div>
-                                </div>
-                              </div>
-                              <span className="bg-red-500 text-white px-3 py-1 rounded-full font-bold">
-                                {produto.quantidade.toLocaleString("pt-BR")}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-4xl mb-2">📭</p>
-                      <p className="text-gray-600">Nenhum produto saiu</p>
-                    </div>
-                  )}
+                  {renderTabelaProdutosSaidos({
+                    resumoProdutos: resumoProdutosConsolidado,
+                    contexto: "consolidado",
+                    exibirConferencia: false,
+                  })}
                 </div>
 
                 {/* Produtos que Entraram - Consolidado */}
