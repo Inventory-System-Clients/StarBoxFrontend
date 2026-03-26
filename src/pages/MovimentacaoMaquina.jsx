@@ -357,9 +357,10 @@ export default function MovimentacaoMaquina() {
       },
     );
 
-    const linhaComissao = !isPrimeiraMovimentacao
-      ? `Comissao a pagar (${percentualComissaoFormatado}%): R$${formatarMoeda((Math.max(0, Number(saldo || 0)) * percentualComissao) / 100)}`
-      : null;
+    const linhaComissao =
+      !isPrimeiraMovimentacao && dataUltimaMovimentacao !== "Sem movimentação anterior"
+        ? `Comissao a pagar (${percentualComissaoFormatado}%): R$${formatarMoeda((Math.max(0, Number(saldo || 0)) * percentualComissao) / 100)}`
+        : null;
     const nomeProdutoAbastecido =
       produtoSelecionado?.nome || "Produto não informado";
     const quantidadeAbastecidaInformada =
