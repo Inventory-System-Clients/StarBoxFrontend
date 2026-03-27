@@ -311,7 +311,9 @@ export function Dashboard() {
 
   const isFuncionario = usuario?.role === "FUNCIONARIO";
   const isAdminLike =
-    usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
+    usuario?.role === "ADMIN" ||
+    usuario?.role === "GERENCIADOR" ||
+    usuario?.role === "GERENTE";
   const podeVerDefeituosasNoDashboard =
     usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const [stats, setStats] = useState({
@@ -378,7 +380,9 @@ export function Dashboard() {
   const carregarDados = useCallback(async () => {
     try {
       const isAdmin =
-        usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
+        usuario?.role === "ADMIN" ||
+        usuario?.role === "GERENCIADOR" ||
+        usuario?.role === "GERENTE";
       const bloquearVisualizacaoLojasEMaquinas =
         usuario?.role === "FUNCIONARIO";
 
