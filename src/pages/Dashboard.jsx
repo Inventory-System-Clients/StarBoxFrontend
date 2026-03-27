@@ -54,6 +54,33 @@ export function Dashboard() {
   transition: color 5s; /* Garante que o texto também mude abruptamente */
   color: #D92E30 !important;
 }
+
+/* Variante para cards de alerta, sem sobrescrever a cor do texto */
+.blink-red-alert {
+  animation: blinkBruscoRed 0.9s steps(1, start) infinite !important;
+  border: 2px solid #b91c1c !important;
+  border-radius: 12px;
+}
+
+/* Pulso suave com fade vermelho para botão de alerta */
+@keyframes alertFadeRed {
+  0% {
+    background-color: rgba(220, 38, 38, 1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.82);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.18);
+  }
+  100% {
+    background-color: rgba(220, 38, 38, 1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.alert-fade-red {
+  animation: alertFadeRed 1.2s ease-in-out infinite;
+}
 `;
   const { usuario } = useAuth();
   // Estado para saber se há manutenção pendente atribuída ao usuário
@@ -332,6 +359,10 @@ export function Dashboard() {
   const [alertasEstoqueLoja, setAlertasEstoqueLoja] = useState([]);
   const [alertasEstoqueUsuario, setAlertasEstoqueUsuario] = useState([]);
   const [revisoesPendentes, setRevisoesPendentes] = useState([]);
+  const [alertaInatividadeLojas, setAlertaInatividadeLojas] = useState({
+    lojas: [],
+    carregando: false,
+  });
 
   // Estados para estoque das lojas
   const [lojasComEstoque, setLojasComEstoque] = useState([]);
@@ -554,6 +585,8 @@ export function Dashboard() {
         carregarAlertasEstoqueLoja(lojasVisiveis);
       }
 
+      carregarAlertaInatividadeLojas(lojasVisiveis);
+
       carregarAlertasEstoqueUsuario();
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
@@ -641,6 +674,183 @@ export function Dashboard() {
       console.error("Erro ao carregar alertas de estoque do usuario:", error);
       setAlertasEstoqueUsuario([]);
     }
+  };
+
+  const carregarAlertaInatividadeLojas = async (lojasData) => {
+    let lojasParaAnalise = Array.isArray(lojasData) ? lojasData : [];
+
+    if (lojasParaAnalise.length === 0 && usuario?.role === "FUNCIONARIO") {
+      try {
+        const lojasRes = await api.get("/lojas");
+        lojasParaAnalise = Array.isArray(lojasRes.data) ? lojasRes.data : [];
+      } catch {
+        lojasParaAnalise = [];
+      }
+    }
+
+    if (lojasParaAnalise.length === 0) {
+      setAlertaInatividadeLojas({ lojas: [], carregando: false });
+      return;
+    }
+
+    setAlertaInatividadeLojas((prev) => ({ ...prev, carregando: true }));
+
+    try {
+      const hoje = new Date();
+      const dataInicioBusca = new Date(
+        hoje.getTime() - 90 * 24 * 60 * 60 * 1000,
+      )
+        .toISOString()
+        .split("T")[0];
+      const dataFimBusca = hoje.toISOString().split("T")[0];
+
+      const [movRes, fluxoRes] = await Promise.all([
+        api
+          .get("/movimentacoes", {
+            params: {
+              dataInicio: dataInicioBusca,
+              dataFim: `${dataFimBusca}T23:59:59`,
+              limite: 50000,
+            },
+          })
+          .catch(() => ({ data: [] })),
+        api
+          .get(`/fluxo-caixa?dataInicio=${dataInicioBusca}&dataFim=${dataFimBusca}&status=todos`)
+          .catch(() => ({ data: [] })),
+      ]);
+
+      const movimentacoes = Array.isArray(movRes?.data)
+        ? movRes.data
+        : movRes?.data?.movimentacoes || movRes?.data?.rows || [];
+      const fluxos = Array.isArray(fluxoRes?.data)
+        ? fluxoRes.data
+        : fluxoRes?.data?.fluxos || fluxoRes?.data?.rows || [];
+
+      const ultimaMovPorLoja = new Map();
+      const ultimaRetiradaPorLoja = new Map();
+
+      movimentacoes.forEach((mov) => {
+        const lojaId = String(
+          mov?.lojaId || mov?.maquina?.lojaId || mov?.maquina?.loja?.id || "",
+        );
+        if (!lojaId) return;
+
+        const dataMov = new Date(
+          mov?.dataColeta || mov?.data || mov?.dataMovimentacao || mov?.createdAt,
+        );
+        if (Number.isNaN(dataMov.getTime())) return;
+
+        const anterior = ultimaMovPorLoja.get(lojaId);
+        if (!anterior || dataMov > anterior) {
+          ultimaMovPorLoja.set(lojaId, dataMov);
+        }
+      });
+
+      fluxos.forEach((fluxo) => {
+        const lojaId = String(
+          fluxo?.lojaId ||
+            fluxo?.movimentacao?.maquina?.lojaId ||
+            fluxo?.movimentacao?.maquina?.loja?.id ||
+            "",
+        );
+        if (!lojaId) return;
+
+        const dataRetirada = new Date(
+          fluxo?.movimentacao?.dataColeta ||
+            fluxo?.dataRetirada ||
+            fluxo?.dataConferencia ||
+            fluxo?.createdAt ||
+            fluxo?.updatedAt,
+        );
+        if (Number.isNaN(dataRetirada.getTime())) return;
+
+        const anterior = ultimaRetiradaPorLoja.get(lojaId);
+        if (!anterior || dataRetirada > anterior) {
+          ultimaRetiradaPorLoja.set(lojaId, dataRetirada);
+        }
+      });
+
+      const MS_DIA = 24 * 60 * 60 * 1000;
+      const lojasComAlerta = lojasParaAnalise
+        .filter((loja) => !loja?.isDepositoPrincipal)
+        .map((loja) => {
+          const id = String(loja?.id || "");
+          const ultimaMov = ultimaMovPorLoja.get(id) || null;
+          const ultimaRetirada = ultimaRetiradaPorLoja.get(id) || null;
+
+          const diasSemMov = ultimaMov
+            ? Math.floor((hoje - ultimaMov) / MS_DIA)
+            : 9999;
+          const diasSemRetirada = ultimaRetirada
+            ? Math.floor((hoje - ultimaRetirada) / MS_DIA)
+            : 9999;
+
+          return {
+            lojaId: loja.id,
+            lojaNome: loja.nome,
+            ultimaMovimentacao: ultimaMov,
+            ultimaRetirada,
+            diasSemMov,
+            diasSemRetirada,
+          };
+        })
+        .filter((loja) => loja.diasSemMov > 15 && loja.diasSemRetirada > 15)
+        .sort((a, b) => b.diasSemMov - a.diasSemMov);
+
+      setAlertaInatividadeLojas({ lojas: lojasComAlerta, carregando: false });
+    } catch (error) {
+      console.error("Erro ao calcular alerta de inatividade das lojas:", error);
+      setAlertaInatividadeLojas({ lojas: [], carregando: false });
+    }
+  };
+
+  const abrirDetalheAlertaInatividade = () => {
+    const linhasHtml = alertaInatividadeLojas.lojas
+      .map((loja) => {
+        const ultimaMov = loja.ultimaMovimentacao
+          ? loja.ultimaMovimentacao.toLocaleDateString("pt-BR")
+          : "Nunca";
+        const ultimaRetirada = loja.ultimaRetirada
+          ? loja.ultimaRetirada.toLocaleDateString("pt-BR")
+          : "Nunca";
+
+        return `
+          <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${loja.lojaNome}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${loja.diasSemMov}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${loja.diasSemRetirada}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${ultimaMov}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${ultimaRetirada}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    Swal.fire({
+      title: "Lojas com inatividade crítica",
+      width: 1000,
+      confirmButtonText: "Fechar",
+      confirmButtonColor: "#dc2626",
+      html: `
+        <div style="text-align:left;max-height:60vh;overflow:auto;font-size:14px;">
+          <p style="margin-bottom:10px;">
+            Critério: <strong>mais de 15 dias sem movimentação</strong> e <strong>mais de 15 dias sem retirada de dinheiro</strong>.
+          </p>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#fee2e2;">
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Ponto</th>
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:center;">Dias sem movimentação</th>
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:center;">Dias sem retirada</th>
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Última movimentação</th>
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Última retirada</th>
+              </tr>
+            </thead>
+            <tbody>${linhasHtml}</tbody>
+          </table>
+        </div>
+      `,
+    });
   };
 
   const carregarEstoqueDasLojas = async () => {
@@ -798,6 +1008,55 @@ export function Dashboard() {
       carregarVendasPorProduto();
     }
     setMostrarDetalhesProdutos(!mostrarDetalhesProdutos);
+  };
+
+  const abrirDetalheComparativoMensal = () => {
+    const hoje = new Date();
+    const diaAtual = hoje.getDate();
+    const mesAtual = hoje.getMonth() + 1;
+    const anoAtual = hoje.getFullYear();
+
+    let total = 0;
+    const linhasHtml = [];
+    for (let d = 1; d <= diaAtual; d++) {
+      const dataStr = `${anoAtual}-${String(mesAtual).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const valor = Number(stats.balanco?.lucroPorDia?.[dataStr] || 0);
+      total += valor;
+      linhasHtml.push(`
+        <tr>
+          <td style="padding:8px;border:1px solid #e5e7eb;">${dataStr}</td>
+          <td style="padding:8px;border:1px solid #e5e7eb;text-align:right;">R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `);
+    }
+
+    Swal.fire({
+      title: "Detalhamento do Comparativo Mensal",
+      width: 900,
+      confirmButtonText: "Fechar",
+      confirmButtonColor: "#f59e0b",
+      html: `
+        <div style="text-align:left;max-height:60vh;overflow:auto;font-size:14px;">
+          <p style="margin-bottom:8px;"><strong>Fonte dos dados:</strong> endpoint <code>/dashboard/lucro-diario</code>.</p>
+          <p style="margin-bottom:12px;"><strong>Regra:</strong> lucro líquido diário consolidado de todas as lojas, somado até o dia atual do mês.</p>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;">Data</th>
+                <th style="padding:8px;border:1px solid #e5e7eb;text-align:right;">Lucro consolidado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${linhasHtml.join("")}
+              <tr style="background:#fef3c7;font-weight:700;">
+                <td style="padding:8px;border:1px solid #e5e7eb;text-align:right;">Total até hoje</td>
+                <td style="padding:8px;border:1px solid #e5e7eb;text-align:right;">R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `,
+    });
   };
 
   const toggleLojaEstoque = (lojaId) => {
@@ -1006,7 +1265,7 @@ export function Dashboard() {
                       <td>${item.produto.emoji || "📦"} ${
                         item.produto.nome
                       }</td>
-                      <td>${item.produto.codigo || "-"}</td>
+                      <td>${item.produto?.codigo || "-"}</td>
                       <td>${item.quantidade}</td>
                       <td>${item.estoqueMinimo}</td>
                       <td>${abaixo ? "⚠️ ABAIXO DO MÍNIMO" : "✅ OK"}</td>
@@ -1036,8 +1295,8 @@ export function Dashboard() {
                     const sugestao = item.estoqueMinimo - item.quantidade;
                     return `
                       <tr>
-                        <td>${item.produto.emoji || "📦"} ${
-                          item.produto.nome
+                        <td>${item.produto?.emoji || "📦"} ${
+                          item.produto?.nome || "-"
                         }</td>
                         <td>${item.quantidade}</td>
                         <td>${item.estoqueMinimo}</td>
@@ -1230,7 +1489,7 @@ export function Dashboard() {
                           <strong>${item.produto.emoji || "📦"} ${
                             item.produto.nome
                           }</strong><br>
-                          <small>Cód: ${item.produto.codigo || "-"}</small>
+                          <small>Cód: ${item.produto?.codigo || "-"}</small>
                         </td>
                         <td style="font-size: 18px; font-weight: bold; color: #FF69B4;">
                           ${item.totalNecessario} unidades
@@ -1480,8 +1739,10 @@ export function Dashboard() {
     return <PageLoader />;
   }
 
+
   console.log("Estado stats no render:", stats);
   console.log("Fichas no render:", stats.balanco?.totais?.totalFichas);
+  console.log("LucroPorDia no render:", stats.balanco?.lucroPorDia);
 
   return (
     <div className="min-h-screen bg-[rgb(242, 242, 242)];">
@@ -1720,6 +1981,28 @@ export function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {alertaInatividadeLojas.lojas.length > 0 && (
+              <>
+                <style>{blinkRedStyle}</style>
+                <button
+                  type="button"
+                  onClick={
+                    isAdminLike ? abrirDetalheAlertaInatividade : undefined
+                  }
+                  disabled={!isAdminLike}
+                  title={
+                    isAdminLike
+                      ? `Alerta: ${alertaInatividadeLojas.lojas.length} ponto(s) sem movimentação e retirada há mais de 15 dias. Clique para detalhes.`
+                      : "Alerta de inatividade de pontos"
+                  }
+                  className={`w-11 h-11 rounded-full bg-red-600 text-white text-xl flex items-center justify-center shadow-md alert-fade-red ${
+                    isAdminLike ? "cursor-pointer" : "cursor-default opacity-90"
+                  }`}
+                >
+                  🚨
+                </button>
+              </>
+            )}
             <button
               onClick={carregarDados}
               className="bg-[#62A1D9] hover:bg-[#24094E] text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition-colors"
@@ -1748,7 +2031,10 @@ export function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
             {/* Faturamento Semanal - Ocupa 2 colunas */}
             {usuario?.role === "ADMIN" && (
-            <div className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2">
+            <div
+              className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2 cursor-pointer"
+              onClick={abrirDetalheComparativoMensal}
+            >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
@@ -1764,26 +2050,26 @@ export function Dashboard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
                     />
                   </svg>
                 </div>
                 <p className="text-3xl font-bold">
                   R${" "}
                   {(() => {
-                    const dinheiro = Number(
-                      stats.balanco?.totais?.totalDinheiro || 0,
-                    );
-                    const cartaoPix = Number(
-                      stats.balanco?.totais?.totalCartaoPix || 0,
-                    );
-                    const receita = dinheiro + cartaoPix;
-                    return receita > 0
-                      ? receita.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                        })
-                      : stats.balanco?.totais?.totalFaturamento?.toFixed(2) ||
-                          "0,00";
+                    // Exibir o lucro líquido consolidado do mês atual (todas as lojas)
+                    const hoje = new Date();
+                    const diaAtual = hoje.getDate();
+                    const mesAtual = hoje.getMonth() + 1;
+                    const anoAtual = hoje.getFullYear();
+                    let totalLucroMes = 0;
+                    for (let d = 1; d <= diaAtual; d++) {
+                      const dataStr = `${anoAtual}-${String(mesAtual).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                      totalLucroMes += Number(stats.balanco?.lucroPorDia?.[dataStr] || 0);
+                    }
+                    return totalLucroMes.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    });
                   })()}
                 </p>
                 <div className="flex flex-wrap gap-1 mt-1">
@@ -1800,7 +2086,7 @@ export function Dashboard() {
                     ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                <p className="text-xs opacity-75 mt-1">💰 Últimos 7 dias</p>
+                <p className="text-xs opacity-75 mt-1">💰 Último mês</p>
                 {/* Comparação de lucro com mês anterior */}
                 {(() => {
                   // Supondo que stats.balanco.lucroPorDia[YYYY-MM-DD] existe
@@ -1840,7 +2126,7 @@ export function Dashboard() {
                       : 0;
                   return (
                     <div className="mt-2 text-xs font-semibold">
-                      Lucro até hoje vs mês passado:
+                    Renda bruta até hoje vs mês passado:
                       <span
                         className={
                           percent >= 0 ? "text-green-700" : "text-red-700"
@@ -2033,7 +2319,7 @@ export function Dashboard() {
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
-                    Estoque por Usuário
+                    Meu Estoque
                   </h3>
                   <svg
                     className="w-8 h-8 opacity-80"
@@ -2051,7 +2337,7 @@ export function Dashboard() {
                 </div>
                 <p className="text-3xl font-bold">📦</p>
                 <p className="text-xs opacity-75 mt-1">
-                  {alertasEstoqueUsuario.length} alertas no seu estoque
+                  {alertasEstoqueUsuario.length} alertas pendentes
                 </p>
               </div>
             </div>
@@ -2060,6 +2346,8 @@ export function Dashboard() {
               className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
+              {/* Injeta o CSS da animação blink-red para o card inteiro */}
+              <style>{blinkRedStyle}</style>
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
@@ -2376,7 +2664,7 @@ export function Dashboard() {
 
                   {revisoesPendentes.length > 3 && (
                     <p className="text-sm text-gray-500 mt-2">
-                      + {revisoesPendentes.length - 3} mais{" "}
+                      + {revisoesPendentes.length - 3} mais
                       {revisoesPendentes.length - 3 === 1
                         ? "veículo"
                         : "veículos"}
@@ -2777,9 +3065,9 @@ export function Dashboard() {
                                               </span>
                                             )}
                                           </div>
-                                          {item.produto.codigo && (
+                                          {item.produto?.codigo && (
                                             <p className="text-xs text-gray-500 mt-1">
-                                              Cód: {item.produto.codigo}
+                                              Cód: {item.produto?.codigo}
                                             </p>
                                           )}
                                         </div>
@@ -3470,7 +3758,7 @@ export function Dashboard() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-lg text-gray-900">
-                          {alerta.maquina.codigo}
+                          {alerta.maquina?.codigo || "-"}
                         </span>
                         <span className="text-gray-600">-</span>
                         <span className="text-gray-800 font-medium">
@@ -3491,13 +3779,18 @@ export function Dashboard() {
                         </svg>
                         {alerta.maquina.loja}
                       </p>
+                      {alerta.produto?.codigo && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Código: {alerta.produto?.codigo}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-bold text-gray-900">
-                          {alerta.percentualAtual}
+                          {alerta.quantidade}
                         </span>
-                        <span className="text-lg text-gray-600">%</span>
+                        <span className="text-lg text-gray-600">un</span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1 bg-white/60 px-2 py-1 rounded-full">
                         {alerta.estoqueAtual}/{alerta.capacidadePadrao} unidades
@@ -3527,6 +3820,7 @@ export function Dashboard() {
                           ? "bg-linear-to-r from-orange-50 to-orange-100/50 border-orange-500 shadow-orange-100 shadow-md"
                           : "bg-linear-to-r from-yellow-50 to-yellow-100/50 border-yellow-500 shadow-yellow-100 shadow-md"
                     }`}
+                    title={alerta.produtoNome}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
@@ -3621,6 +3915,7 @@ export function Dashboard() {
                           ? "bg-linear-to-r from-orange-50 to-orange-100/50 border-orange-500 shadow-orange-100 shadow-md"
                           : "bg-linear-to-r from-yellow-50 to-yellow-100/50 border-yellow-500 shadow-yellow-100 shadow-md"
                     }`}
+                    title={alerta.produtoNome}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
