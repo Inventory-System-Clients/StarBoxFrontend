@@ -26,6 +26,14 @@ export function Roteiros() {
     "concluido",
     "concluida",
   ]);
+  const STATUS_ROTEIRO_PENDENTE = new Set([
+    "pendente",
+    "em_andamento",
+    "em-andamento",
+    "aberto",
+    "nao_iniciado",
+    "não_iniciado",
+  ]);
 
   // --- ESTADOS DE DADOS ---
   const [roteiros, setRoteiros] = useState([]);
@@ -122,6 +130,16 @@ export function Roteiros() {
         .trim()
         .toLowerCase(),
     );
+
+  const isRoteiroPendenteOuEmAndamento = (roteiro) => {
+    const status = String(roteiro?.status || "")
+      .trim()
+      .toLowerCase();
+
+    if (!status) return true;
+    if (STATUS_ROTEIRO_PENDENTE.has(status)) return true;
+    return !isRoteiroFinalizado(roteiro);
+  };
 
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
@@ -1367,7 +1385,7 @@ export function Roteiros() {
 
               {/* Botões de Ação com lógica dinâmica */}
               <div className="flex gap-2 mt-auto">
-                {!roteiro.status || roteiro.status === "pendente" ? (
+                {isRoteiroPendenteOuEmAndamento(roteiro) ? (
                   <>
                     <button
                       onClick={() => iniciarOuContinuarRoteiro(roteiro.id)}
@@ -1393,7 +1411,7 @@ export function Roteiros() {
                       </button>
                     )}
                   </>
-                ) : roteiro.status === "finalizado" ? (
+                ) : isRoteiroFinalizado(roteiro) ? (
                   <>
                     <button
                       onClick={() => navigate(`/roteiros/${roteiro.id}/executar`)}

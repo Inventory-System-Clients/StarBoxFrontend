@@ -21,7 +21,8 @@ export function MaquinaDetalhes() {
   const [alertaInconsistencia, setAlertaInconsistencia] = useState(null);
   const [alertaAbastecimento, setAlertaAbastecimento] = useState(null);
   const [produtoUltimaMov, setProdutoUltimaMov] = useState(null);
-  const [concluidaHoje, setConcluidaHoje] = useState(false);
+  const [maquinaConcluidaNoRoteiro, setMaquinaConcluidaNoRoteiro] =
+    useState(false);
   
   // Estados para modal de edição
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
@@ -102,22 +103,21 @@ export function MaquinaDetalhes() {
   };
 
   useEffect(() => {
-    // Verifica status de movimentação concluída para hoje
+    // O status de execução agora é semanal (até reset), sem filtro por data.
     const verificarStatus = async () => {
       try {
-        const hoje = new Date().toISOString().slice(0, 10);
         const res = await api.get(
-          `/status-diario?maquinaId=${id}&roteiroId=${maquina?.roteiroId}&data=${hoje}`,
+          `/status-diario?maquinaId=${id}&roteiroId=${maquina?.roteiroId}`,
         );
-        setConcluidaHoje(res.data.concluida === true);
+        setMaquinaConcluidaNoRoteiro(res.data?.concluida === true);
       } catch (e) {
-        setConcluidaHoje(false);
+        setMaquinaConcluidaNoRoteiro(false);
       }
     };
     if (maquina && maquina.roteiroId) {
       verificarStatus();
     }
-  }, [maquina]);
+  }, [id, maquina]);
 
   // Função para verificar se usuário pode editar uma movimentação
   const podeEditar = (movimentacao) => {
@@ -366,16 +366,16 @@ export function MaquinaDetalhes() {
 
         {/* Botão de movimentação */}
         <button
-          className={`btn-primary ${concluidaHoje ? "opacity-50 cursor-not-allowed" : ""}`}
-          disabled={concluidaHoje}
+          className={`btn-primary ${maquinaConcluidaNoRoteiro ? "opacity-50 cursor-not-allowed" : ""}`}
+          disabled={maquinaConcluidaNoRoteiro}
           title={
-            concluidaHoje
-              ? "Movimentação já registrada hoje"
+            maquinaConcluidaNoRoteiro
+              ? "Máquina já concluída neste roteiro (até o reset semanal)"
               : "Registrar movimentação"
           }
         >
-          {concluidaHoje
-            ? "Movimentação concluída hoje"
+          {maquinaConcluidaNoRoteiro
+            ? "Máquina concluída no roteiro"
             : "Registrar movimentação"}
         </button>
       </div>

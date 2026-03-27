@@ -66,6 +66,16 @@ export default function RoteiroExecucao() {
       String(status || "").toLowerCase(),
     );
 
+  const roteiroEstaFinalizado = (status) =>
+    ["finalizado", "finalizada", "concluido", "concluida"].includes(
+      String(status || "").toLowerCase(),
+    );
+
+  const maquinaEstaConcluida = (status) =>
+    ["finalizado", "finalizada", "concluido", "concluida"].includes(
+      String(status || "").toLowerCase(),
+    );
+
   const formatarMoedaBRL = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
       style: "currency",
@@ -119,7 +129,7 @@ export default function RoteiroExecucao() {
   }, [roteiro, location.state]);
 
   useEffect(() => {
-    if (!roteiro || roteiro.status !== "finalizado") return;
+    if (!roteiro || !roteiroEstaFinalizado(roteiro.status)) return;
     if (!location.state?.origemMovimentacao) return;
     if (location.state?.pilotagemFinalizada) return;
 
@@ -141,6 +151,11 @@ export default function RoteiroExecucao() {
       },
     });
   }, [id, location.state, navigate, roteiro]);
+
+  useEffect(() => {
+    if (!location.state?.origemMovimentacao) return;
+    carregarRoteiro();
+  }, [location.state?.origemMovimentacao]);
 
   useEffect(() => {
     const roteiroIdState = String(location.state?.roteiroIdParaFinalizar || "");
@@ -653,7 +668,7 @@ export default function RoteiroExecucao() {
       setSuccess("");
       setModalFinalizar((prev) => ({ ...prev, loading: true }));
 
-      if (roteiro?.status === "finalizado") {
+      if (roteiroEstaFinalizado(roteiro?.status)) {
         const mensagemWhatsApp = await montarMensagemWhatsAppFinalizacao(roteiro);
         const abriuWhatsApp = abrirWhatsAppComMensagem(
           mensagemWhatsApp,
@@ -848,10 +863,10 @@ export default function RoteiroExecucao() {
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <h1
-          className={`text-2xl font-bold mb-6 flex items-center gap-2 ${roteiro.status === "finalizado" ? "text-green-600" : ""}`}
+          className={`text-2xl font-bold mb-6 flex items-center gap-2 ${roteiroEstaFinalizado(roteiro.status) ? "text-green-600" : ""}`}
         >
           Execução do Roteiro: {roteiro.nome}
-          {roteiro.status === "finalizado" && (
+          {roteiroEstaFinalizado(roteiro.status) && (
             <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold">
               Finalizado
             </span>
@@ -1213,21 +1228,21 @@ export default function RoteiroExecucao() {
                   <button
                     key={maquina.id}
                     className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
-                      ${maquina.status === "finalizado" ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
-                      ${roteiro.status === "finalizado" ? "opacity-70 cursor-not-allowed" : ""}`}
+                      ${maquinaEstaConcluida(maquina.status) ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
+                      ${roteiroEstaFinalizado(roteiro.status) ? "opacity-70 cursor-not-allowed" : ""}`}
                     onClick={() => {
-                      if (roteiro.status === "finalizado") return;
+                      if (roteiroEstaFinalizado(roteiro.status)) return;
                       navigate(
                         `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
                       );
                     }}
-                    disabled={roteiro.status === "finalizado"}
+                    disabled={roteiroEstaFinalizado(roteiro.status)}
                   >
                     <span>🖲️ {maquina.nome}</span>
                     <span className="text-xs text-gray-500 ml-2">
                       ({maquina.tipo})
                     </span>
-                    {maquina.status === "finalizado" && (
+                    {maquinaEstaConcluida(maquina.status) && (
                       <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
                         Finalizada
                       </span>
@@ -1243,7 +1258,7 @@ export default function RoteiroExecucao() {
           </div>
         )}
         <div className="flex gap-3">
-          {roteiro.status !== "finalizado" && (
+          {!roteiroEstaFinalizado(roteiro.status) && (
             <button
               className="bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
               onClick={abrirModalFinalizacao}
