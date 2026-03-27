@@ -76,6 +76,17 @@ export default function RoteiroExecucao() {
       String(status || "").toLowerCase(),
     );
 
+  const roteiroTemPendencias = (roteiroAtual) => {
+    const lojas = Array.isArray(roteiroAtual?.lojas) ? roteiroAtual.lojas : [];
+    return lojas.some((loja) => {
+      const statusLojaConcluido = lojaEstaConcluida(loja?.status);
+      const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
+
+      if (!statusLojaConcluido) return true;
+      return maquinas.some((maquina) => !maquinaEstaConcluida(maquina?.status));
+    });
+  };
+
   const formatarMoedaBRL = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
       style: "currency",
@@ -130,6 +141,7 @@ export default function RoteiroExecucao() {
 
   useEffect(() => {
     if (!roteiro || !roteiroEstaFinalizado(roteiro.status)) return;
+    if (roteiroTemPendencias(roteiro)) return;
     if (!location.state?.origemMovimentacao) return;
     if (location.state?.pilotagemFinalizada) return;
 
@@ -863,10 +875,14 @@ export default function RoteiroExecucao() {
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <h1
-          className={`text-2xl font-bold mb-6 flex items-center gap-2 ${roteiroEstaFinalizado(roteiro.status) ? "text-green-600" : ""}`}
+          className={`text-2xl font-bold mb-6 flex items-center gap-2 ${
+            roteiroEstaFinalizado(roteiro.status) && !roteiroTemPendencias(roteiro)
+              ? "text-green-600"
+              : ""
+          }`}
         >
           Execução do Roteiro: {roteiro.nome}
-          {roteiroEstaFinalizado(roteiro.status) && (
+          {roteiroEstaFinalizado(roteiro.status) && !roteiroTemPendencias(roteiro) && (
             <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold">
               Finalizado
             </span>
@@ -1225,29 +1241,34 @@ export default function RoteiroExecucao() {
               {lojaSelecionada.maquinas &&
               lojaSelecionada.maquinas.length > 0 ? (
                 lojaSelecionada.maquinas.map((maquina) => (
+                  (() => {
+                    const maquinaConcluida = maquinaEstaConcluida(maquina.status);
+                    return (
                   <button
                     key={maquina.id}
                     className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
-                      ${maquinaEstaConcluida(maquina.status) ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
-                      ${roteiroEstaFinalizado(roteiro.status) ? "opacity-70 cursor-not-allowed" : ""}`}
+                      ${maquinaConcluida ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
+                      ${maquinaConcluida ? "opacity-70 cursor-not-allowed" : ""}`}
                     onClick={() => {
-                      if (roteiroEstaFinalizado(roteiro.status)) return;
+                      if (maquinaConcluida) return;
                       navigate(
                         `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
                       );
                     }}
-                    disabled={roteiroEstaFinalizado(roteiro.status)}
+                    disabled={maquinaConcluida}
                   >
                     <span>🖲️ {maquina.nome}</span>
                     <span className="text-xs text-gray-500 ml-2">
                       ({maquina.tipo})
                     </span>
-                    {maquinaEstaConcluida(maquina.status) && (
+                    {maquinaConcluida && (
                       <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
                         Finalizada
                       </span>
                     )}
                   </button>
+                    );
+                  })()
                 ))
               ) : (
                 <div className="text-gray-400">
@@ -1258,7 +1279,7 @@ export default function RoteiroExecucao() {
           </div>
         )}
         <div className="flex gap-3">
-          {!roteiroEstaFinalizado(roteiro.status) && (
+          {(!roteiroEstaFinalizado(roteiro.status) || roteiroTemPendencias(roteiro)) && (
             <button
               className="bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
               onClick={abrirModalFinalizacao}
