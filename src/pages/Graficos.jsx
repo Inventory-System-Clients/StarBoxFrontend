@@ -33,8 +33,22 @@ export function Graficos() {
   const [custoQuebraCaixa, setCustoQuebraCaixa] = useState(0);
   const toNumber = (valor) => Number(valor || 0);
 
-  const calcularQuebraCaixaComoCusto = (fluxos = []) => {
+  const calcularQuebraCaixaComoCusto = (fluxos = [], lojaIdAlvo = null) => {
+    const alvo = lojaIdAlvo === null || lojaIdAlvo === undefined ? null : String(lojaIdAlvo);
+
     return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      const lojaDoFluxo = String(
+        fluxo?.lojaId ||
+          fluxo?.movimentacao?.maquina?.lojaId ||
+          fluxo?.movimentacao?.maquina?.loja?.id ||
+          "",
+      );
+
+      // Segurança extra: desconta quebra apenas da loja selecionada nos filtros.
+      if (alvo && lojaDoFluxo !== alvo) {
+        return acc;
+      }
+
       const temDiferencaDireta =
         fluxo?.diferenca !== null &&
         fluxo?.diferenca !== undefined &&
@@ -242,7 +256,7 @@ export function Graficos() {
           ? fluxoResponse.data
           : fluxoResponse?.data?.rows || fluxoResponse?.data?.fluxos || [];
 
-        quebraPeriodo = calcularQuebraCaixaComoCusto(fluxos);
+        quebraPeriodo = calcularQuebraCaixaComoCusto(fluxos, lojaSelecionada);
       } catch {
         quebraPeriodo = 0;
       }
