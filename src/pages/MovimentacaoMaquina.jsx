@@ -377,7 +377,7 @@ export default function MovimentacaoMaquina() {
       : "Sem movimentação anterior";
     const nomeUsuario = usuario?.nome || "Usuário";
     const codigoMaquina = maquina?.codigo || "-";
-    const nomeMaquina = maquina?.nome || "Máquina";
+    const tipoMaquina = maquina?.tipo || "Máquina";
     const modeloMaquina = maquina?.modelo || null;
     const percentualComissao = Number(maquina?.comissaoLojaPercentual || 0);
     const percentualComissaoFormatado = percentualComissao.toLocaleString(
@@ -419,7 +419,7 @@ export default function MovimentacaoMaquina() {
       `Última movimentação da máquina: ${dataUltimaMovimentacao}`,
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
-      `${codigoMaquina} | ${nomeMaquina}${modeloMaquina ? ` | Modelo: ${modeloMaquina}` : ""}`,
+      `${codigoMaquina} | ${tipoMaquina}${modeloMaquina ? ` | Modelo: ${modeloMaquina}` : ""}`,
       `Produto abastecido: ${nomeProdutoAbastecido}$${
         quantidadeAbastecidaInformada > 0
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
