@@ -1051,7 +1051,7 @@ export default function MovimentacaoMaquina() {
             )}
 
             {!isFuncionarioAbastecedor && (
-              <div className="p-4 bg-linear-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
+              <div className="p-4 bg-linear-to-r from-green-100 to-emerald-200 border-4 border-green-500 rounded-lg shadow-lg shadow-green-300/60 animate-pulse">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1061,10 +1061,13 @@ export default function MovimentacaoMaquina() {
                     className="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
                   />
                   <div className="flex-1">
-                    <span className="text-sm font-bold text-green-900 flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-green-900 flex items-center gap-2">
                       💰 Retirada de Dinheiro
+                      <span className="px-2 py-0.5 rounded-full bg-green-700 text-white text-[10px] tracking-wide uppercase animate-pulse">
+                        Destaque
+                      </span>
                     </span>
-                    <p className="text-xs text-green-700 mt-1">
+                    <p className="text-xs text-green-800 mt-1 font-medium">
                       Marque esta opção se você está retirando dinheiro desta
                       máquina. Esta movimentação aparecerá na aba "Fluxo de
                       Caixa" para conferência pelo administrador.
