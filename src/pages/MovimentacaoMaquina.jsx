@@ -18,6 +18,8 @@ export default function MovimentacaoMaquina() {
     produto_id: "",
     quantidadeAtualMaquina: "",
     quantidadeAdicionada: "",
+    contadorInAnterior: "",
+    contadorOutAnterior: "",
     contadorInManual: "",
     contadorOutManual: "",
     contadorInDigital: "",
@@ -70,8 +72,6 @@ export default function MovimentacaoMaquina() {
           null;
 
         setUltimaMovimentacaoData(dataUltimaMovimentacao);
-        const primeiraMovimentacao = movimentacoesMaquina.length === 0;
-        setIsPrimeiraMovimentacao(primeiraMovimentacao);
         const capacidadePadrao = Number(
           maqRes.data?.capacidadePadrao ?? maqRes.data?.capacidade ?? 0,
         );
@@ -79,12 +79,7 @@ export default function MovimentacaoMaquina() {
         setFormData((prev) => ({
           ...prev,
           produto_id: ultimoProdRes.data?.produtoId || prev.produto_id,
-          quantidadeAtualMaquina:
-            primeiraMovimentacao &&
-            prev.quantidadeAtualMaquina === "" &&
-            capacidadePadrao > 0
-              ? String(capacidadePadrao)
-              : prev.quantidadeAtualMaquina,
+          quantidadeAtualMaquina: prev.quantidadeAtualMaquina,
         }));
       } catch {
         setError("Erro ao carregar dados da máquina ou produtos.");
@@ -96,7 +91,7 @@ export default function MovimentacaoMaquina() {
   }, [maquinaId, usuario]);
 
   useEffect(() => {
-    if (!isFuncionarioAbastecedor) return;
+    if (!isFuncionarioAbastecedor || isPrimeiraMovimentacao) return;
 
     setFormData((prev) => ({
       ...prev,
@@ -137,6 +132,10 @@ export default function MovimentacaoMaquina() {
           },
         );
 
+        if (typeof res.data?.primeiraMovimentacao === "boolean") {
+          setIsPrimeiraMovimentacao(res.data.primeiraMovimentacao);
+        }
+
         const quantidadeCalculada =
           res.data.quantidadeAtual >= 0 ? res.data.quantidadeAtual : 0;
 
@@ -170,6 +169,28 @@ export default function MovimentacaoMaquina() {
     formData.contadorOutDigital,
     formData.ignoreInOut,
   ]);
+
+  useEffect(() => {
+    if (!maquina || !isPrimeiraMovimentacao) return;
+    const capacidadePadrao = Number(
+      maquina?.capacidadePadrao ?? maquina?.capacidade ?? 0,
+    );
+
+    if (formData.quantidadeAtualMaquina === "" && capacidadePadrao > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        quantidadeAtualMaquina: String(capacidadePadrao),
+      }));
+    }
+  }, [maquina, isPrimeiraMovimentacao, formData.quantidadeAtualMaquina]);
+
+  useEffect(() => {
+    if (!isPrimeiraMovimentacao) return;
+    setFormData((prev) => ({
+      ...prev,
+      ignoreInOut: false,
+    }));
+  }, [isPrimeiraMovimentacao]);
 
   // Sugestão de abastecimento usando backend
   const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
@@ -291,12 +312,21 @@ export default function MovimentacaoMaquina() {
   };
 
   const obterResumoContadores = () => {
-    const inAnterior = Number(resumoCalculo?.contadorInSugerido || 0);
-    const outAnterior = Number(
-      resumoCalculo?.contadorOutUltimaMovimentacao ??
-        resumoCalculo?.contadorOutSugerido ??
-        0,
+    const inAnteriorPrimeira = parseNumeroOpcional(formData.contadorInAnterior);
+    const outAnteriorPrimeira = parseNumeroOpcional(
+      formData.contadorOutAnterior,
     );
+
+    const inAnterior = isPrimeiraMovimentacao
+      ? inAnteriorPrimeira ?? 0
+      : Number(resumoCalculo?.contadorInSugerido || 0);
+    const outAnterior = isPrimeiraMovimentacao
+      ? outAnteriorPrimeira ?? 0
+      : Number(
+          resumoCalculo?.contadorOutUltimaMovimentacao ??
+            resumoCalculo?.contadorOutSugerido ??
+            0,
+        );
 
     const inManual = parseNumeroOpcional(formData.contadorInManual);
     const outManual = parseNumeroOpcional(formData.contadorOutManual);
@@ -348,6 +378,7 @@ export default function MovimentacaoMaquina() {
     const nomeUsuario = usuario?.nome || "Usuário";
     const codigoMaquina = maquina?.codigo || "-";
     const nomeMaquina = maquina?.nome || "Máquina";
+    const modeloMaquina = maquina?.modelo || null;
     const percentualComissao = Number(maquina?.comissaoLojaPercentual || 0);
     const percentualComissaoFormatado = percentualComissao.toLocaleString(
       "pt-BR",
@@ -388,7 +419,7 @@ export default function MovimentacaoMaquina() {
       `Última movimentação da máquina: ${dataUltimaMovimentacao}`,
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
-      `${codigoMaquina} | ${nomeMaquina}`,
+      `${codigoMaquina} | ${nomeMaquina}${modeloMaquina ? ` | Modelo: ${modeloMaquina}` : ""}`,
       `Produto abastecido: ${nomeProdutoAbastecido}$${
         quantidadeAbastecidaInformada > 0
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
@@ -421,12 +452,20 @@ export default function MovimentacaoMaquina() {
     setSuccess("");
     try {
       const deveIgnorarContadores =
-        isFuncionarioAbastecedor || Boolean(formData.ignoreInOut);
+        (isFuncionarioAbastecedor && !isPrimeiraMovimentacao) ||
+        Boolean(formData.ignoreInOut);
       const parseContadorOpcional = (valor) => {
         if (valor === "" || valor === null || valor === undefined) return null;
         const numero = parseInt(valor, 10);
         return Number.isNaN(numero) ? null : numero;
       };
+
+      const contadorInAnteriorInformado = parseContadorOpcional(
+        formData.contadorInAnterior,
+      );
+      const contadorOutAnteriorInformado = parseContadorOpcional(
+        formData.contadorOutAnterior,
+      );
 
       const contadorInManualInformado = parseContadorOpcional(
         formData.contadorInManual,
@@ -440,6 +479,40 @@ export default function MovimentacaoMaquina() {
       const contadorOutDigitalInformado = parseContadorOpcional(
         formData.contadorOutDigital,
       );
+
+      const contadorInAtualInformado =
+        contadorInManualInformado ?? contadorInDigitalInformado;
+      const contadorOutAtualInformado =
+        contadorOutManualInformado ?? contadorOutDigitalInformado;
+
+      if (isPrimeiraMovimentacao) {
+        if (deveIgnorarContadores) {
+          setError(
+            "Primeira movimentação exige os contadores. Desmarque a opção de ignorar IN/OUT.",
+          );
+          return;
+        }
+
+        if (
+          contadorInAnteriorInformado === null ||
+          contadorOutAnteriorInformado === null
+        ) {
+          setError(
+            "Informe os contadores anteriores (IN e OUT) para a primeira movimentação.",
+          );
+          return;
+        }
+
+        if (
+          contadorInAtualInformado === null ||
+          contadorOutAtualInformado === null
+        ) {
+          setError(
+            "Informe os contadores atuais (IN e OUT) para a primeira movimentação.",
+          );
+          return;
+        }
+      }
 
       const produtosParaEnviar = [
         {
@@ -458,12 +531,18 @@ export default function MovimentacaoMaquina() {
         totalPre: parseInt(formData.quantidadeAtualMaquina) || 0,
         abastecidas: parseInt(formData.quantidadeAdicionada) || 0,
         fichas: parseInt(formData.fichas) || 0,
+        contadorInAnterior: isPrimeiraMovimentacao
+          ? contadorInAnteriorInformado
+          : null,
+        contadorOutAnterior: isPrimeiraMovimentacao
+          ? contadorOutAnteriorInformado
+          : null,
         contadorIn: deveIgnorarContadores
           ? null
-          : (contadorInManualInformado ?? contadorInDigitalInformado),
+          : contadorInAtualInformado,
         contadorOut: deveIgnorarContadores
           ? null
-          : (contadorOutManualInformado ?? contadorOutDigitalInformado),
+          : contadorOutAtualInformado,
         contadorInDigital: deveIgnorarContadores
           ? null
           : contadorInDigitalInformado,
@@ -473,7 +552,7 @@ export default function MovimentacaoMaquina() {
         quantidade_notas_entrada: null,
         valor_entrada_maquininha_pix: null,
         ignoreInOut: isFuncionarioAbastecedor
-          ? true
+          ? !isPrimeiraMovimentacao
           : Boolean(formData.ignoreInOut),
         retiradaEstoque: isFuncionarioAbastecedor
           ? false
@@ -541,6 +620,9 @@ export default function MovimentacaoMaquina() {
   if (loading)
     return <div className="p-20 text-center font-bold">Carregando...</div>;
 
+  const deveExibirContadores =
+    !isFuncionarioAbastecedor || isPrimeiraMovimentacao;
+
   return (
     <div className="min-h-screen bg-gray-100 text-[#24094E]">
       <Navbar />
@@ -589,9 +671,57 @@ export default function MovimentacaoMaquina() {
               quantos foram adicionados.
             </p>
           </div>
+          {isPrimeiraMovimentacao && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                Primeira movimentação: informe os contadores anteriores e os
+                atuais. O sistema criará dois registros automaticamente.
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isFuncionarioAbastecedor ? (
+            {deveExibirContadores ? (
               <>
+                {isPrimeiraMovimentacao && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        🧾 Contador IN Anterior
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorInAnterior"
+                        value={formData.contadorInAnterior}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                        required={isPrimeiraMovimentacao}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Contador IN antes da primeira movimentação
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        🧾 Contador OUT Anterior
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorOutAnterior"
+                        value={formData.contadorOutAnterior}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                        required={isPrimeiraMovimentacao}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Contador OUT antes da primeira movimentação
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -605,6 +735,11 @@ export default function MovimentacaoMaquina() {
                       className="input-field"
                       placeholder="0"
                       min="0"
+                      required={
+                        isPrimeiraMovimentacao &&
+                        !formData.usarContadorManual &&
+                        !formData.ignoreInOut
+                      }
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Número do contador IN Mecânico da máquina
@@ -622,6 +757,11 @@ export default function MovimentacaoMaquina() {
                       className="input-field"
                       placeholder="0"
                       min="0"
+                      required={
+                        isPrimeiraMovimentacao &&
+                        !formData.usarContadorManual &&
+                        !formData.ignoreInOut
+                      }
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Número do contador OUT Mecânico da máquina
@@ -659,6 +799,11 @@ export default function MovimentacaoMaquina() {
                         className="input-field"
                         placeholder="0"
                         min="0"
+                        required={
+                          isPrimeiraMovimentacao &&
+                          formData.usarContadorManual &&
+                          !formData.ignoreInOut
+                        }
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Número do contador IN digital (opcional)
@@ -676,6 +821,11 @@ export default function MovimentacaoMaquina() {
                         className="input-field"
                         placeholder="0"
                         min="0"
+                        required={
+                          isPrimeiraMovimentacao &&
+                          formData.usarContadorManual &&
+                          !formData.ignoreInOut
+                        }
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Número do contador OUT digital (opcional)
@@ -691,6 +841,7 @@ export default function MovimentacaoMaquina() {
                     checked={formData.ignoreInOut || false}
                     onChange={handleChange}
                     className="mr-2"
+                    disabled={isPrimeiraMovimentacao}
                   />
                   <label
                     htmlFor="ignoreInOut"
