@@ -207,6 +207,10 @@ function Manutencoes() {
   });
   const [manutencaoParaConcluir, setManutencaoParaConcluir] = useState(null);
   const [observacaoConclusao, setObservacaoConclusao] = useState("");
+  const [pecaSelecionada, setPecaSelecionada] = useState("");
+  const [quantidadePecaUsada, setQuantidadePecaUsada] = useState("1");
+  const [pecasCarrinho, setPecasCarrinho] = useState([]);
+  const [carregandoCarrinho, setCarregandoCarrinho] = useState(false);
 
   const carregarManutencoes = async () => {
     try {
@@ -673,26 +677,86 @@ function Manutencoes() {
     setError("");
     setSuccess("");
     setObservacaoConclusao("");
+    setPecaSelecionada("");
+    setQuantidadePecaUsada("1");
+    carregarCarrinho();
     setManutencaoParaConcluir(manutencao);
   };
 
   const fecharConclusaoManutencao = () => {
     setManutencaoParaConcluir(null);
     setObservacaoConclusao("");
+    setPecaSelecionada("");
+    setQuantidadePecaUsada("1");
+  };
+
+  const carregarCarrinho = async () => {
+    try {
+      setCarregandoCarrinho(true);
+      const res = await api.get(`/usuarios/${usuario?.id}/carrinho`);
+      setPecasCarrinho(res.data || []);
+    } catch (err) {
+      console.error("Erro ao carregar carrinho:", err?.response?.data || err);
+      setPecasCarrinho([]);
+    } finally {
+      setCarregandoCarrinho(false);
+    }
+  };
+
+  const obterQuantidadeDisponivelDaPecaSelecionada = () => {
+    if (!pecaSelecionada || pecaSelecionada === "nao-usar") return 0;
+
+    const peca = pecasCarrinho.find((item) => {
+      const id = item.pecaId || item.id || item.Peca?.id;
+      return String(id) === String(pecaSelecionada);
+    });
+
+    return Number(peca?.quantidade || 0);
   };
 
   const concluirManutencao = async (manutencao) => {
     if (!manutencao?.id) return;
 
     const observacaoLimpa = String(observacaoConclusao || "").trim();
-    if (!observacaoLimpa) {
-      setError("Observação é obrigatória ao concluir manutenção sem peça.");
+    if (!pecaSelecionada) {
+      setError("Selecione uma peça ou 'Não usar peças'.");
       return;
     }
 
-    if (observacaoLimpa.length > 100) {
-      setError("A observação deve ter no máximo 100 caracteres.");
-      return;
+    if (pecaSelecionada === "nao-usar") {
+      if (!observacaoLimpa) {
+        setError("Observação é obrigatória ao concluir manutenção sem peça.");
+        return;
+      }
+
+      if (observacaoLimpa.length > 100) {
+        setError("A observação deve ter no máximo 100 caracteres.");
+        return;
+      }
+    }
+
+    const quantidadeDisponivel = obterQuantidadeDisponivelDaPecaSelecionada();
+    const quantidadeSelecionada = Number.parseInt(quantidadePecaUsada, 10);
+
+    if (pecaSelecionada !== "nao-usar") {
+      if (
+        !Number.isInteger(quantidadeSelecionada) ||
+        quantidadeSelecionada <= 0
+      ) {
+        setError("Informe uma quantidade válida de peça para a manutenção.");
+        return;
+      }
+
+      if (
+        Number.isFinite(quantidadeDisponivel) &&
+        quantidadeDisponivel > 0 &&
+        quantidadeSelecionada > quantidadeDisponivel
+      ) {
+        setError(
+          `Quantidade solicitada maior que o disponível no carrinho (${quantidadeDisponivel}).`,
+        );
+        return;
+      }
     }
 
     try {
@@ -703,7 +767,11 @@ function Manutencoes() {
       await api.put(`/manutencoes/${manutencao.id}/concluir`, {
         status: "feito",
         concluidoPorId: usuario?.id || null,
-        explicacao_sem_peca: observacaoLimpa,
+        pecaId: pecaSelecionada !== "nao-usar" ? pecaSelecionada : null,
+        quantidade:
+          pecaSelecionada !== "nao-usar" ? quantidadeSelecionada : null,
+        explicacao_sem_peca:
+          pecaSelecionada === "nao-usar" ? observacaoLimpa : null,
       });
       if (detalhe?.id === manutencao.id) {
         setDetalhe(null);
@@ -1264,22 +1332,72 @@ function Manutencoes() {
               <h3 className="text-xl font-bold mb-3">Concluir manutenção</h3>
 
               <p className="text-sm text-gray-600 mb-3">
-                Como esta conclusão está sendo feita sem registrar peça, informe
-                a observação obrigatória.
+                Informe se usou peças e descreva a manutenção quando não usar
+                peça.
               </p>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Observação (obrigatória, máx. 100 caracteres)
-                </label>
-                <textarea
-                  className="input-field w-full"
-                  value={observacaoConclusao}
-                  onChange={(event) =>
-                    setObservacaoConclusao(event.target.value.slice(0, 100))
-                  }
-                  placeholder="Ex.: manutenção concluída sem uso de peça"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Peça utilizada
+                  </label>
+                  <select
+                    className="input-field w-full"
+                    value={pecaSelecionada}
+                    onChange={(event) => setPecaSelecionada(event.target.value)}
+                    disabled={carregandoCarrinho}
+                  >
+                    <option value="">Selecione uma opção</option>
+                    <option value="nao-usar">Não usar peças</option>
+                    {pecasCarrinho.map((item) => {
+                      const id = item.pecaId || item.id || item.Peca?.id;
+                      const nome =
+                        item.nome || item.Peca?.nome || item.peca?.nome || id;
+                      const quantidade = Number(item.quantidade || 0);
+                      return (
+                        <option key={id} value={String(id)}>
+                          {nome}
+                          {Number.isFinite(quantidade)
+                            ? ` (Disponível: ${quantidade})`
+                            : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {pecaSelecionada && pecaSelecionada !== "nao-usar" && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Quantidade utilizada
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="input-field w-full"
+                      value={quantidadePecaUsada}
+                      onChange={(event) =>
+                        setQuantidadePecaUsada(event.target.value)
+                      }
+                    />
+                  </div>
+                )}
+
+                {pecaSelecionada === "nao-usar" && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Observação (obrigatória, máx. 100 caracteres)
+                    </label>
+                    <textarea
+                      className="input-field w-full"
+                      value={observacaoConclusao}
+                      onChange={(event) =>
+                        setObservacaoConclusao(event.target.value.slice(0, 100))
+                      }
+                      placeholder="Ex.: manutenção concluída sem uso de peça"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 flex gap-2">

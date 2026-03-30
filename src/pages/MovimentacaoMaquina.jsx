@@ -375,6 +375,15 @@ export default function MovimentacaoMaquina() {
     const dataUltimaMovimentacao = ultimaMovimentacaoData
       ? new Date(ultimaMovimentacaoData).toLocaleString("pt-BR")
       : "Sem movimentação anterior";
+    const diasDesdeUltimaMovimentacao = ultimaMovimentacaoData
+      ? Math.max(
+          0,
+          Math.floor(
+            (Date.now() - new Date(ultimaMovimentacaoData).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : null;
     const nomeUsuario = usuario?.nome || "Usuário";
     const codigoMaquina = maquina?.codigo || "-";
     const tipoMaquina = maquina?.tipo || "Máquina";
@@ -417,6 +426,9 @@ export default function MovimentacaoMaquina() {
       `*${lojaCodigo} | ${lojaNome}*`,
       `Data: ${dataMovimentacao}`,
       `Última movimentação da máquina: ${dataUltimaMovimentacao}`,
+      ...(diasDesdeUltimaMovimentacao !== null
+        ? [`Cobrado com ${diasDesdeUltimaMovimentacao} dias`]
+        : []),
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
       `${codigoMaquina} | ${tipoMaquina}${modeloMaquina ? ` | Modelo: ${modeloMaquina}` : ""}`,

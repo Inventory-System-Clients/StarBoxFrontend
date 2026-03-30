@@ -7,7 +7,9 @@ import Footer from "../components/Footer.jsx";
 
 export default function PecasPage() {
   const { usuario } = useAuth();
-  const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isFuncionarioComum =
+    usuario?.role === "FUNCIONARIO" ||
+    usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const [pecas, setPecas] = useState([]);
   const [pecaEditando, setPecaEditando] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -46,7 +48,7 @@ export default function PecasPage() {
 
   // Adiciona peça ao carrinho do usuário
   const adicionarAoCarrinho = async (peca) => {
-    if (isFuncionario) {
+    if (isFuncionarioComum) {
       alert("Seu perfil não possui permissão para adicionar peças ao carrinho.");
       return;
     }
@@ -161,6 +163,24 @@ export default function PecasPage() {
     quantidadeCarrinho: carrinhoPorPecaId[String(peca.id)] || 0,
   }));
 
+  const itensCarrinho = isFuncionarioComum
+    ? carrinho.map((item) => {
+        const pecaId = item.pecaId || item.id || item.Peca?.id;
+        const quantidadeCarrinho = Number(item.quantidade || 0);
+        return {
+          id: pecaId,
+          nome:
+            item.nome ||
+            item.Peca?.nome ||
+            item.peca?.nome ||
+            `Peça ${pecaId}`,
+          categoria:
+            item.categoria || item.Peca?.categoria || item.peca?.categoria,
+          quantidadeCarrinho,
+        };
+      })
+    : pecasNoCarrinhoComZero;
+
   // Editar peça
   const handleEditar = (peca) => {
     setPecaEditando(peca);
@@ -245,81 +265,88 @@ export default function PecasPage() {
           Perfis autorizados podem adicionar peças ao carrinho para uso em roteiros.
         </p>
 
-        <div className="overflow-x-auto bg-white rounded-xl shadow p-4 border border-gray-100 mb-8">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Nome
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Categoria
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Quantidade
-                </th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {pecas.map((peca) => (
-                <tr key={peca.id}>
-                  <td className="px-4 py-2 font-semibold text-gray-800">
-                    {peca.nome}
-                  </td>
-                  <td className="px-4 py-2 text-gray-700">{peca.categoria}</td>
-                  <td className="px-4 py-2">
-                    <span className={`font-semibold ${peca.quantidade === 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {peca.quantidade}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center justify-center gap-2">
-                      {/* Botões para funcionários - Adicionar ao carrinho */}
-                      {(usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
-                        usuario?.role === "CONTROLADOR_ESTOQUE" ||
-                        usuario?.role === "MANUTENCAO" ||
-                        usuario?.role === "ADMIN" ||
-                        usuario?.role === "GERENCIADOR") && (
-                        <button
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold"
-                          onClick={() => adicionarAoCarrinho(peca)}
-                          title="Adicionar peça ao carrinho"
-                        >
-                          🛒 Carrinho
-                        </button>
-                      )}
-                      
-                      {/* Botões para admin/gerenciador - Editar e Excluir */}
-                      {(usuario?.role === "ADMIN" ||
-                        usuario?.role === "GERENCIADOR" ||
-                        usuario?.role === "CONTROLADOR_ESTOQUE") && (
-                        <>
-                          <button
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1"
-                            onClick={() => handleEditar(peca)}
-                            title="Editar peça"
-                          >
-                            ✏️ Editar
-                          </button>
-                          <button
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1"
-                            onClick={() => handleExcluir(peca.id, peca.nome)}
-                            title="Excluir peça"
-                          >
-                            🗑️ Excluir
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+        {!isFuncionarioComum && (
+          <div className="overflow-x-auto bg-white rounded-xl shadow p-4 border border-gray-100 mb-8">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Nome
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Categoria
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Quantidade
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                    Ações
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pecas.map((peca) => (
+                  <tr key={peca.id}>
+                    <td className="px-4 py-2 font-semibold text-gray-800">
+                      {peca.nome}
+                    </td>
+                    <td className="px-4 py-2 text-gray-700">
+                      {peca.categoria}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`font-semibold ${
+                          peca.quantidade === 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {peca.quantidade}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center justify-center gap-2">
+                        {(usuario?.role === "CONTROLADOR_ESTOQUE" ||
+                          usuario?.role === "MANUTENCAO" ||
+                          usuario?.role === "ADMIN" ||
+                          usuario?.role === "GERENCIADOR") && (
+                          <button
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold"
+                            onClick={() => adicionarAoCarrinho(peca)}
+                            title="Adicionar peça ao carrinho"
+                          >
+                            🛒 Carrinho
+                          </button>
+                        )}
+
+                        {(usuario?.role === "ADMIN" ||
+                          usuario?.role === "GERENCIADOR" ||
+                          usuario?.role === "CONTROLADOR_ESTOQUE") && (
+                          <>
+                            <button
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1"
+                              onClick={() => handleEditar(peca)}
+                              title="Editar peça"
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1"
+                              onClick={() => handleExcluir(peca.id, peca.nome)}
+                              title="Excluir peça"
+                            >
+                              🗑️ Excluir
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Carrinho do usuário */}
         {(usuario?.role === "FUNCIONARIO" ||
@@ -333,7 +360,7 @@ export default function PecasPage() {
               🛒 Meu Carrinho
             </h2>
 
-            {pecasNoCarrinhoComZero.length === 0 ? (
+            {itensCarrinho.length === 0 ? (
               <p className="text-gray-500">Nenhuma peça cadastrada.</p>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
@@ -352,7 +379,7 @@ export default function PecasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {pecasNoCarrinhoComZero.map((peca) => {
+                  {itensCarrinho.map((peca) => {
                     const pecaId = peca.id;
                     const quantidadeCarrinho = peca.quantidadeCarrinho || 0;
                     return (
