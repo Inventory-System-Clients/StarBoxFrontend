@@ -104,6 +104,76 @@ export default function FluxoCaixa() {
     }
   };
 
+  const fluxosComBaseContadores = (() => {
+    const parseNumero = (valor) => {
+      const numero = Number(valor);
+      return Number.isFinite(numero) ? numero : null;
+    };
+
+    const obterDataFluxo = (fluxo) => {
+      const data =
+        fluxo?.movimentacao?.dataColeta ||
+        fluxo?.movimentacao?.createdAt ||
+        fluxo?.createdAt ||
+        fluxo?.updatedAt;
+      const dataMs = new Date(data).getTime();
+      return Number.isFinite(dataMs) ? dataMs : 0;
+    };
+
+    const ordenadosPorData = [...fluxos].sort(
+      (a, b) => obterDataFluxo(a) - obterDataFluxo(b),
+    );
+
+    const ultimoContadorPorMaquina = new Map();
+    const enriquecidoPorId = new Map();
+
+    ordenadosPorData.forEach((fluxo) => {
+      const maquinaId = String(
+        fluxo?.movimentacao?.maquinaId || fluxo?.movimentacao?.maquina?.id || "",
+      );
+      const anterior = ultimoContadorPorMaquina.get(maquinaId) || {};
+
+      const contadorInAnteriorCalculado =
+        fluxo?.movimentacao?.contadorInAnterior ??
+        fluxo?.contadorInAnterior ??
+        fluxo?.ultimoContadorInRetirada ??
+        anterior.contadorInAtual ??
+        null;
+
+      const contadorOutAnteriorCalculado =
+        fluxo?.movimentacao?.contadorOutAnterior ??
+        fluxo?.contadorOutAnterior ??
+        fluxo?.ultimoContadorOutRetirada ??
+        anterior.contadorOutAtual ??
+        null;
+
+      enriquecidoPorId.set(fluxo.id, {
+        ultimoContadorInRetirada: contadorInAnteriorCalculado,
+        ultimoContadorOutRetirada: contadorOutAnteriorCalculado,
+      });
+
+      const contadorInAtual = parseNumero(
+        fluxo?.movimentacao?.contadorIn ?? fluxo?.movimentacao?.contadorInDigital,
+      );
+      const contadorOutAtual = parseNumero(
+        fluxo?.movimentacao?.contadorOut ??
+          fluxo?.movimentacao?.contadorOutDigital,
+      );
+
+      if (maquinaId) {
+        ultimoContadorPorMaquina.set(maquinaId, {
+          contadorInAtual,
+          contadorOutAtual,
+        });
+      }
+    });
+
+    return fluxos.map((fluxo) => ({
+      ...fluxo,
+      ...(enriquecidoPorId.get(fluxo.id) || {}),
+    }));
+  })();
+
   return (
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
       <Navbar />
@@ -236,7 +306,7 @@ export default function FluxoCaixa() {
                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                 <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
               </svg>
-              Retiradas de Dinheiro ({fluxos.length})
+              Retiradas de Dinheiro ({fluxosComBaseContadores.length})
             </h3>
             <p className="text-xs text-gray-600 mt-2 flex items-start gap-2">
               <span className="text-blue-600">💡</span>
@@ -250,7 +320,7 @@ export default function FluxoCaixa() {
 
           {loading ? (
             <PageLoader />
-          ) : fluxos.length === 0 ? (
+          ) : fluxosComBaseContadores.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📭</div>
               <p className="text-gray-600 font-medium">
@@ -289,7 +359,7 @@ export default function FluxoCaixa() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {fluxos.map(fluxo => (
+                  {fluxosComBaseContadores.map(fluxo => (
                     <ItemFluxoCaixa
                       key={fluxo.id}
                       fluxo={fluxo}
@@ -311,13 +381,93 @@ export default function FluxoCaixa() {
 
 // Componente Item da Tabela
 function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
+  const parseNumero = (valor) => {
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : null;
+  };
+
+  const calcularValorEsperadoPorContador = () => {
+    const movimentacao = fluxo?.movimentacao || {};
+    const maquina = movimentacao?.maquina || {};
+
+    const contadorInAtual = parseNumero(
+      movimentacao?.contadorIn ?? movimentacao?.contadorInDigital,
+    );
+    const contadorInAnterior = parseNumero(
+      movimentacao?.contadorInAnterior ??
+        fluxo?.contadorInAnterior ??
+        fluxo?.ultimoContadorInRetirada,
+    );
+
+    const contadorOutAtual = parseNumero(
+      movimentacao?.contadorOut ?? movimentacao?.contadorOutDigital,
+    );
+    const contadorOutAnterior = parseNumero(
+      movimentacao?.contadorOutAnterior ??
+        fluxo?.contadorOutAnterior ??
+        fluxo?.ultimoContadorOutRetirada,
+    );
+
+    const diferencaContadorIn =
+      contadorInAtual !== null && contadorInAnterior !== null
+        ? Math.max(0, contadorInAtual - contadorInAnterior)
+        : null;
+
+    const diferencaContadorOut =
+      contadorOutAtual !== null && contadorOutAnterior !== null
+        ? Math.max(0, contadorOutAtual - contadorOutAnterior)
+        : null;
+
+    const diferencaBase =
+      diferencaContadorIn !== null ? diferencaContadorIn : diferencaContadorOut;
+
+    const valorJogada = parseNumero(
+      maquina?.valorFicha ??
+        maquina?.valorJogada ??
+        movimentacao?.valorJogada ??
+        fluxo?.valorJogada,
+    );
+
+    if (diferencaBase === null || valorJogada === null || valorJogada <= 0) {
+      return null;
+    }
+
+    return diferencaBase / valorJogada;
+  };
+
+  const valorEsperadoCalculadoLocal = calcularValorEsperadoPorContador();
+  const valorEsperadoCalculadoBackend = parseNumero(
+    fluxo?.valorEsperadoCalculado,
+  );
+  const valorEsperadoInicial =
+    valorEsperadoCalculadoBackend ??
+    valorEsperadoCalculadoLocal ??
+    parseNumero(fluxo?.valorEsperado) ??
+    parseNumero(fluxo?.movimentacao?.valorFaturado) ??
+    0;
+
   const [editando, setEditando] = useState(false);
   const [formConferencia, setFormConferencia] = useState({
     valorRetirado: fluxo.valorRetirado || "",
-    valorEsperado: fluxo.valorEsperado || fluxo.movimentacao?.valorFaturado || "",
+    valorEsperado: valorEsperadoInicial,
     conferencia: fluxo.conferencia || "pendente",
     observacoes: fluxo.observacoes || ""
   });
+
+  useEffect(() => {
+    setFormConferencia({
+      valorRetirado: fluxo.valorRetirado || "",
+      valorEsperado: valorEsperadoInicial,
+      conferencia: fluxo.conferencia || "pendente",
+      observacoes: fluxo.observacoes || "",
+    });
+  }, [
+    fluxo.id,
+    fluxo.valorRetirado,
+    fluxo.conferencia,
+    fluxo.observacoes,
+    valorEsperadoInicial,
+  ]);
 
   const handleSalvar = () => {
     if (!formConferencia.valorRetirado || formConferencia.valorRetirado === "") {
@@ -345,9 +495,9 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     setEditando(false);
   };
 
-  const valorEsperado = editando 
-    ? parseFloat(formConferencia.valorEsperado) || 0 
-    : (fluxo.valorEsperado || fluxo.movimentacao?.valorFaturado || 0);
+  const valorEsperado = editando
+    ? parseFloat(formConferencia.valorEsperado) || 0
+    : valorEsperadoInicial;
   const valorRetirado = parseFloat(formConferencia.valorRetirado) || (fluxo.valorRetirado ? parseFloat(fluxo.valorRetirado) : null);
   const diferenca = valorRetirado !== null ? valorRetirado - valorEsperado : 0;
 
@@ -506,7 +656,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
                   setEditando(false);
                   setFormConferencia({
                     valorRetirado: fluxo.valorRetirado || "",
-                    valorEsperado: fluxo.movimentacao?.valorFaturado || "",
+                    valorEsperado: valorEsperadoInicial,
                     conferencia: fluxo.conferencia || "pendente",
                     observacoes: fluxo.observacoes || ""
                   });

@@ -192,6 +192,44 @@ export default function MovimentacaoMaquina() {
     }));
   }, [isPrimeiraMovimentacao]);
 
+  useEffect(() => {
+    const parseContadorOpcional = (valor) => {
+      if (valor === "" || valor === null || valor === undefined) return null;
+      const numero = parseInt(valor, 10);
+      return Number.isNaN(numero) ? null : numero;
+    };
+
+    const contadorInAtualInformado =
+      parseContadorOpcional(formData.contadorInManual) ??
+      parseContadorOpcional(formData.contadorInDigital);
+    const contadorOutAtualInformado =
+      parseContadorOpcional(formData.contadorOutManual) ??
+      parseContadorOpcional(formData.contadorOutDigital);
+
+    const deveMarcarRetiradaDinheiro =
+      !formData.ignoreInOut &&
+      contadorInAtualInformado !== null &&
+      contadorOutAtualInformado !== null;
+
+    setFormData((prev) => {
+      if (deveMarcarRetiradaDinheiro && !prev.retiradaDinheiro) {
+        return { ...prev, retiradaDinheiro: true };
+      }
+
+      if (!deveMarcarRetiradaDinheiro && prev.retiradaDinheiro) {
+        return { ...prev, retiradaDinheiro: false };
+      }
+
+      return prev;
+    });
+  }, [
+    formData.contadorInManual,
+    formData.contadorInDigital,
+    formData.contadorOutManual,
+    formData.contadorOutDigital,
+    formData.ignoreInOut,
+  ]);
+
   // Sugestão de abastecimento usando backend
   const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
   useEffect(() => {
@@ -493,6 +531,10 @@ export default function MovimentacaoMaquina() {
         contadorInManualInformado ?? contadorInDigitalInformado;
       const contadorOutAtualInformado =
         contadorOutManualInformado ?? contadorOutDigitalInformado;
+      const deveGerarFluxoCaixaAutomatico =
+        !deveIgnorarContadores &&
+        contadorInAtualInformado !== null &&
+        contadorOutAtualInformado !== null;
 
       if (isPrimeiraMovimentacao) {
         if (deveIgnorarContadores) {
@@ -572,9 +614,7 @@ export default function MovimentacaoMaquina() {
           ? formData.observacao || ""
           : "",
         produtos: produtosParaEnviar,
-        retiradaDinheiro: isFuncionarioAbastecedor
-          ? false
-          : formData.retiradaDinheiro || false,
+        retiradaDinheiro: deveGerarFluxoCaixaAutomatico,
       };
 
       const enviarMovimentacao = (confirmarUsoEstoqueLoja = false) =>
