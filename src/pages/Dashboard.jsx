@@ -2487,7 +2487,7 @@ export function Dashboard() {
             </div>
             {podeVerDefeituosasNoDashboard && (
               <div
-                className="stat-card order-3 md:order-none bg-linear-to-br from-amber-500 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+                className="stat-card order-3 md:order-0 bg-linear-to-br from-amber-500 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
                 onClick={() => navigate("/dashboard/pecas-defeituosas")}
               >
                 <div className="relative z-10">
@@ -2518,7 +2518,7 @@ export function Dashboard() {
             )}
             {/* Manutenções */}
             <div
-              className={`stat-card order-2 md:order-none bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
+              className={`stat-card order-2 md:order-0 bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
               {/* Injeta o CSS da animação blink-red para o card inteiro */}
