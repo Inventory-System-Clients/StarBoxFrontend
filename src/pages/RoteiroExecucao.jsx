@@ -37,6 +37,14 @@ export default function RoteiroExecucao() {
     etapa: 1,
     loading: false,
   });
+  const [modalNovaManutencao, setModalNovaManutencao] = useState({
+    aberto: false,
+    loading: false,
+  });
+  const [novaManutencaoRoteiro, setNovaManutencaoRoteiro] = useState({
+    maquinaId: "",
+    descricao: "",
+  });
 
   // Estados para manutenção
   const [manutencaoPendente, setManutencaoPendente] = useState(null);
@@ -257,6 +265,7 @@ export default function RoteiroExecucao() {
     }
 
     setLojaSelecionada(loja);
+    setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
 
     // Verificar se há manutenções pendentes nesta loja
     if (loja && loja.id) {
@@ -307,6 +316,56 @@ export default function RoteiroExecucao() {
     setManutencaoPendente(null);
     // Recarregar roteiro para atualizar status
     await carregarRoteiro();
+  };
+
+  const abrirModalNovaManutencao = () => {
+    setError("");
+    setSuccess("");
+    setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
+    setModalNovaManutencao({ aberto: true, loading: false });
+  };
+
+  const fecharModalNovaManutencao = () => {
+    if (modalNovaManutencao.loading) return;
+    setModalNovaManutencao({ aberto: false, loading: false });
+  };
+
+  const handleCriarManutencaoRoteiro = async () => {
+    if (!lojaSelecionada?.id) {
+      setError("Selecione uma loja para adicionar manutenção.");
+      return;
+    }
+
+    const descricaoLimpa = String(novaManutencaoRoteiro.descricao || "").trim();
+    if (!novaManutencaoRoteiro.maquinaId) {
+      setError("Selecione a máquina da manutenção.");
+      return;
+    }
+    if (!descricaoLimpa) {
+      setError("Descreva o que precisa ser feito na manutenção.");
+      return;
+    }
+
+    try {
+      setModalNovaManutencao((prev) => ({ ...prev, loading: true }));
+      setError("");
+      setSuccess("");
+
+      await api.post("/manutencoes", {
+        descricao: descricaoLimpa,
+        lojaId: lojaSelecionada.id,
+        maquinaId: novaManutencaoRoteiro.maquinaId,
+        funcionarioId: usuario?.id || null,
+      });
+
+      setSuccess("Manutenção criada com sucesso!");
+      setModalNovaManutencao({ aberto: false, loading: false });
+      setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
+      await carregarRoteiro();
+    } catch (err) {
+      setError(err?.response?.data?.error || "Erro ao criar manutenção.");
+      setModalNovaManutencao((prev) => ({ ...prev, loading: false }));
+    }
   };
 
   const handleLancarGasto = async () => {
@@ -1237,6 +1296,14 @@ export default function RoteiroExecucao() {
             <h3 className="text-xl font-bold mb-4">
               Máquinas da loja: {lojaSelecionada.nome}
             </h3>
+            <div className="mb-4">
+              <button
+                className="bg-indigo-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-indigo-700"
+                onClick={abrirModalNovaManutencao}
+              >
+                ➕ Adicionar manutenção
+              </button>
+            </div>
             <div className="space-y-3">
               {lojaSelecionada.maquinas &&
               lojaSelecionada.maquinas.length > 0 ? (
@@ -1408,6 +1475,74 @@ export default function RoteiroExecucao() {
                 onClick={confirmarSelecaoComJustificativa}
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={modalNovaManutencao.aberto}
+          onClose={fecharModalNovaManutencao}
+          title="Nova manutenção da loja"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                Máquina
+              </label>
+              <select
+                className="w-full p-3 border rounded-lg bg-white"
+                value={novaManutencaoRoteiro.maquinaId}
+                onChange={(e) =>
+                  setNovaManutencaoRoteiro((prev) => ({
+                    ...prev,
+                    maquinaId: e.target.value,
+                  }))
+                }
+              >
+                <option value="">Selecione uma máquina</option>
+                {(lojaSelecionada?.maquinas || []).map((maquina) => (
+                  <option key={maquina.id} value={maquina.id}>
+                    {maquina.codigo || "-"}
+                    {maquina.nome ? ` - ${maquina.nome}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                Descrição da manutenção
+              </label>
+              <textarea
+                rows="3"
+                className="w-full p-3 border rounded-lg bg-white resize-y"
+                placeholder="Descreva o que precisa ser feito..."
+                value={novaManutencaoRoteiro.descricao}
+                onChange={(e) =>
+                  setNovaManutencaoRoteiro((prev) => ({
+                    ...prev,
+                    descricao: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="btn-secondary"
+                onClick={fecharModalNovaManutencao}
+                disabled={modalNovaManutencao.loading}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleCriarManutencaoRoteiro}
+                disabled={modalNovaManutencao.loading}
+              >
+                {modalNovaManutencao.loading
+                  ? "Salvando..."
+                  : "Criar manutenção"}
               </button>
             </div>
           </div>
