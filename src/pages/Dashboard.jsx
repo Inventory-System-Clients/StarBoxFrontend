@@ -2030,6 +2030,16 @@ export function Dashboard() {
           </div>
         </div>
 
+        <div className="mb-6 md:hidden">
+          <button
+            onClick={() => navigate("/roteiros")}
+            className="w-full bg-linear-to-r from-blue-600 to-indigo-700 text-white font-bold px-4 py-3 rounded-xl shadow-md flex items-center justify-center gap-2"
+          >
+            <span className="text-xl">🗺️</span>
+            Ir para Rotas
+          </button>
+        </div>
+
         {/* Cards de Resumo com design moderno - Apenas para ADMIN */}
         {isAdminLike && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
@@ -2477,7 +2487,7 @@ export function Dashboard() {
             </div>
             {podeVerDefeituosasNoDashboard && (
               <div
-                className="stat-card bg-linear-to-br from-amber-500 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+                className="stat-card order-3 md:order-none bg-linear-to-br from-amber-500 to-orange-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
                 onClick={() => navigate("/dashboard/pecas-defeituosas")}
               >
                 <div className="relative z-10">
@@ -2508,7 +2518,7 @@ export function Dashboard() {
             )}
             {/* Manutenções */}
             <div
-              className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
+              className={`stat-card order-2 md:order-none bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
               {/* Injeta o CSS da animação blink-red para o card inteiro */}
