@@ -1121,7 +1121,6 @@ export function Relatorios() {
           const lojaNome = dadosLoja?.loja?.nome || nomeFallback;
           const fluxo = obterTotaisFluxoCaixaRelatorio(dadosLoja);
           const lucroBruto = calcularValorConsolidadoRelatorio(dadosLoja);
-          const lucroLiquido = calcularLucroLiquidoRelatorio(dadosLoja);
 
           const gastosFixosLista = extrairListaGastosFixos(
             gastosFixosResponse?.data,
@@ -1155,6 +1154,7 @@ export function Relatorios() {
           // gastos fixos cadastrados na loja + custo dos produtos que saíram.
           const custoBase = custoProdutos + custoFixo;
           const custoTotal = custoBase + toNumber(custoQuebraCaixa);
+          const lucroLiquido = lucroBruto - custoTotal;
           const custoVariavel = Math.max(
             0,
             custoTotal - custoProdutos - custoFixo,
@@ -1607,44 +1607,29 @@ export function Relatorios() {
           comparativoMensal,
         });
       } else if (consolidadoTodas) {
-        const response = await api.get("/relatorios/todas-lojas", {
-          params: { dataInicio, dataFim },
-        });
+        const idsTodasLojas = (Array.isArray(lojas) ? lojas : [])
+          .map((loja) => String(loja?.id || "").trim())
+          .filter(Boolean);
 
-        let relatorioTodasLojas = response.data;
-
-        try {
-          const gastosFixosPorLoja = await carregarGastosFixosPorLoja(
-            relatorioTodasLojas,
-          );
-
-          if (gastosFixosPorLoja.length > 0) {
-            relatorioTodasLojas = aplicarGastosFixosPorLojaNoConsolidado(
-              relatorioTodasLojas,
-              gastosFixosPorLoja,
-            );
-          }
-        } catch (erroGastosFixosTodasLojas) {
-          console.warn(
-            "Não foi possível recalcular os gastos fixos por lojaId no consolidado:",
-            erroGastosFixosTodasLojas,
-          );
-        }
+        const relatorioTodasLojas = await construirConsolidadoManualPorLojas(
+          idsTodasLojas,
+          dataInicio,
+          dataFim,
+        );
 
         let comparativoMensal = null;
         try {
           const dataInicioMesAnterior = obterMesmoDiaNoMesAnterior(dataInicio);
           const dataFimMesAnterior = obterMesmoDiaNoMesAnterior(dataFim);
 
-          const responseMesAnterior = await api.get("/relatorios/todas-lojas", {
-            params: {
-              dataInicio: dataInicioMesAnterior,
-              dataFim: dataFimMesAnterior,
-            },
-          });
+          const relatorioMesAnterior = await construirConsolidadoManualPorLojas(
+            idsTodasLojas,
+            dataInicioMesAnterior,
+            dataFimMesAnterior,
+          );
 
           const totaisAtual = relatorioTodasLojas?.totais || {};
-          const totaisAnterior = responseMesAnterior.data?.totais || {};
+          const totaisAnterior = relatorioMesAnterior?.totais || {};
 
           const valorConsolidadoAtual =
             toNumber(totaisAtual.lucroBrutoTotal) ||
