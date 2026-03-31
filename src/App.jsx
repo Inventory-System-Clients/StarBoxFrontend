@@ -1,3 +1,4 @@
+import React, { Suspense, lazy } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -43,6 +44,10 @@ import FluxoCaixa from "./pages/FluxoCaixa.jsx";
 import PecasDefeituosasDashboard from "./pages/PecasDefeituosasDashboard.jsx";
 import PecasDefeituosasAdminPage from "./pages/PecasDefeituosasAdminPage.jsx";
 import "./App.css";
+
+const CarrinhoDetalhePage = lazy(
+  () => import("./pages/CarrinhoDetalhePage.jsx"),
+);
 
 function AppRoutes() {
   // ...existing code...
@@ -323,6 +328,16 @@ function AppRoutes() {
         element={
           <PrivateRoute adminOnly>
             <GerenciarCarrinhosPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/carrinho/:funcionarioId"
+        element={
+          <PrivateRoute adminOnly>
+            <Suspense fallback={<div>Carregando...</div>}>
+              <CarrinhoDetalhePage />
+            </Suspense>
           </PrivateRoute>
         }
       />
