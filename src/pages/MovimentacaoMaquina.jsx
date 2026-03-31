@@ -329,7 +329,7 @@ export default function MovimentacaoMaquina() {
     });
   };
 
-  const abrirWhatsAppComMensagem = (mensagem) => {
+  const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
     const textoCodificado = encodeURIComponent(mensagem);
     const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
@@ -340,6 +340,12 @@ export default function MovimentacaoMaquina() {
       ? `https://wa.me/?text=${textoCodificado}`
       : `https://web.whatsapp.com/send?text=${textoCodificado}`;
 
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.location.href = whatsappUrl;
+      popupReservado.focus?.();
+      return true;
+    }
+
     const link = document.createElement("a");
     link.href = whatsappUrl;
     link.target = "_blank";
@@ -347,6 +353,8 @@ export default function MovimentacaoMaquina() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    return true;
   };
 
   const obterResumoContadores = () => {
@@ -385,7 +393,7 @@ export default function MovimentacaoMaquina() {
     return { inAnterior, inAtual, outAnterior, outAtual };
   };
 
-  const handleEnviarResumoWhatsApp = () => {
+  const montarResumoWhatsApp = () => {
     const { inAnterior, inAtual, outAnterior, outAtual } =
       obterResumoContadores();
 
@@ -456,7 +464,7 @@ export default function MovimentacaoMaquina() {
           `Especie.....: ${formatarMoeda(saldo)}`,
         ];
 
-    const mensagem = [
+    return [
       "STAR BOX",
       `*${lojaCodigo} | ${lojaNome}*`,
       `Data: ${dataMovimentacao}`,
@@ -477,10 +485,6 @@ export default function MovimentacaoMaquina() {
       ...(linhaComissao ? [linhaComissao] : []),
       ...blocoFinanceiro,
     ].join("\n");
-
-    abrirWhatsAppComMensagem(mensagem);
-
-    setSuccess("Resumo pronto! Escolha o contato no WhatsApp e envie.");
   };
 
   const handleChange = (e) => {
@@ -623,6 +627,8 @@ export default function MovimentacaoMaquina() {
           confirmarUsoEstoqueLoja,
         });
 
+      const popupReservado = window.open("about:blank", "_blank");
+
       try {
         await enviarMovimentacao(false);
       } catch (postError) {
@@ -647,6 +653,9 @@ export default function MovimentacaoMaquina() {
         );
 
         if (!confirmar) {
+          if (popupReservado && !popupReservado.closed) {
+            popupReservado.close();
+          }
           setError("Movimentacao cancelada. Origem de estoque nao confirmada.");
           return;
         }
@@ -654,7 +663,21 @@ export default function MovimentacaoMaquina() {
         await enviarMovimentacao(true);
       }
 
-      setSuccess("Movimentação registrada com sucesso!");
+      const mensagemWhatsApp = montarResumoWhatsApp();
+      const abriuWhatsApp = abrirWhatsAppComMensagem(
+        mensagemWhatsApp,
+        popupReservado,
+      );
+
+      if (!abriuWhatsApp) {
+        setSuccess(
+          "Movimentação registrada, mas o navegador bloqueou a abertura do WhatsApp.",
+        );
+      } else {
+        setSuccess(
+          "Movimentação registrada com sucesso e mensagem preparada no WhatsApp!",
+        );
+      }
       setTimeout(() => {
         navigate(`/roteiros/${roteiroId}/executar`, {
           replace: true,
@@ -1129,18 +1152,8 @@ export default function MovimentacaoMaquina() {
               >
                 Voltar
               </button>
-              <button
-                type="button"
-                onClick={handleEnviarResumoWhatsApp}
-                className="w-full md:w-auto px-4 py-2 rounded-lg font-bold text-sm bg-green-600 text-white hover:bg-green-700 transition-colors text-center"
-              >
-                <span className="md:hidden">Enviar para o WhatsApp</span>
-                <span className="hidden md:inline">
-                  Enviar informações para o WhatsApp
-                </span>
-              </button>
               <button type="submit" className="btn-primary w-full md:w-auto">
-                Registrar Movimentação
+                Salvar e Enviar no WhatsApp
               </button>
             </div>
             {error && <div className="text-red-600 mt-2">{error}</div>}

@@ -11,6 +11,7 @@ import {
   extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
+  somarPeluciasUsadasMovimentacoes,
   somarSaldoEstoqueUsuario,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
@@ -582,6 +583,12 @@ export default function RoteiroExecucao() {
         finalizacaoData,
       });
 
+      const funcionarioDoRoteiro =
+        finalizacaoData?.funcionarioId ||
+        finalizacaoData?.funcionario?.id ||
+        roteiro?.funcionarioId ||
+        usuario?.id;
+
       let totalPeluciasUsadas = extrairNumero(
         finalizacaoData?.totalPeluciasUsadas,
         finalizacaoData?.totalPeluciasUtilizadas,
@@ -601,11 +608,6 @@ export default function RoteiroExecucao() {
           const estoqueResMe = await api.get("/estoque-usuarios/me");
           saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResMe.data);
         } catch {
-          const funcionarioDoRoteiro =
-            finalizacaoData?.funcionarioId ||
-            finalizacaoData?.funcionario?.id ||
-            roteiro?.funcionarioId;
-
           if (funcionarioDoRoteiro) {
             try {
               const estoqueRes = await api.get(
@@ -619,7 +621,7 @@ export default function RoteiroExecucao() {
         }
       }
 
-      const saldoPeluciasInicial = extrairNumero(
+      let saldoPeluciasInicial = extrairNumero(
         finalizacaoData?.saldoPeluciasInicialUsuario,
         finalizacaoData?.saldoInicialEstoqueUsuario,
         finalizacaoData?.peluciasIniciaisRoteiro,
@@ -635,11 +637,42 @@ export default function RoteiroExecucao() {
         roteiro?.estoqueInicialUsuario,
       );
 
+      if (totalPeluciasUsadas === null || totalPeluciasUsadas <= 0) {
+        try {
+          const movRes = await api.get("/movimentacoes", {
+            params: {
+              roteiroId: id,
+            },
+          });
+
+          const listaMov = Array.isArray(movRes.data)
+            ? movRes.data
+            : movRes.data?.rows || movRes.data?.movimentacoes || [];
+
+          const totalPorMovimentacoes = somarPeluciasUsadasMovimentacoes(
+            listaMov,
+            funcionarioDoRoteiro,
+          );
+
+          if (Number.isFinite(totalPorMovimentacoes) && totalPorMovimentacoes > 0) {
+            totalPeluciasUsadas = totalPorMovimentacoes;
+          }
+        } catch {
+          // Sem fallback adicional.
+        }
+      }
+
       if (saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null) {
         totalPeluciasUsadas = Math.max(
           0,
           saldoPeluciasInicial - saldoPeluciasEstoque,
         );
+      } else if (
+        saldoPeluciasInicial === null &&
+        saldoPeluciasEstoque !== null &&
+        totalPeluciasUsadas !== null
+      ) {
+        saldoPeluciasInicial = saldoPeluciasEstoque + totalPeluciasUsadas;
       }
 
       const despesaTotal = extrairNumero(
@@ -672,6 +705,79 @@ export default function RoteiroExecucao() {
           finalizacaoData?.pendencias ||
           [],
       );
+
+      if (
+        manutencoesRealizadas.length === 0 &&
+        manutencoesNaoRealizadas.length === 0
+      ) {
+        try {
+          const manutRes = await api.get("/manutencoes", {
+            params: {
+              roteiroId: id,
+            },
+          });
+
+          const listaManut = Array.isArray(manutRes.data)
+            ? manutRes.data
+            : manutRes.data?.rows || [];
+
+          const idsLojasRoteiro = new Set(
+            (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
+              .map((loja) => String(loja?.id || ""))
+              .filter(Boolean),
+          );
+
+          const relacionadasRoteiro = listaManut.filter((item) => {
+            const rotaId = String(item?.roteiroId || item?.roteiro?.id || "");
+            const lojaIdItem = String(item?.lojaId || item?.loja?.id || "");
+
+            if (rotaId && rotaId === String(id)) return true;
+            if (idsLojasRoteiro.has(lojaIdItem)) return true;
+            return false;
+          });
+
+          const doFuncionarioRota = relacionadasRoteiro.filter((item) => {
+            const funcionarioId = String(
+              item?.funcionarioId ||
+                item?.funcionario?.id ||
+                item?.concluidoPorId ||
+                item?.concluidoPor?.id ||
+                "",
+            );
+
+            return !funcionarioDoRoteiro || funcionarioId === String(funcionarioDoRoteiro);
+          });
+
+          const feitas = doFuncionarioRota
+            .filter((item) => {
+              const status = String(item?.status || "").toLowerCase();
+              return ["feito", "concluida", "concluido", "finalizada", "finalizado"].includes(
+                status,
+              );
+            })
+            .map(
+              (item) => item?.descricao || item?.maquina?.nome || item?.maquinaNome,
+            )
+            .filter(Boolean);
+
+          const pendentes = doFuncionarioRota
+            .filter((item) => {
+              const status = String(item?.status || "").toLowerCase();
+              return !["feito", "concluida", "concluido", "finalizada", "finalizado"].includes(
+                status,
+              );
+            })
+            .map(
+              (item) => item?.descricao || item?.maquina?.nome || item?.maquinaNome,
+            )
+            .filter(Boolean);
+
+          manutencoesRealizadas.push(...Array.from(new Set(feitas)));
+          manutencoesNaoRealizadas.push(...Array.from(new Set(pendentes)));
+        } catch {
+          // Sem fallback adicional.
+        }
+      }
 
       let kmInicialVeiculo = extrairNumero(
         finalizacaoData?.kmInicialVeiculo,

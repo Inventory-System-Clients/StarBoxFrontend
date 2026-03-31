@@ -198,14 +198,39 @@ export const extrairKmMovimentacoesRoteiro = (
     .reverse()
     .find((mov) => normalizarTexto(mov?.tipo).toLowerCase() === "devolucao");
 
-  const parseKm = (mov) => {
-    const numero = Number(mov?.km ?? mov?.quilometragem ?? mov?.odometro);
+  const parseKmPorTipo = (mov, tipo) => {
+    const chavesPreferenciais =
+      tipo === "retirada"
+        ? [
+            mov?.kmInicial,
+            mov?.quilometragemInicial,
+            mov?.kmRetirada,
+            mov?.odometroInicial,
+            mov?.km,
+            mov?.quilometragem,
+            mov?.odometro,
+          ]
+        : [
+            mov?.kmFinal,
+            mov?.quilometragemFinal,
+            mov?.kmDevolucao,
+            mov?.odometroFinal,
+            mov?.km,
+            mov?.quilometragem,
+            mov?.odometro,
+          ];
+
+    const numero = Number(
+      chavesPreferenciais.find(
+        (valor) => valor !== null && valor !== undefined && valor !== "",
+      ),
+    );
     return Number.isFinite(numero) ? numero : null;
   };
 
   return {
-    kmInicial: parseKm(primeiraRetirada),
-    kmFinal: parseKm(ultimaDevolucao),
+    kmInicial: parseKmPorTipo(primeiraRetirada, "retirada"),
+    kmFinal: parseKmPorTipo(ultimaDevolucao, "devolucao"),
   };
 };
 
@@ -251,6 +276,10 @@ export const montarMensagemFinalizacaoRoteiro = ({
   const kmFinal = Number.isFinite(Number(kmFinalVeiculo))
     ? Number(kmFinalVeiculo)
     : null;
+  const kmRodado =
+    kmInicial !== null && kmFinal !== null ? Math.max(0, kmFinal - kmInicial) : null;
+  const manutencoesFeitasLista = toArray(manutencoesRealizadas).filter(Boolean);
+  const manutencoesNaoFeitasLista = toArray(manutencoesNaoRealizadas).filter(Boolean);
 
   return [
     "STAR BOX",
@@ -259,6 +288,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Roteiro: ${normalizarTexto(roteiroNome) || "-"}`,
     `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
     `KM final (devolucao): ${kmFinal !== null ? kmFinal : "Nao informado"}`,
+    `KM rodado: ${kmRodado !== null ? kmRodado : "Nao informado"}`,
     `Pontos feitos: ${formatarLista(lojasFeitas)}`,
     `Pontos nao feitos: ${formatarLista(lojasNaoFeitas)}`,
     `Maquinas feitas: ${formatarLista(maquinasFeitas)}`,
@@ -267,8 +297,8 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Pelucias restantes no estoque do usuario: ${saldoEstoque !== null ? saldoEstoque : "Nao informado"}`,
     `Despesa total: ${formatarMoedaBRL(despesaTotal)}`,
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
-    `Manutencoes realizadas: ${formatarLista(manutencoesRealizadas)}`,
-    `Manutencoes nao realizadas: ${formatarLista(manutencoesNaoRealizadas)}`,
+    `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,
+    `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,
   ].join("\n");
 };
 

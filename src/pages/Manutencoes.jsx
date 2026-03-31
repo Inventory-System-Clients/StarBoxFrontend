@@ -37,6 +37,17 @@ const abrirWhatsAppEmNovaAba = ({ whatsappUrl, popupReservado }) => {
   return false;
 };
 
+const montarWhatsAppUrl = (mensagem) => {
+  const textoCodificado = encodeURIComponent(String(mensagem || ""));
+  const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  );
+
+  return isMobile
+    ? `https://wa.me/?text=${textoCodificado}`
+    : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+};
+
 const montarMensagemDetalhesManutencao = (detalhe) => {
   if (!detalhe) return "";
 
@@ -66,6 +77,35 @@ const montarMensagemDetalhesManutencao = (detalhe) => {
     `Concluída em: ${concluidaEm}`,
     `Ponto: ${lojaNome}`,
     `Máquina: ${maquinaCodigo} - ${maquinaNome}`,
+  ].join("\n");
+};
+
+const montarMensagemConclusaoManutencao = ({
+  manutencao,
+  usuarioNome,
+  acao,
+  observacao,
+  pecaUsada,
+}) => {
+  const dataHora = new Date().toLocaleString("pt-BR");
+  const lojaNome = manutencao?.loja?.nome || "-";
+  const maquinaCodigo = manutencao?.maquina?.codigo || "-";
+  const maquinaNome = manutencao?.maquina?.nome || "-";
+  const descricao = manutencao?.descricao || "-";
+  const usuarioAcao = usuarioNome || "Usuário";
+
+  return [
+    "STAR BOX",
+    "*Atualização de Manutenção*",
+    `Data/Hora: ${dataHora}`,
+    `Ponto: ${lojaNome}`,
+    `Máquina: ${maquinaCodigo} - ${maquinaNome}`,
+    `Usuário: ${usuarioAcao}`,
+    "___________________________________",
+    `Descrição: ${descricao}`,
+    `Ação: ${acao}`,
+    `Peça: ${pecaUsada || "-"}`,
+    `Observação: ${observacao || "-"}`,
   ].join("\n");
 };
 
@@ -714,8 +754,22 @@ function Manutencoes() {
     return Number(peca?.quantidade || 0);
   };
 
+  const obterNomePecaSelecionada = () => {
+    if (!pecaSelecionada) return "-";
+    if (pecaSelecionada === "nao-usar") return "Não usar peças";
+
+    const peca = pecasCarrinho.find((item) => {
+      const id = item.pecaId || item.id || item.Peca?.id;
+      return String(id) === String(pecaSelecionada);
+    });
+
+    return peca?.nome || peca?.Peca?.nome || peca?.peca?.nome || pecaSelecionada;
+  };
+
   const concluirManutencao = async (manutencao) => {
     if (!manutencao?.id) return;
+
+    const popupReservado = window.open("about:blank", "_blank");
 
     const observacaoLimpa = String(observacaoConclusao || "").trim();
     if (!pecaSelecionada) {
@@ -773,13 +827,42 @@ function Manutencoes() {
         explicacao_sem_peca:
           pecaSelecionada === "nao-usar" ? observacaoLimpa : null,
       });
+
+      const mensagemWhatsApp = montarMensagemConclusaoManutencao({
+        manutencao,
+        usuarioNome: usuario?.nome,
+        acao: "Concluiu manutenção",
+        observacao:
+          pecaSelecionada === "nao-usar"
+            ? observacaoLimpa || "-"
+            : "-",
+        pecaUsada:
+          pecaSelecionada !== "nao-usar"
+            ? `${obterNomePecaSelecionada()} (x${quantidadeSelecionada})`
+            : obterNomePecaSelecionada(),
+      });
+
+      const abriuWhatsApp = abrirWhatsAppEmNovaAba({
+        whatsappUrl: montarWhatsAppUrl(mensagemWhatsApp),
+        popupReservado,
+      });
+
       if (detalhe?.id === manutencao.id) {
         setDetalhe(null);
       }
       fecharConclusaoManutencao();
-      setSuccess("Manutenção marcada como feita!");
+      if (!abriuWhatsApp) {
+        setSuccess(
+          "Manutenção marcada como feita, mas o navegador bloqueou a abertura do WhatsApp.",
+        );
+      } else {
+        setSuccess("Manutenção marcada como feita e mensagem preparada no WhatsApp!");
+      }
       await carregarManutencoes();
     } catch (err) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
       setError(
         err?.response?.data?.error || "Erro ao marcar manutenção como feita.",
       );
