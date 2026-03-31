@@ -1,4 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+// Função utilitária para buscar saldo do depósito principal para múltiplos produtos
+async function buscarSaldosDepositoPrincipal(produtoIds) {
+  if (!Array.isArray(produtoIds) || produtoIds.length === 0) return {};
+  try {
+    // Busca a loja depósito principal
+    const lojasRes = await api.get("/lojas");
+    const deposito = (lojasRes.data || []).find((l) => l.isDepositoPrincipal);
+    if (!deposito) return {};
+    // Busca o estoque do depósito principal
+    const estoqueRes = await api.get(`/estoque-lojas/${deposito.id}`);
+    const estoque = Array.isArray(estoqueRes.data) ? estoqueRes.data : [];
+    // Monta um map produtoId -> quantidade
+    const saldos = {};
+    for (const pid of produtoIds) {
+      const item = estoque.find((e) => String(e.produtoId) === String(pid));
+      saldos[pid] = item ? Number(item.quantidade) : 0;
+    }
+    return saldos;
+  } catch {
+    return {};
+  }
+}
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import api from "../services/api";
@@ -35,6 +57,8 @@ const formatarDataHora = (valor) => {
 };
 
 export default function EstoqueUsuarios() {
+  // Saldos do depósito principal para os produtos selecionados no modal
+  const [saldosDeposito, setSaldosDeposito] = useState({});
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === "ADMIN";
   const isControlador = usuario?.role === "CONTROLADOR_ESTOQUE";
@@ -467,6 +491,9 @@ export default function EstoqueUsuarios() {
     setMovimentacoesForm([criarLinhaMovimentacao(produtoInicial)]);
     setMovimentacaoErro("");
     setMostrarModalMovimentacao(true);
+
+    // Buscar saldo do depósito principal para o produto inicial
+    buscarSaldosDepositoPrincipal([produtoInicial]).then(setSaldosDeposito);
   };
 
   const fecharModalMovimentacao = () => {
@@ -501,6 +528,18 @@ export default function EstoqueUsuarios() {
         idx === indice ? { ...item, [campo]: valorFinal } : item,
       ),
     );
+
+    // Se trocar produto, buscar saldo do depósito principal para todos produtos do form
+    if (campo === "produtoId") {
+      const novosIds = [
+        ...new Set([
+          ...movimentacoesForm.map((m, i) =>
+            i === indice ? valorFinal : m.produtoId,
+          ),
+        ]),
+      ];
+      buscarSaldosDepositoPrincipal(novosIds).then(setSaldosDeposito);
+    }
   };
 
   const lancarMovimentacao = async (event) => {
@@ -1032,7 +1071,7 @@ export default function EstoqueUsuarios() {
 
         {isGestorEstoque && mostrarModalMovimentacao ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+            <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl max-h-[90vh] flex flex-col">
               <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-bold text-gray-900">
                   Movimentacao de estoque do usuario
@@ -1048,7 +1087,8 @@ export default function EstoqueUsuarios() {
               </div>
 
               <form
-                className="space-y-4 px-6 py-5"
+                className="space-y-4 px-6 py-5 overflow-y-auto flex-1"
+                style={{ maxHeight: "70vh" }}
                 onSubmit={lancarMovimentacao}
               >
                 {/* Aviso sobre desconto do depósito principal */}
@@ -1082,6 +1122,10 @@ export default function EstoqueUsuarios() {
                     const saldoLinha = toNumberOrZero(
                       saldoAtualPorProduto.get(String(linha.produtoId)),
                     );
+
+                    // Saldo do depósito principal para o produto
+                    const saldoDeposito =
+                      saldosDeposito[String(linha.produtoId)] ?? null;
 
                     return (
                       <div
@@ -1179,6 +1223,17 @@ export default function EstoqueUsuarios() {
                               ? ` ${produtoLinha.emoji || ""} ${produtoLinha.nome}`
                               : ""}
                           </p>
+                          {/* Alerta de saldo do depósito principal insuficiente */}
+                          {linha.tipoMovimentacao === "entrada" &&
+                          saldoDeposito !== null &&
+                          Number(linha.quantidade) > saldoDeposito ? (
+                            <div className="mt-2 rounded bg-amber-100 border border-amber-300 px-3 py-2 text-xs text-amber-900">
+                              Atenção: O depósito principal possui apenas{" "}
+                              <strong>{saldoDeposito}</strong> unidade(s) deste
+                              produto. A quantidade informada é maior que o
+                              disponível no depósito.
+                            </div>
+                          ) : null}
 
                           {movimentacoesForm.length > 1 ? (
                             <button
