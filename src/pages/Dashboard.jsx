@@ -349,6 +349,8 @@ export function Dashboard() {
     usuario?.role === "GERENTE";
   const podeVerDefeituosasNoDashboard =
     usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
+  const resumoCardsGridClass = "grid gap-4 md:gap-6 mb-8";
+  const atalhosAdminLikeGridClass = "grid gap-4 md:gap-6 mb-8";
   const [stats, setStats] = useState({
     alertas: [],
     balanco: null,
@@ -2028,7 +2030,7 @@ export function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header com boas-vindas */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2 text-[#24094E]">
               <span className="bg-linear-to-r from-[#62A1D9] via-[#A6806A] to-[#733D38] text-transparent bg-clip-text">
@@ -2098,11 +2100,16 @@ export function Dashboard() {
 
         {/* Cards de Resumo com design moderno - Apenas para ADMIN */}
         {isAdminLike && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+          <div
+            className={resumoCardsGridClass}
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            }}
+          >
             {/* Faturamento Semanal - Ocupa 2 colunas */}
             {usuario?.role === "ADMIN" && (
               <div
-                className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2 cursor-pointer"
+                className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer 2xl:col-span-2"
                 onClick={abrirDetalheComparativoMensal}
               >
                 <div className="relative z-10">
@@ -2296,7 +2303,12 @@ export function Dashboard() {
 
         {/* Financeiro, Veículos, Quebra de Ordem, Estoque e Manutenções */}
         {isAdminLike ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-6 mb-8">
+          <div
+            className={atalhosAdminLikeGridClass}
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            }}
+          >
             {/* Financeiro */}
             {usuario?.role === "ADMIN" && (
               <div
@@ -2480,11 +2492,10 @@ export function Dashboard() {
           </div>
         ) : (
           <div
-            className={`grid grid-cols-1 ${
-              podeVerDefeituosasNoDashboard
-                ? "md:grid-cols-4"
-                : "md:grid-cols-3"
-            } gap-4 md:gap-6 mb-8`}
+            className="grid gap-4 md:gap-6 mb-8"
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            }}
           >
             {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
               <div

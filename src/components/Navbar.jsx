@@ -22,7 +22,7 @@ export default function Navbar() {
   useEffect(() => {
     const handleResize = () => {
       // Desktop mantém links visíveis. Menu compacto apenas para tamanhos menores.
-      const shouldCompact = window.innerWidth < 1024;
+      const shouldCompact = window.innerWidth < 1280;
       setUseCompactMenu((prev) =>
         prev === shouldCompact ? prev : shouldCompact,
       );
@@ -57,10 +57,10 @@ export default function Navbar() {
           "linear-gradient(90deg, #62A1D9 0%, #24094E 35%, #24094E 100%)",
       }}
     >
-      <div className="w-full px-0 sm:px-2 lg:px-3">
-        <div className="flex items-center justify-between h-30 w-full">
+      <div className="w-full px-2 sm:px-3 lg:px-4">
+        <div className="flex items-center justify-between w-full min-h-18 py-2 gap-2">
           {/* Logo e Nome */}
-          <div className="flex items-center relative min-w-0">
+          <div className="flex items-center relative min-w-0 flex-1">
             <Link
               to="/"
               className="flex items-center space-x-2 sm:space-x-3 group min-w-0 relative z-10"
@@ -68,7 +68,7 @@ export default function Navbar() {
               <img
                 src="/starbox-logo.png"
                 alt="StarBox Logo"
-                className="pl-1 sm:pl-2 w-18 h-7 sm:w-24 sm:h-9 lg:w-30 lg:h-10 object-contain transition-transform duration-300 group-hover:scale-105"
+                className="pl-1 sm:pl-2 w-20 h-8 sm:w-24 sm:h-9 lg:w-30 lg:h-10 object-contain transition-transform duration-300 group-hover:scale-105"
                 style={{
                   maxWidth: "150px",
                   height: "auto",
@@ -81,7 +81,7 @@ export default function Navbar() {
             </Link>
 
             {/* Menu Desktop */}
-            <div className={`${useCompactMenu ? "hidden" : "hidden lg:block"} ml-4`}>
+            <div className={`${useCompactMenu ? "hidden" : "hidden xl:block"} ml-4`}>
               <div className="flex items-center space-x-2 whitespace-nowrap">
                 <NavLink to="/" active={isActive("/")}>
                   📊 Dashboard
@@ -156,19 +156,19 @@ export default function Navbar() {
           </div>
 
           {/* User Info e Logout */}
-          <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 pr-1 sm:pr-2">
+          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0 pr-1 sm:pr-2 min-w-0">
             <button
               onClick={toggleMenu}
-              className={`${useCompactMenu ? "" : "lg:hidden"} p-2 rounded-lg hover:bg-white/10 transition-colors`}
+              className={`${useCompactMenu ? "" : "xl:hidden"} p-2 rounded-lg hover:bg-white/10 transition-colors`}
             >
               {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
 
-            <div className="hidden md:block text-right bg-white/5 px-4 py-2 rounded-lg border border-white/10">
-              <div className="text-sm font-semibold text-white">
+            <div className="hidden xl:block text-right bg-white/5 px-3 py-2 rounded-lg border border-white/10 max-w-55">
+              <div className="text-sm font-semibold text-white truncate">
                 {usuario?.nome || "Usuário"}
               </div>
-              <div className="text-xs text-accent-cream flex items-center justify-end gap-1">
+              <div className="text-xs text-accent-cream flex items-center justify-end gap-1 truncate">
                 {usuario?.role === "ADMIN"
                   ? "🛡️ Administrador"
                   : usuario?.role === "CONTROLADOR_ESTOQUE"
@@ -185,7 +185,7 @@ export default function Navbar() {
 
             <button
               onClick={handleLogout}
-              className="bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-1.5"
+              className="bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-1.5 whitespace-nowrap"
             >
               <LogoutIcon />
               <span className="hidden sm:inline">Sair</span>
@@ -197,7 +197,7 @@ export default function Navbar() {
       {/* Menu Mobile Dropdown */}
       {isMenuOpen && (
         <div
-          className={`${useCompactMenu ? "" : "lg:hidden"} bg-gray-900 border-t border-white/10 animate-fade-in-down`}
+          className={`${useCompactMenu ? "" : "xl:hidden"} bg-gray-900 border-t border-white/10 animate-fade-in-down`}
         >
           <div className="px-4 py-3 space-y-2">
             <MobileNavLink to="/" active={isActive("/")} onClick={closeMenu}>
