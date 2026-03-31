@@ -1,3 +1,22 @@
+// Função utilitária para buscar saldo do depósito principal para múltiplos produtos
+async function buscarSaldosDepositoPrincipal(produtoIds, api) {
+  if (!Array.isArray(produtoIds) || produtoIds.length === 0) return {};
+  try {
+    const lojasRes = await api.get("/lojas");
+    const deposito = (lojasRes.data || []).find((l) => l.isDepositoPrincipal);
+    if (!deposito) return {};
+    const estoqueRes = await api.get(`/estoque-lojas/${deposito.id}`);
+    const estoque = Array.isArray(estoqueRes.data) ? estoqueRes.data : [];
+    const saldos = {};
+    for (const pid of produtoIds) {
+      const item = estoque.find((e) => String(e.produtoId) === String(pid));
+      saldos[pid] = item ? Number(item.quantidade) : 0;
+    }
+    return saldos;
+  } catch {
+    return {};
+  }
+}
 // Adiciona CSS para animação de piscar vermelho
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -18,6 +37,8 @@ import DashboardGastosRoteirosTab from "../components/DashboardGastosRoteirosTab
 import Swal from "sweetalert2";
 
 export function Dashboard() {
+  // Saldos do depósito principal para os produtos selecionados no modal de loja
+  const [saldosDeposito, setSaldosDeposito] = useState({});
   const blinkRedStyle = `
                 /* Define a animação brusca */
 @keyframes blinkBruscoRed {
@@ -223,6 +244,18 @@ export function Dashboard() {
       }
       return novos;
     });
+
+    // Se trocar produto, buscar saldo do depósito principal para todos produtos do form
+    if (field === "produtoId") {
+      const novosIds = [
+        ...new Set([
+          ...produtosMovimentacao.map((m, i) =>
+            i === index ? value : m.produtoId,
+          ),
+        ]),
+      ];
+      buscarSaldosDepositoPrincipal(novosIds, api).then(setSaldosDeposito);
+    }
   };
   // ...já declarado acima...
   // removido reloadAfterModal/setReloadAfterModal pois não são usados
@@ -549,7 +582,8 @@ export function Dashboard() {
 
           const roteirosDoUsuario = roteirosLista.filter(
             (roteiro) =>
-              String(roteiro?.funcionarioId || "") === String(usuario?.id || ""),
+              String(roteiro?.funcionarioId || "") ===
+              String(usuario?.id || ""),
           );
 
           const lojasPermitidasPorRoteiro = new Set(
@@ -719,7 +753,9 @@ export function Dashboard() {
           })
           .catch(() => ({ data: [] })),
         api
-          .get(`/fluxo-caixa?dataInicio=${dataInicioBusca}&dataFim=${dataFimBusca}&status=todos`)
+          .get(
+            `/fluxo-caixa?dataInicio=${dataInicioBusca}&dataFim=${dataFimBusca}&status=todos`,
+          )
           .catch(() => ({ data: [] })),
       ]);
 
@@ -740,7 +776,10 @@ export function Dashboard() {
         if (!lojaId) return;
 
         const dataMov = new Date(
-          mov?.dataColeta || mov?.data || mov?.dataMovimentacao || mov?.createdAt,
+          mov?.dataColeta ||
+            mov?.data ||
+            mov?.dataMovimentacao ||
+            mov?.createdAt,
         );
         if (Number.isNaN(dataMov.getTime())) return;
 
@@ -1743,7 +1782,6 @@ export function Dashboard() {
     return <PageLoader />;
   }
 
-
   console.log("Estado stats no render:", stats);
   console.log("Fichas no render:", stats.balanco?.totais?.totalFichas);
   console.log("LucroPorDia no render:", stats.balanco?.lucroPorDia);
@@ -1791,7 +1829,8 @@ export function Dashboard() {
             </div>
 
             <form
-              className="space-y-6"
+              className="space-y-6 overflow-y-auto flex-1"
+              style={{ maxHeight: "70vh" }}
               onSubmit={async (e) => {
                 e.preventDefault();
                 setMovimentacaoEnviando(true);
@@ -1845,69 +1884,86 @@ export function Dashboard() {
               </div>
 
               {/* Loop dos Produtos */}
-              {produtosMovimentacao.map((p, idx) => (
-                <div key={idx} className="flex gap-2 mb-2 items-center">
-                  {/* Select de Produto */}
-                  <select
-                    value={p.produtoId}
-                    onChange={(e) =>
-                      handleProdutoChange(idx, "produtoId", e.target.value)
-                    }
-                    className="input-field flex-1"
-                    required
-                  >
-                    <option value="">Produto...</option>
-                    {produtos.map((prod) => (
-                      <option key={prod.id} value={prod.id}>
-                        {prod.nome}
-                      </option>
-                    ))}
-                  </select>
+              {produtosMovimentacao.map((p, idx) => {
+                const saldoDeposito =
+                  saldosDeposito[String(p.produtoId)] ?? null;
+                return (
+                  <div key={idx} className="flex flex-col gap-1 mb-2">
+                    <div className="flex gap-2 items-center">
+                      {/* Select de Produto */}
+                      <select
+                        value={p.produtoId}
+                        onChange={(e) =>
+                          handleProdutoChange(idx, "produtoId", e.target.value)
+                        }
+                        className="input-field flex-1"
+                        required
+                      >
+                        <option value="">Produto...</option>
+                        {produtos.map((prod) => (
+                          <option key={prod.id} value={prod.id}>
+                            {prod.nome}
+                          </option>
+                        ))}
+                      </select>
 
-                  {/* Input de Quantidade */}
-                  <input
-                    type="number"
-                    min="1"
-                    value={p.quantidade}
-                    onChange={(e) =>
-                      handleProdutoChange(idx, "quantidade", e.target.value)
-                    }
-                    placeholder="Qtd"
-                    className="input-field w-20"
-                    required
-                    onWheel={(e) => e.target.blur()}
-                  />
+                      {/* Input de Quantidade */}
+                      <input
+                        type="number"
+                        min="1"
+                        value={p.quantidade}
+                        onChange={(e) =>
+                          handleProdutoChange(idx, "quantidade", e.target.value)
+                        }
+                        placeholder="Qtd"
+                        className="input-field w-20"
+                        required
+                        onWheel={(e) => e.target.blur()}
+                      />
 
-                  {/* Select de Tipo (Entrada/Saída) */}
-                  <select
-                    value={p.tipoMovimentacao || "saida"}
-                    onChange={(e) =>
-                      handleProdutoChange(
-                        idx,
-                        "tipoMovimentacao",
-                        e.target.value,
-                      )
-                    }
-                    className="input-field w-28"
-                    required
-                  >
-                    <option value="saida">Saída</option>
-                    <option value="entrada">Entrada</option>
-                  </select>
+                      {/* Select de Tipo (Entrada/Saída) */}
+                      <select
+                        value={p.tipoMovimentacao || "saida"}
+                        onChange={(e) =>
+                          handleProdutoChange(
+                            idx,
+                            "tipoMovimentacao",
+                            e.target.value,
+                          )
+                        }
+                        className="input-field w-28"
+                        required
+                      >
+                        <option value="saida">Saída</option>
+                        <option value="entrada">Entrada</option>
+                      </select>
 
-                  {/* Botão Remover (X) */}
-                  {produtosMovimentacao.length > 1 && (
-                    <button
-                      type="button"
-                      className="text-red-500 hover:text-red-700 font-bold p-2"
-                      onClick={() => handleRemoveProduto(idx)}
-                      title="Remover item"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
+                      {/* Botão Remover (X) */}
+                      {produtosMovimentacao.length > 1 && (
+                        <button
+                          type="button"
+                          className="text-red-500 hover:text-red-700 font-bold p-2"
+                          onClick={() => handleRemoveProduto(idx)}
+                          title="Remover item"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {/* Alerta de saldo do depósito principal insuficiente */}
+                    {p.tipoMovimentacao === "entrada" &&
+                    saldoDeposito !== null &&
+                    Number(p.quantidade) > saldoDeposito ? (
+                      <div className="mt-1 rounded bg-amber-100 border border-amber-300 px-3 py-2 text-xs text-amber-900">
+                        Atenção: O depósito principal possui apenas{" "}
+                        <strong>{saldoDeposito}</strong> unidade(s) deste
+                        produto. A quantidade informada é maior que o disponível
+                        no depósito.
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
 
               {/* Botão Adicionar Mais Produtos */}
               <button
@@ -2045,126 +2101,128 @@ export function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
             {/* Faturamento Semanal - Ocupa 2 colunas */}
             {usuario?.role === "ADMIN" && (
-            <div
-              className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2 cursor-pointer"
-              onClick={abrirDetalheComparativoMensal}
-            >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium opacity-90">
-                    Comparativo Mensal
-                  </h3>
-                  <svg
-                    className="w-8 h-8 opacity-80"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
-                    />
-                  </svg>
-                </div>
-                <p className="text-3xl font-bold">
-                  R${" "}
+              <div
+                className="stat-card bg-linear-to-br from-yellow-500 to-orange-500 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 lg:col-span-2 cursor-pointer"
+                onClick={abrirDetalheComparativoMensal}
+              >
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium opacity-90">
+                      Comparativo Mensal
+                    </h3>
+                    <svg
+                      className="w-8 h-8 opacity-80"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-3xl font-bold">
+                    R${" "}
+                    {(() => {
+                      // Exibir o lucro líquido consolidado do mês atual (todas as lojas)
+                      const hoje = new Date();
+                      const diaAtual = hoje.getDate();
+                      const mesAtual = hoje.getMonth() + 1;
+                      const anoAtual = hoje.getFullYear();
+                      let totalLucroMes = 0;
+                      for (let d = 1; d <= diaAtual; d++) {
+                        const dataStr = `${anoAtual}-${String(mesAtual).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                        totalLucroMes += Number(
+                          stats.balanco?.lucroPorDia?.[dataStr] || 0,
+                        );
+                      }
+                      return totalLucroMes.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                      });
+                    })()}
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
+                      💵 R${" "}
+                      {Number(
+                        stats.balanco?.totais?.totalDinheiro || 0,
+                      ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
+                      💳 R${" "}
+                      {Number(
+                        stats.balanco?.totais?.totalCartaoPix || 0,
+                      ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <p className="text-xs opacity-75 mt-1">💰 Último mês</p>
+                  {/* Comparação de lucro com mês anterior */}
                   {(() => {
-                    // Exibir o lucro líquido consolidado do mês atual (todas as lojas)
+                    // Supondo que stats.balanco.lucroPorDia[YYYY-MM-DD] existe
                     const hoje = new Date();
                     const diaAtual = hoje.getDate();
                     const mesAtual = hoje.getMonth() + 1;
                     const anoAtual = hoje.getFullYear();
-                    let totalLucroMes = 0;
-                    for (let d = 1; d <= diaAtual; d++) {
-                      const dataStr = `${anoAtual}-${String(mesAtual).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                      totalLucroMes += Number(stats.balanco?.lucroPorDia?.[dataStr] || 0);
+                    function getLucroPeriodo(stats, ano, mes, dias) {
+                      let total = 0;
+                      for (let d = 1; d <= dias; d++) {
+                        const dataStr = `${ano}-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                        total += Number(
+                          stats.balanco?.lucroPorDia?.[dataStr] || 0,
+                        );
+                      }
+                      return total;
                     }
-                    return totalLucroMes.toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                    });
+                    const lucroPeriodoAtual = getLucroPeriodo(
+                      stats,
+                      anoAtual,
+                      mesAtual,
+                      diaAtual,
+                    );
+                    const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
+                    const anoMesAnterior =
+                      mesAtual === 1 ? anoAtual - 1 : anoAtual;
+                    const lucroPeriodoAnterior = getLucroPeriodo(
+                      stats,
+                      anoMesAnterior,
+                      mesAnterior,
+                      diaAtual,
+                    );
+                    const diff = lucroPeriodoAtual - lucroPeriodoAnterior;
+                    const percent =
+                      lucroPeriodoAnterior > 0
+                        ? (diff / lucroPeriodoAnterior) * 100
+                        : 0;
+                    return (
+                      <div className="mt-2 text-xs font-semibold">
+                        Renda bruta até hoje vs mês passado:
+                        <span
+                          className={
+                            percent >= 0 ? "text-green-700" : "text-red-700"
+                          }
+                        >
+                          {percent >= 0 ? "▲" : "▼"}{" "}
+                          {Math.abs(percent).toFixed(1)}%
+                        </span>
+                        <span className="ml-2 text-gray-700">
+                          (R${" "}
+                          {lucroPeriodoAtual.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}{" "}
+                          vs R${" "}
+                          {lucroPeriodoAnterior.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                          )
+                        </span>
+                      </div>
+                    );
                   })()}
-                </p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
-                    💵 R${" "}
-                    {Number(
-                      stats.balanco?.totais?.totalDinheiro || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-xs opacity-75 bg-white/20 rounded px-1.5 py-0.5">
-                    💳 R${" "}
-                    {Number(
-                      stats.balanco?.totais?.totalCartaoPix || 0,
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </span>
                 </div>
-                <p className="text-xs opacity-75 mt-1">💰 Último mês</p>
-                {/* Comparação de lucro com mês anterior */}
-                {(() => {
-                  // Supondo que stats.balanco.lucroPorDia[YYYY-MM-DD] existe
-                  const hoje = new Date();
-                  const diaAtual = hoje.getDate();
-                  const mesAtual = hoje.getMonth() + 1;
-                  const anoAtual = hoje.getFullYear();
-                  function getLucroPeriodo(stats, ano, mes, dias) {
-                    let total = 0;
-                    for (let d = 1; d <= dias; d++) {
-                      const dataStr = `${ano}-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                      total += Number(
-                        stats.balanco?.lucroPorDia?.[dataStr] || 0,
-                      );
-                    }
-                    return total;
-                  }
-                  const lucroPeriodoAtual = getLucroPeriodo(
-                    stats,
-                    anoAtual,
-                    mesAtual,
-                    diaAtual,
-                  );
-                  const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
-                  const anoMesAnterior =
-                    mesAtual === 1 ? anoAtual - 1 : anoAtual;
-                  const lucroPeriodoAnterior = getLucroPeriodo(
-                    stats,
-                    anoMesAnterior,
-                    mesAnterior,
-                    diaAtual,
-                  );
-                  const diff = lucroPeriodoAtual - lucroPeriodoAnterior;
-                  const percent =
-                    lucroPeriodoAnterior > 0
-                      ? (diff / lucroPeriodoAnterior) * 100
-                      : 0;
-                  return (
-                    <div className="mt-2 text-xs font-semibold">
-                    Renda bruta até hoje vs mês passado:
-                      <span
-                        className={
-                          percent >= 0 ? "text-green-700" : "text-red-700"
-                        }
-                      >
-                        {percent >= 0 ? "▲" : "▼"}{" "}
-                        {Math.abs(percent).toFixed(1)}%
-                      </span>
-                      <span className="ml-2 text-gray-700">
-                        (R${" "}
-                        {lucroPeriodoAtual.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                        })}{" "}
-                        vs R${" "}
-                        {lucroPeriodoAnterior.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                        })}
-                        )
-                      </span>
-                    </div>
-                  );
-                })()}
               </div>
-            </div>
             )}
             {/* Prêmios Saídos */}
             <div className="stat-card bg-linear-to-br from-green-500 to-green-600 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30">
@@ -2241,31 +2299,33 @@ export function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-6 mb-8">
             {/* Financeiro */}
             {usuario?.role === "ADMIN" && (
-            <div
-              className="stat-card bg-linear-to-br from-blue-500 to-blue-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
-              onClick={() => navigate("/financeiro/")}
-            >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium opacity-90">Financeiro</h3>
-                  <svg
-                    className="w-8 h-8 opacity-80"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+              <div
+                className="stat-card bg-linear-to-br from-blue-500 to-blue-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer"
+                onClick={() => navigate("/financeiro/")}
+              >
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium opacity-90">
+                      Financeiro
+                    </h3>
+                    <svg
+                      className="w-8 h-8 opacity-80"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-3xl font-bold">💸</p>
+                  <p className="text-xs opacity-75 mt-1">Gestão Financeira</p>
                 </div>
-                <p className="text-3xl font-bold">💸</p>
-                <p className="text-xs opacity-75 mt-1">Gestão Financeira</p>
               </div>
-            </div>
             )}
             {/* Veículos */}
             <div
@@ -2701,119 +2761,118 @@ export function Dashboard() {
         {isAdminLike && <DashboardGastosRoteirosTab />}
 
         {/* Estatísticas de Produtos Totais - Apenas para ADMIN */}
-        {isAdminLike &&
-          stats.balanco?.distribuicaoLojas?.length > 0 && (
-            <div className="card-gradient mb-8 border-l-4 border-pink-500 p-4 sm:p-8 rounded-xl shadow-md">
-              <div
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between cursor-pointer hover:bg-pink-50/50 transition-colors rounded-xl p-2 sm:p-4 -m-2"
-                onClick={toggleDetalhesProdutos}
-              >
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                    <span className="bg-linear-to-br from-pink-500 to-pink-600 p-2 sm:p-3 rounded-xl text-white">
-                      🎁
-                    </span>
-                    Total de Produtos Vendidos
-                  </h2>
-                  <p className="text-gray-600 text-sm sm:text-base">
-                    Soma de todos os pontos no período
-                  </p>
-                </div>
-                <div className="text-left sm:text-right mt-4 sm:mt-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl sm:text-5xl font-bold text-gradient">
-                      {stats.balanco.distribuicaoLojas.reduce(
-                        (total, loja) =>
-                          total + (loja.produtosVendidos || loja.sairam || 0),
-                        0,
-                      )}
-                    </span>
-                    <span className="text-lg sm:text-2xl text-gray-600">
-                      unidades
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-500 mt-2">
-                    📊 {stats.balanco.distribuicaoLojas.length}{" "}
-                    {stats.balanco.distribuicaoLojas.length === 1
-                      ? "ponto"
-                      : "pontos"}{" "}
-                    ativas
-                  </p>
-                  <button className="mt-2 text-xs text-pink-600 font-semibold hover:text-pink-700 flex items-center gap-1">
-                    {mostrarDetalhesProdutos ? "▼ Ocultar" : "▶ Ver detalhes"}
-                  </button>
-                </div>
+        {isAdminLike && stats.balanco?.distribuicaoLojas?.length > 0 && (
+          <div className="card-gradient mb-8 border-l-4 border-pink-500 p-4 sm:p-8 rounded-xl shadow-md">
+            <div
+              className="flex flex-col sm:flex-row items-start sm:items-center justify-between cursor-pointer hover:bg-pink-50/50 transition-colors rounded-xl p-2 sm:p-4 -m-2"
+              onClick={toggleDetalhesProdutos}
+            >
+              <div className="flex-1 min-w-0">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                  <span className="bg-linear-to-br from-pink-500 to-pink-600 p-2 sm:p-3 rounded-xl text-white">
+                    🎁
+                  </span>
+                  Total de Produtos Vendidos
+                </h2>
+                <p className="text-gray-600 text-sm sm:text-base">
+                  Soma de todos os pontos no período
+                </p>
               </div>
+              <div className="text-left sm:text-right mt-4 sm:mt-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-5xl font-bold text-gradient">
+                    {stats.balanco.distribuicaoLojas.reduce(
+                      (total, loja) =>
+                        total + (loja.produtosVendidos || loja.sairam || 0),
+                      0,
+                    )}
+                  </span>
+                  <span className="text-lg sm:text-2xl text-gray-600">
+                    unidades
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                  📊 {stats.balanco.distribuicaoLojas.length}{" "}
+                  {stats.balanco.distribuicaoLojas.length === 1
+                    ? "ponto"
+                    : "pontos"}{" "}
+                  ativas
+                </p>
+                <button className="mt-2 text-xs text-pink-600 font-semibold hover:text-pink-700 flex items-center gap-1">
+                  {mostrarDetalhesProdutos ? "▼ Ocultar" : "▶ Ver detalhes"}
+                </button>
+              </div>
+            </div>
 
-              {/* Detalhes de Vendas por Produto */}
-              {mostrarDetalhesProdutos && (
-                <div className="mt-6 pt-6 border-t-2 border-pink-200">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="text-2xl">📦</span>
-                    Vendas Detalhadas por Produto
-                  </h3>
+            {/* Detalhes de Vendas por Produto */}
+            {mostrarDetalhesProdutos && (
+              <div className="mt-6 pt-6 border-t-2 border-pink-200">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">📦</span>
+                  Vendas Detalhadas por Produto
+                </h3>
 
-                  {vendasPorProduto.length > 0 ? (
-                    <div className="space-y-4">
-                      {vendasPorProduto.map((produto) => (
-                        <div
-                          key={produto.id}
-                          className="bg-linear-to-r from-pink-50 to-purple-50 p-5 rounded-xl border-2 border-pink-200 hover:shadow-md transition-all"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-lg font-bold text-gray-900 flex items-center gap-3">
-                              <span className="bg-pink-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold">
-                                {produto.totalVendido}
-                              </span>
-                              <span className="text-2xl">{produto.emoji}</span>
-                              <span>{produto.nome}</span>
-                            </h4>
-                            <span className="badge bg-pink-100 text-pink-700 border-pink-300 text-base px-4 py-2">
-                              {produto.totalVendido}{" "}
-                              {produto.totalVendido === 1
-                                ? "unidade vendida"
-                                : "unidades vendidas"}
+                {vendasPorProduto.length > 0 ? (
+                  <div className="space-y-4">
+                    {vendasPorProduto.map((produto) => (
+                      <div
+                        key={produto.id}
+                        className="bg-linear-to-r from-pink-50 to-purple-50 p-5 rounded-xl border-2 border-pink-200 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-lg font-bold text-gray-900 flex items-center gap-3">
+                            <span className="bg-pink-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold">
+                              {produto.totalVendido}
                             </span>
-                          </div>
+                            <span className="text-2xl">{produto.emoji}</span>
+                            <span>{produto.nome}</span>
+                          </h4>
+                          <span className="badge bg-pink-100 text-pink-700 border-pink-300 text-base px-4 py-2">
+                            {produto.totalVendido}{" "}
+                            {produto.totalVendido === 1
+                              ? "unidade vendida"
+                              : "unidades vendidas"}
+                          </span>
+                        </div>
 
-                          {/* Vendas por Ponto */}
-                          <div className="mt-3 pl-10">
-                            <p className="text-sm font-semibold text-gray-700 mb-2">
-                              📍 Vendas por ponto:
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                              {Object.entries(produto.vendasPorLoja).map(
-                                ([loja, quantidade]) => (
-                                  <div
-                                    key={loja}
-                                    className="bg-white px-3 py-2 rounded-lg border border-pink-200 flex items-center justify-between"
-                                  >
-                                    <span className="text-sm text-gray-700">
-                                      {loja}
-                                    </span>
-                                    <span className="text-sm font-bold text-pink-600">
-                                      {quantidade}
-                                    </span>
-                                  </div>
-                                ),
-                              )}
-                            </div>
+                        {/* Vendas por Ponto */}
+                        <div className="mt-3 pl-10">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">
+                            📍 Vendas por ponto:
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {Object.entries(produto.vendasPorLoja).map(
+                              ([loja, quantidade]) => (
+                                <div
+                                  key={loja}
+                                  className="bg-white px-3 py-2 rounded-lg border border-pink-200 flex items-center justify-between"
+                                >
+                                  <span className="text-sm text-gray-700">
+                                    {loja}
+                                  </span>
+                                  <span className="text-sm font-bold text-pink-600">
+                                    {quantidade}
+                                  </span>
+                                </div>
+                              ),
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-                      <p className="text-gray-600">
-                        Carregando detalhes dos produtos...
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">
+                      Carregando detalhes dos produtos...
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Estoque dos Depósitos - Apenas para ADMIN */}
         {isAdminLike && lojasComEstoque.length > 0 && (
