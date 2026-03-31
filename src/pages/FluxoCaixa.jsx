@@ -110,6 +110,30 @@ export default function FluxoCaixa() {
       return Number.isFinite(numero) ? numero : null;
     };
 
+    const obterContadorInAtual = (fluxo) =>
+      parseNumero(
+        fluxo?.movimentacao?.contadorIn ?? fluxo?.movimentacao?.contadorInDigital,
+      );
+
+    const obterContadorOutAtual = (fluxo) =>
+      parseNumero(
+        fluxo?.movimentacao?.contadorOut ??
+          fluxo?.movimentacao?.contadorOutDigital,
+      );
+
+    const normalizarNumeroOrdenacao = (
+      valor,
+      fallback = Number.MAX_SAFE_INTEGER,
+    ) => (valor === null ? fallback : valor);
+
+    const obterIdMovimentacao = (fluxo) =>
+      String(fluxo?.movimentacao?.id || fluxo?.id || "");
+
+    const obterMaquinaId = (fluxo) =>
+      String(
+        fluxo?.movimentacao?.maquinaId || fluxo?.movimentacao?.maquina?.id || "",
+      );
+
     const obterDataFluxo = (fluxo) => {
       const data =
         fluxo?.movimentacao?.dataColeta ||
@@ -120,17 +144,48 @@ export default function FluxoCaixa() {
       return Number.isFinite(dataMs) ? dataMs : 0;
     };
 
-    const ordenadosPorData = [...fluxos].sort(
-      (a, b) => obterDataFluxo(a) - obterDataFluxo(b),
-    );
+    const ordenadosPorData = [...fluxos]
+      .map((fluxo, indiceOriginal) => ({ fluxo, indiceOriginal }))
+      .sort((itemA, itemB) => {
+        const a = itemA.fluxo;
+        const b = itemB.fluxo;
+
+        const diferencaData = obterDataFluxo(a) - obterDataFluxo(b);
+        if (diferencaData !== 0) return diferencaData;
+
+        const maquinaA = obterMaquinaId(a);
+        const maquinaB = obterMaquinaId(b);
+        const diferencaMaquina = maquinaA.localeCompare(maquinaB, "pt-BR", {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (diferencaMaquina !== 0) return diferencaMaquina;
+
+        const inA = normalizarNumeroOrdenacao(obterContadorInAtual(a));
+        const inB = normalizarNumeroOrdenacao(obterContadorInAtual(b));
+        if (inA !== inB) return inA - inB;
+
+        const outA = normalizarNumeroOrdenacao(obterContadorOutAtual(a));
+        const outB = normalizarNumeroOrdenacao(obterContadorOutAtual(b));
+        if (outA !== outB) return outA - outB;
+
+        const idA = obterIdMovimentacao(a);
+        const idB = obterIdMovimentacao(b);
+        const diferencaId = idA.localeCompare(idB, "pt-BR", {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (diferencaId !== 0) return diferencaId;
+
+        return itemA.indiceOriginal - itemB.indiceOriginal;
+      })
+      .map((item) => item.fluxo);
 
     const ultimoContadorPorMaquina = new Map();
     const enriquecidoPorId = new Map();
 
     ordenadosPorData.forEach((fluxo) => {
-      const maquinaId = String(
-        fluxo?.movimentacao?.maquinaId || fluxo?.movimentacao?.maquina?.id || "",
-      );
+      const maquinaId = obterMaquinaId(fluxo);
       const anterior = ultimoContadorPorMaquina.get(maquinaId) || {};
 
       const contadorInAnteriorCalculado =
@@ -152,18 +207,17 @@ export default function FluxoCaixa() {
         ultimoContadorOutRetirada: contadorOutAnteriorCalculado,
       });
 
-      const contadorInAtual = parseNumero(
-        fluxo?.movimentacao?.contadorIn ?? fluxo?.movimentacao?.contadorInDigital,
-      );
-      const contadorOutAtual = parseNumero(
-        fluxo?.movimentacao?.contadorOut ??
-          fluxo?.movimentacao?.contadorOutDigital,
-      );
+      const contadorInAtual = obterContadorInAtual(fluxo);
+      const contadorOutAtual = obterContadorOutAtual(fluxo);
 
       if (maquinaId) {
         ultimoContadorPorMaquina.set(maquinaId, {
-          contadorInAtual,
-          contadorOutAtual,
+          contadorInAtual:
+            contadorInAtual !== null ? contadorInAtual : anterior.contadorInAtual,
+          contadorOutAtual:
+            contadorOutAtual !== null
+              ? contadorOutAtual
+              : anterior.contadorOutAtual,
         });
       }
     });

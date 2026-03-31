@@ -636,15 +636,40 @@ export function Relatorios() {
 
   const calcularQuebraCaixaComoCusto = (fluxos = []) => {
     return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      const conferencia = String(fluxo?.conferencia || "").toLowerCase();
+      const valorRetiradoInformado =
+        fluxo?.valorRetirado !== null &&
+        fluxo?.valorRetirado !== undefined &&
+        fluxo?.valorRetirado !== "";
+
+      // Só calcula quebra quando há conferência efetiva ou valor retirado explícito.
+      if (!valorRetiradoInformado && conferencia !== "nao_bateu") {
+        return acc;
+      }
+
       const temDiferencaDireta =
         fluxo?.diferenca !== null &&
         fluxo?.diferenca !== undefined &&
         fluxo?.diferenca !== "";
 
+      const valorEsperadoReferencia =
+        fluxo?.valorEsperado ??
+        fluxo?.valorEsperadoCalculado ??
+        fluxo?.movimentacao?.valorFaturado;
+
+      const valorEsperadoInformado =
+        valorEsperadoReferencia !== null &&
+        valorEsperadoReferencia !== undefined &&
+        valorEsperadoReferencia !== "";
+
+      if (!temDiferencaDireta && (!valorRetiradoInformado || !valorEsperadoInformado)) {
+        return acc;
+      }
+
       const diferenca = temDiferencaDireta
         ? toNumber(fluxo?.diferenca)
         : toNumber(fluxo?.valorRetirado) -
-          toNumber(fluxo?.valorEsperado ?? fluxo?.movimentacao?.valorFaturado);
+          toNumber(valorEsperadoReferencia);
 
       // Quebra de caixa só ocorre quando o retirado é menor que o esperado.
       return diferenca < 0 ? acc + Math.abs(diferenca) : acc;
@@ -1126,11 +1151,9 @@ export function Relatorios() {
             dadosLoja?.totais,
           );
           const custoProdutos = resumoProdutosSairam.custoTotalItens;
-          const gastoTotalPeriodo = toNumber(dadosLoja?.totais?.gastoTotalPeriodo);
-          const custoBase =
-            gastoTotalPeriodo > 0
-              ? gastoTotalPeriodo
-              : custoProdutos + custoFixo;
+          // Regra de negócio local: custo da loja vem apenas de
+          // gastos fixos cadastrados na loja + custo dos produtos que saíram.
+          const custoBase = custoProdutos + custoFixo;
           const custoTotal = custoBase + toNumber(custoQuebraCaixa);
           const custoVariavel = Math.max(
             0,
@@ -2181,17 +2204,17 @@ export function Relatorios() {
   const custoProdutosRelatorio = calcularCustoSaidaProdutosRelatorio(relatorio);
   const custoProdutosBaseRelatorio = calcularCustoSaidaProdutosRelatorio(relatorio);
   const gastoTotalPeriodoRelatorio = toNumber(relatorio?.totais?.gastoTotalPeriodo);
-  const outrosCustosRelatorio = Math.max(
+  const custosNaoMapeadosBackendRelatorio = Math.max(
     0,
     gastoTotalPeriodoRelatorio -
       custoProdutosBaseRelatorio -
-      custoQuebraCaixaRelatorio,
+      custoQuebraCaixaRelatorio -
+      totalGastosFixosDaLoja,
   );
   const custoTotalConsideradoRelatorio =
     custoProdutosRelatorio +
     totalGastosFixosDaLoja +
-    custoQuebraCaixaRelatorio +
-    outrosCustosRelatorio;
+    custoQuebraCaixaRelatorio;
   const lucroLiquidoRelatorio =
     valorConsolidadoRelatorio - custoTotalConsideradoRelatorio;
 
@@ -2929,6 +2952,15 @@ export function Relatorios() {
                   <div className="text-xs sm:text-sm opacity-90">
                     Gasto Total
                   </div>
+                  {custosNaoMapeadosBackendRelatorio > 0 && (
+                    <div className="text-[10px] sm:text-xs opacity-90 mt-1">
+                      Ignorado do backend (não mapeado em fixo/produto): R${" "}
+                      {Number(custosNaoMapeadosBackendRelatorio).toLocaleString(
+                        "pt-BR",
+                        { minimumFractionDigits: 2 },
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Quebra de Caixa como Custo */}
