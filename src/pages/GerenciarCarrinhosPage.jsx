@@ -236,36 +236,38 @@ export default function GerenciarCarrinhosPage() {
               </p>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {pecasNoCarrinhoComZero
-                  .filter((peca) => (peca.quantidadeCarrinho || 0) > 0)
-                  .map((peca) => {
-                    const quantidadeCarrinho = peca.quantidadeCarrinho || 0;
-                    return (
-                      <div
-                        key={peca.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                      >
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-800">
-                            {peca.nome ||
-                              `Peça ID: ${peca.id || "desconhecida"}`}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Código: {peca.codigo || "N/A"}
-                          </div>
-                          <div className="text-xs text-gray-600 mt-1">
-                            Quantidade: <strong>{quantidadeCarrinho}</strong>
-                          </div>
+                {pecasNoCarrinhoComZero.map((peca) => {
+                  const quantidadeCarrinho = peca.quantidadeCarrinho || 0;
+                  return (
+                    <div
+                      key={peca.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-800">
+                          {peca.nome || `Peça ID: ${peca.id || "desconhecida"}`}
                         </div>
-                        <button
-                          onClick={() => removerPecaDoCarrinho(peca.id)}
-                          className="ml-2 px-3 py-1 rounded text-sm transition-colors bg-red-500 hover:bg-red-600 text-white"
-                        >
-                          ❌
-                        </button>
+                        <div className="text-xs text-gray-500">
+                          Código: {peca.codigo || "N/A"}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          Quantidade: <strong>{quantidadeCarrinho}</strong>
+                        </div>
                       </div>
-                    );
-                  })}
+                      <button
+                        onClick={() => removerPecaDoCarrinho(peca.id)}
+                        disabled={quantidadeCarrinho === 0}
+                        className={`ml-2 px-3 py-1 rounded text-sm transition-colors ${
+                          quantidadeCarrinho > 0
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
