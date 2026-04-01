@@ -115,12 +115,28 @@ export default function MovimentacaoMaquina() {
         return;
       }
 
-      const contadorOutDigitalReferencia = formData.contadorOutDigital;
+      const contadorInReferencia = formData.usarContadorManual
+        ? formData.contadorInManual
+        : formData.contadorInDigital;
+      const contadorOutReferencia = formData.usarContadorManual
+        ? formData.contadorOutManual
+        : formData.contadorOutDigital;
 
       const params = { maquinaId };
       if (!isFuncionarioAbastecedor && !formData.ignoreInOut) {
-        if (contadorOutDigitalReferencia !== "") {
-          params.contadorOut = contadorOutDigitalReferencia;
+        if (contadorInReferencia !== "") {
+          params.contadorIn = contadorInReferencia;
+        }
+        if (contadorOutReferencia !== "") {
+          params.contadorOut = contadorOutReferencia;
+        }
+        if (isPrimeiraMovimentacao) {
+          if (formData.contadorInAnterior !== "") {
+            params.contadorInAnterior = formData.contadorInAnterior;
+          }
+          if (formData.contadorOutAnterior !== "") {
+            params.contadorOutAnterior = formData.contadorOutAnterior;
+          }
         }
       }
 
@@ -144,9 +160,9 @@ export default function MovimentacaoMaquina() {
 
         const temContadoresDigitados =
           !isFuncionarioAbastecedor &&
-          !isPrimeiraMovimentacao &&
           !formData.ignoreInOut &&
-          contadorOutDigitalReferencia !== "";
+          contadorOutReferencia !== "" &&
+          (!isPrimeiraMovimentacao || formData.contadorOutAnterior !== "");
 
         if (temContadoresDigitados) {
           setFormData((prev) => ({
@@ -166,7 +182,13 @@ export default function MovimentacaoMaquina() {
     maquinaId,
     isFuncionarioAbastecedor,
     isPrimeiraMovimentacao,
+    formData.usarContadorManual,
+    formData.contadorInAnterior,
+    formData.contadorOutAnterior,
+    formData.contadorInManual,
+    formData.contadorOutManual,
     formData.contadorOutDigital,
+    formData.contadorInDigital,
     formData.ignoreInOut,
   ]);
 
@@ -364,10 +386,10 @@ export default function MovimentacaoMaquina() {
     );
 
     const inAnterior = isPrimeiraMovimentacao
-      ? inAnteriorPrimeira ?? 0
+      ? (inAnteriorPrimeira ?? 0)
       : Number(resumoCalculo?.contadorInSugerido || 0);
     const outAnterior = isPrimeiraMovimentacao
-      ? outAnteriorPrimeira ?? 0
+      ? (outAnteriorPrimeira ?? 0)
       : Number(
           resumoCalculo?.contadorOutUltimaMovimentacao ??
             resumoCalculo?.contadorOutSugerido ??
@@ -592,12 +614,8 @@ export default function MovimentacaoMaquina() {
         contadorOutAnterior: isPrimeiraMovimentacao
           ? contadorOutAnteriorInformado
           : null,
-        contadorIn: deveIgnorarContadores
-          ? null
-          : contadorInAtualInformado,
-        contadorOut: deveIgnorarContadores
-          ? null
-          : contadorOutAtualInformado,
+        contadorIn: deveIgnorarContadores ? null : contadorInAtualInformado,
+        contadorOut: deveIgnorarContadores ? null : contadorOutAtualInformado,
         contadorInDigital: deveIgnorarContadores
           ? null
           : contadorInDigitalInformado,
