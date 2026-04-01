@@ -116,7 +116,7 @@ export function Dashboard() {
         const pendentes = Array.isArray(res.data) ? res.data : [];
         const atribuida = pendentes.some((m) => m.funcionarioId === usuario.id);
         if (!cancelado) setTemManutencaoPendente(atribuida);
-      } catch (e) {
+      } catch {
         if (!cancelado) setTemManutencaoPendente(false);
       }
     }
@@ -259,7 +259,7 @@ export function Dashboard() {
   };
   // ...já declarado acima...
   // removido reloadAfterModal/setReloadAfterModal pois não são usados
-  const enviarMovimentacaoEstoqueLoja = async (e) => {
+  const _enviarMovimentacaoEstoqueLoja = async (e) => {
     if (e) e.preventDefault();
     setMovimentacaoEnviando(true);
     setMovimentacaoErro("");
@@ -634,7 +634,7 @@ export function Dashboard() {
       setLojas([]);
       setMaquinas([]);
     }
-  }, [usuario]);
+  }, [carregarAlertaInatividadeLojas, usuario]);
 
   useEffect(() => {
     carregarDados();
@@ -1856,7 +1856,7 @@ export function Dashboard() {
                       tipoMovimentacao: "entrada",
                     },
                   ]);
-                } catch (erro) {
+                } catch {
                   setMovimentacaoErro(
                     "Erro ao registrar movimentação. Tente novamente.",
                   );
@@ -3895,62 +3895,73 @@ export function Dashboard() {
             )}
             {mostrarTodosAlertasMaquinas && (
               <div className="mt-6 space-y-3">
-                {stats.alertas.slice(5).map((alerta, index) => (
-                  <div
-                    key={index}
-                    className={`p-5 rounded-xl border-l-4 transition-all duration-200 hover:scale-[1.02] ${
-                      alerta.nivelAlerta === "CRÍTICO"
-                        ? "bg-linear-to-r from-red-50 to-red-100/50 border-red-500 shadow-red-100 shadow-md"
-                        : alerta.nivelAlerta === "ALTO"
-                          ? "bg-linear-to-r from-orange-50 to-orange-100/50 border-orange-500 shadow-orange-100 shadow-md"
-                          : "bg-linear-to-r from-yellow-50 to-yellow-100/50 border-yellow-500 shadow-yellow-100 shadow-md"
-                    }`}
-                    title={alerta.produtoNome}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-2xl">
-                            {alerta.produto.emoji || "📦"}
-                          </span>
-                          <span className="font-bold text-lg text-gray-900">
-                            {alerta.produto.nome}
-                          </span>
+                {stats.alertas.slice(5).map((alerta, index) =>
+                  (() => {
+                    const percentualAtual =
+                      alerta.estoqueMinimo > 0
+                        ? Math.round(
+                            (alerta.quantidade / alerta.estoqueMinimo) * 100,
+                          )
+                        : 0;
+
+                    return (
+                      <div
+                        key={index}
+                        className={`p-5 rounded-xl border-l-4 transition-all duration-200 hover:scale-[1.02] ${
+                          alerta.nivelAlerta === "CRÍTICO"
+                            ? "bg-linear-to-r from-red-50 to-red-100/50 border-red-500 shadow-red-100 shadow-md"
+                            : alerta.nivelAlerta === "ALTO"
+                              ? "bg-linear-to-r from-orange-50 to-orange-100/50 border-orange-500 shadow-orange-100 shadow-md"
+                              : "bg-linear-to-r from-yellow-50 to-yellow-100/50 border-yellow-500 shadow-yellow-100 shadow-md"
+                        }`}
+                        title={alerta.produtoNome}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-2xl">
+                                {alerta.produto.emoji || "📦"}
+                              </span>
+                              <span className="font-bold text-lg text-gray-900">
+                                {alerta.produto.nome}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 flex items-center gap-1">
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              {alerta.lojaNome}
+                            </p>
+                            {alerta.produto.codigo && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Código: {alerta.produto.codigo}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-3xl font-bold text-gray-900">
+                                {alerta.quantidade}
+                              </span>
+                              <span className="text-lg text-gray-600">un</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1 bg-white/60 px-2 py-1 rounded-full">
+                              Min: {alerta.estoqueMinimo} · {percentualAtual}%
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 flex items-center gap-1">
-                          <svg
-                            className="w-4 h-4"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          {alerta.lojaNome}
-                        </p>
-                        {alerta.produto.codigo && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Código: {alerta.produto.codigo}
-                          </p>
-                        )}
                       </div>
-                      <div className="text-right">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-bold text-gray-900">
-                            {alerta.quantidade}
-                          </span>
-                          <span className="text-lg text-gray-600">un</span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1 bg-white/60 px-2 py-1 rounded-full">
-                          Min: {alerta.estoqueMinimo} · {percentualAtual}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })(),
+                )}
                 <button
                   className="mt-4 w-full text-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-xl transition-all duration-200"
                   onClick={() => setMostrarTodosAlertasMaquinas(false)}
