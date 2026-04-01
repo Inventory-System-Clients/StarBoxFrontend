@@ -865,9 +865,9 @@ export function Dashboard() {
             <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${loja.diasSemMov}</td>
             <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${loja.diasSemRetirada}</td>
             <td style="padding:8px;border:1px solid #e5e7eb;">${ultimaMov}</td>
-            <td style="padding:8px;border:1px solid #e5e7eb;">${ultimaRetirada}</td>
-          </tr>
-        `;
+                                    {mov.totalPos ??
+                                      (mov.totalPre || 0) +
+                                        (mov.abastecidas || 0)}
       })
       .join("");
 
