@@ -50,6 +50,7 @@ export default function RoteiroExecucao() {
   // Estados para manutenção
   const [manutencaoPendente, setManutencaoPendente] = useState(null);
   const [modalManutencao, setModalManutencao] = useState(false);
+  const [manutencaoRecemCriada, setManutencaoRecemCriada] = useState(null);
 
   // Estados para controle de ordem
   const [modalJustificativa, setModalJustificativa] = useState({
@@ -267,6 +268,7 @@ export default function RoteiroExecucao() {
 
     setLojaSelecionada(loja);
     setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
+  setManutencaoRecemCriada(null);
 
     // Verificar se há manutenções pendentes nesta loja
     if (loja && loja.id) {
@@ -314,6 +316,14 @@ export default function RoteiroExecucao() {
   const handleManutencaoConcluida = async () => {
     setSuccess("Manutenção processada com sucesso!");
     setModalManutencao(false);
+
+    if (
+      manutencaoRecemCriada?.id &&
+      manutencaoPendente?.id === manutencaoRecemCriada.id
+    ) {
+      setManutencaoRecemCriada(null);
+    }
+
     setManutencaoPendente(null);
     // Recarregar roteiro para atualizar status
     await carregarRoteiro();
@@ -322,8 +332,17 @@ export default function RoteiroExecucao() {
   const abrirModalNovaManutencao = () => {
     setError("");
     setSuccess("");
+    setManutencaoRecemCriada(null);
     setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
     setModalNovaManutencao({ aberto: true, loading: false });
+  };
+
+  const abrirManutencaoRecemCriada = () => {
+    if (!manutencaoRecemCriada?.id) return;
+
+    setError("");
+    setManutencaoPendente(manutencaoRecemCriada);
+    setModalManutencao(true);
   };
 
   const fecharModalNovaManutencao = () => {
@@ -352,14 +371,71 @@ export default function RoteiroExecucao() {
       setError("");
       setSuccess("");
 
-      await api.post("/manutencoes", {
+      const maquinaIdSelecionada = novaManutencaoRoteiro.maquinaId;
+      const resCriacao = await api.post("/manutencoes", {
         descricao: descricaoLimpa,
         lojaId: lojaSelecionada.id,
-        maquinaId: novaManutencaoRoteiro.maquinaId,
+        maquinaId: maquinaIdSelecionada,
         funcionarioId: usuario?.id || null,
       });
 
-      setSuccess("Manutenção criada com sucesso!");
+      const payload = resCriacao?.data;
+      const manutencaoCriadaResponse =
+        payload?.manutencao && typeof payload.manutencao === "object"
+          ? payload.manutencao
+          : payload && typeof payload === "object" && payload.id
+            ? payload
+            : null;
+
+      let manutencaoCriada = manutencaoCriadaResponse;
+
+      if (!manutencaoCriada?.id) {
+        const resPendentes = await api.get("/manutencoes", {
+          params: {
+            lojaId: lojaSelecionada.id,
+            status: "pendente",
+          },
+        });
+
+        const pendentes = Array.isArray(resPendentes?.data) ? resPendentes.data : [];
+        manutencaoCriada =
+          pendentes.find(
+            (item) =>
+              String(item?.maquinaId || item?.maquina_id || "") ===
+                String(maquinaIdSelecionada || "") &&
+              String(item?.descricao || "").trim() === descricaoLimpa,
+          ) || pendentes[0] || null;
+      }
+
+      if (manutencaoCriada?.id) {
+        const maquinaSelecionada = (lojaSelecionada?.maquinas || []).find(
+          (item) => String(item?.id || "") === String(maquinaIdSelecionada || ""),
+        );
+
+        setManutencaoRecemCriada({
+          ...manutencaoCriada,
+          descricao: manutencaoCriada.descricao || descricaoLimpa,
+          loja: manutencaoCriada.loja || {
+            id: lojaSelecionada.id,
+            nome: lojaSelecionada?.nome || "-",
+          },
+          maquina:
+            manutencaoCriada.maquina ||
+            (maquinaSelecionada
+              ? {
+                  id: maquinaSelecionada.id,
+                  codigo: maquinaSelecionada.codigo,
+                  nome: maquinaSelecionada.nome,
+                }
+              : null),
+        });
+      } else {
+        setManutencaoRecemCriada(null);
+      }
+
+      setSuccess(
+        "Manutenção criada com sucesso! Clique em 'Fazer manutenção criada agora' para concluir agora.",
+      );
       setModalNovaManutencao({ aberto: false, loading: false });
       setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
       await carregarRoteiro();
@@ -1065,6 +1141,20 @@ export default function RoteiroExecucao() {
             message={success}
             onClose={() => setSuccess("")}
           />
+        )}
+        {manutencaoRecemCriada?.id && (
+          <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-semibold text-blue-900">
+              Manutenção criada nesta loja. Se quiser, finalize agora para já registrar
+              peça/observação e disparar o WhatsApp.
+            </p>
+            <button
+              className="btn-primary mt-3"
+              onClick={abrirManutencaoRecemCriada}
+            >
+              Fazer manutenção criada agora
+            </button>
+          </div>
         )}
         {observacaoAdmin && (
           <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
