@@ -6,7 +6,78 @@ const STATUS_CONCLUIDO = new Set([
   "feito",
 ]);
 
+const ESTOQUE_INICIAL_ROTEIRO_STORAGE_PREFIX =
+  "starbox:roteiro:estoque-inicial:";
+
 const normalizarTexto = (valor) => String(valor || "").trim();
+
+const montarChaveEstoqueInicialRoteiro = ({ roteiroId, usuarioId }) => {
+  const roteiroNormalizado = normalizarTexto(roteiroId);
+  const usuarioNormalizado = normalizarTexto(usuarioId);
+
+  if (!roteiroNormalizado || !usuarioNormalizado) return "";
+  return `${ESTOQUE_INICIAL_ROTEIRO_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}`;
+};
+
+export const obterEstoqueInicialSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+  const chave = montarChaveEstoqueInicialRoteiro({ roteiroId, usuarioId });
+  if (!chave) return null;
+
+  try {
+    const bruto = window.localStorage.getItem(chave);
+    if (!bruto) return null;
+
+    const payload = JSON.parse(bruto);
+    const quantidade = Number(payload?.quantidadeInicial);
+    return Number.isFinite(quantidade) ? quantidade : null;
+  } catch {
+    return null;
+  }
+};
+
+export const salvarEstoqueInicialSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+  quantidadeInicial,
+  sobrescrever = false,
+}) => {
+  const chave = montarChaveEstoqueInicialRoteiro({ roteiroId, usuarioId });
+  const quantidade = Number(quantidadeInicial);
+
+  if (!chave || !Number.isFinite(quantidade)) return false;
+
+  try {
+    if (!sobrescrever && window.localStorage.getItem(chave)) {
+      return true;
+    }
+
+    window.localStorage.setItem(
+      chave,
+      JSON.stringify({
+        quantidadeInicial: quantidade,
+        roteiroId: String(roteiroId),
+        usuarioId: String(usuarioId),
+        capturedAt: new Date().toISOString(),
+      }),
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const removerEstoqueInicialSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+  const chave = montarChaveEstoqueInicialRoteiro({ roteiroId, usuarioId });
+  if (!chave) return false;
+
+  try {
+    window.localStorage.removeItem(chave);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const toArray = (valor) => {
   if (Array.isArray(valor)) return valor;
@@ -157,12 +228,14 @@ export const somarSaldoEstoqueUsuario = (estoqueUsuarioData) => {
 
 export const extrairKmMovimentacoesRoteiro = (
   movimentacoes,
-  { usuarioId = null, veiculoId = null } = {},
+  { usuarioId = null, veiculoId = null, roteiroId = null } = {},
 ) => {
   const usuarioNormalizado =
     usuarioId === null || usuarioId === undefined ? null : String(usuarioId);
   const veiculoNormalizado =
     veiculoId === null || veiculoId === undefined ? null : String(veiculoId);
+  const roteiroNormalizado =
+    roteiroId === null || roteiroId === undefined ? null : String(roteiroId);
 
   const listaFiltrada = toArray(movimentacoes).filter((mov) => {
     const tipo = normalizarTexto(mov?.tipo).toLowerCase();
@@ -172,9 +245,13 @@ export const extrairKmMovimentacoesRoteiro = (
       mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
     );
     const movVeiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+    const movRoteiroId = String(mov?.roteiroId || mov?.roteiro?.id || "");
 
     if (usuarioNormalizado && movUsuarioId !== usuarioNormalizado) return false;
     if (veiculoNormalizado && movVeiculoId !== veiculoNormalizado) return false;
+    if (roteiroNormalizado && movRoteiroId && movRoteiroId !== roteiroNormalizado) {
+      return false;
+    }
 
     return true;
   });
@@ -263,6 +340,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
   sobraValorDespesa,
   manutencoesRealizadas,
   manutencoesNaoRealizadas,
+  resumoConsumoProdutos,
 }) => {
   const totalUsadas = Number.isFinite(Number(totalPeluciasUsadas))
     ? Number(totalPeluciasUsadas)
@@ -280,6 +358,19 @@ export const montarMensagemFinalizacaoRoteiro = ({
     kmInicial !== null && kmFinal !== null ? Math.max(0, kmFinal - kmInicial) : null;
   const manutencoesFeitasLista = toArray(manutencoesRealizadas).filter(Boolean);
   const manutencoesNaoFeitasLista = toArray(manutencoesNaoRealizadas).filter(Boolean);
+  const consumoResumo =
+    resumoConsumoProdutos && typeof resumoConsumoProdutos === "object"
+      ? {
+          estoqueInicialTotal: Number(resumoConsumoProdutos.estoqueInicialTotal),
+          estoqueFinalTotal: Number(resumoConsumoProdutos.estoqueFinalTotal),
+          consumoTotalProdutos: Number(resumoConsumoProdutos.consumoTotalProdutos),
+        }
+      : null;
+  const consumoResumoValido =
+    consumoResumo &&
+    Number.isFinite(consumoResumo.estoqueInicialTotal) &&
+    Number.isFinite(consumoResumo.estoqueFinalTotal) &&
+    Number.isFinite(consumoResumo.consumoTotalProdutos);
 
   return [
     "STAR BOX",
@@ -293,8 +384,13 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Pontos nao feitos: ${formatarLista(lojasNaoFeitas)}`,
     `Maquinas feitas: ${formatarLista(maquinasFeitas)}`,
     `Maquinas nao feitas: ${formatarLista(maquinasNaoFeitas)}`,
-    `Total de pelucias usadas na rota: ${totalUsadas !== null ? totalUsadas : "Nao informado"}`,
-    `Pelucias restantes no estoque do usuario: ${saldoEstoque !== null ? saldoEstoque : "Nao informado"}`,
+    ...(consumoResumoValido
+      ? [
+          `Estoque inicial: ${consumoResumo.estoqueInicialTotal} produtos`,
+          `Estoque final: ${consumoResumo.estoqueFinalTotal} produtos`,
+          `Total gasto na rota: ${consumoResumo.consumoTotalProdutos} produtos`,
+        ]
+      : ["Resumo de consumo indisponivel para esta finalizacao."]),
     `Despesa total: ${formatarMoedaBRL(despesaTotal)}`,
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
     `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,

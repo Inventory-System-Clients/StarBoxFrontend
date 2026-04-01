@@ -10,6 +10,9 @@ import {
   extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
+  obterEstoqueInicialSnapshotRoteiro,
+  removerEstoqueInicialSnapshotRoteiro,
+  salvarEstoqueInicialSnapshotRoteiro,
   somarSaldoEstoqueUsuario,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
@@ -516,6 +519,28 @@ export function Roteiros() {
       return;
     }
 
+    const usuarioReferenciaId = String(usuario?.id || "").trim();
+    const snapshotExistente = obterEstoqueInicialSnapshotRoteiro({
+      roteiroId,
+      usuarioId: usuarioReferenciaId,
+    });
+
+    if (!Number.isFinite(snapshotExistente) && usuarioReferenciaId) {
+      try {
+        const estoqueRes = await api.get("/estoque-usuarios/me");
+        const saldoAtual = somarSaldoEstoqueUsuario(estoqueRes.data);
+
+        salvarEstoqueInicialSnapshotRoteiro({
+          roteiroId,
+          usuarioId: usuarioReferenciaId,
+          quantidadeInicial: saldoAtual,
+          sobrescrever: false,
+        });
+      } catch {
+        // Se falhar a captura inicial, seguimos com a navegação.
+      }
+    }
+
     navigate(`/roteiros/${roteiroId}/executar`);
   };
 
@@ -706,6 +731,14 @@ export function Roteiros() {
         finalizacaoData,
       });
 
+      const usuarioReferenciaId = String(
+        finalizacaoData?.funcionarioId ||
+          finalizacaoData?.funcionario?.id ||
+          roteiro?.funcionarioId ||
+          usuario?.id ||
+          "",
+      ).trim();
+
       let totalPeluciasUsadas = extrairNumero(
         finalizacaoData?.totalPeluciasUsadas,
         finalizacaoData?.totalPeluciasUtilizadas,
@@ -722,28 +755,35 @@ export function Roteiros() {
 
       if (saldoPeluciasEstoque === null) {
         try {
-          const estoqueResMe = await api.get("/estoque-usuarios/me");
-          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResMe.data);
-        } catch {
-          const funcionarioDoRoteiro =
-            finalizacaoData?.funcionarioId ||
-            finalizacaoData?.funcionario?.id ||
-            roteiro?.funcionarioId;
+          if (!usuarioReferenciaId) {
+            throw new Error("usuario de referencia ausente");
+          }
 
-          if (funcionarioDoRoteiro) {
+          const estoqueResUsuario = await api.get(
+            `/estoque-usuarios/${usuarioReferenciaId}`,
+          );
+          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResUsuario.data);
+        } catch {
+          if (usuarioReferenciaId && String(usuario?.id || "") === usuarioReferenciaId) {
             try {
-              const estoqueRes = await api.get(
-                `/estoque-usuarios/${funcionarioDoRoteiro}`,
-              );
-              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueRes.data);
+              const estoqueResMe = await api.get("/estoque-usuarios/me");
+              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResMe.data);
             } catch {
               saldoPeluciasEstoque = null;
             }
+          } else {
+            saldoPeluciasEstoque = null;
           }
         }
       }
 
-      const saldoPeluciasInicial = extrairNumero(
+      let saldoPeluciasInicial = obterEstoqueInicialSnapshotRoteiro({
+        roteiroId: roteiro?.id,
+        usuarioId: usuarioReferenciaId,
+      });
+
+      if (saldoPeluciasInicial === null) {
+        saldoPeluciasInicial = extrairNumero(
         finalizacaoData?.saldoPeluciasInicialUsuario,
         finalizacaoData?.saldoInicialEstoqueUsuario,
         finalizacaoData?.peluciasIniciaisRoteiro,
@@ -757,7 +797,8 @@ export function Roteiros() {
         roteiro?.peluciasIniciaisRoteiro,
         roteiro?.peluciasInicioRoteiro,
         roteiro?.estoqueInicialUsuario,
-      );
+        );
+      }
 
       if (saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null) {
         totalPeluciasUsadas = Math.max(
@@ -797,47 +838,53 @@ export function Roteiros() {
           [],
       );
 
-      let kmInicialVeiculo = extrairNumero(
-        finalizacaoData?.kmInicialVeiculo,
-        finalizacaoData?.kmInicial,
-        finalizacaoData?.quilometragemInicial,
-        finalizacaoData?.totais?.kmInicialVeiculo,
-      );
+      let kmInicialVeiculo = null;
+      let kmFinalVeiculo = null;
 
-      let kmFinalVeiculo = extrairNumero(
-        finalizacaoData?.kmFinalVeiculo,
-        finalizacaoData?.kmFinal,
-        finalizacaoData?.quilometragemFinal,
-        finalizacaoData?.totais?.kmFinalVeiculo,
-      );
+      try {
+        const movVeiculoRes = await api.get("/movimentacao-veiculos", {
+          params: {
+            roteiroId: roteiro.id,
+          },
+        });
 
-      if (kmInicialVeiculo === null || kmFinalVeiculo === null) {
-        try {
-          const movVeiculoRes = await api.get("/movimentacao-veiculos", {
-            params: {
-              roteiroId: roteiro.id,
-            },
-          });
+        const listaMovimentacoesVeiculo = Array.isArray(movVeiculoRes.data)
+          ? movVeiculoRes.data
+          : movVeiculoRes.data?.rows || movVeiculoRes.data?.movimentacoes || [];
 
-          const listaMovimentacoesVeiculo = Array.isArray(movVeiculoRes.data)
-            ? movVeiculoRes.data
-            : movVeiculoRes.data?.rows || movVeiculoRes.data?.movimentacoes || [];
+        const resumoKm = extrairKmMovimentacoesRoteiro(
+          listaMovimentacoesVeiculo,
+          {
+            usuarioId: usuario?.id,
+            veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id,
+            roteiroId: roteiro.id,
+          },
+        );
 
-          const resumoKm = extrairKmMovimentacoesRoteiro(
-            listaMovimentacoesVeiculo,
-            {
-              usuarioId: usuario?.id,
-              veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id,
-            },
-          );
-
-          kmInicialVeiculo = kmInicialVeiculo ?? resumoKm.kmInicial;
-          kmFinalVeiculo = kmFinalVeiculo ?? resumoKm.kmFinal;
-        } catch {
-          kmInicialVeiculo = kmInicialVeiculo ?? null;
-          kmFinalVeiculo = kmFinalVeiculo ?? null;
-        }
+        kmInicialVeiculo = resumoKm.kmInicial;
+        kmFinalVeiculo = resumoKm.kmFinal;
+      } catch {
+        kmInicialVeiculo = null;
+        kmFinalVeiculo = null;
       }
+
+      kmInicialVeiculo =
+        kmInicialVeiculo ??
+        extrairNumero(
+          finalizacaoData?.kmInicialVeiculo,
+          finalizacaoData?.kmInicial,
+          finalizacaoData?.quilometragemInicial,
+          finalizacaoData?.totais?.kmInicialVeiculo,
+        );
+
+      kmFinalVeiculo =
+        kmFinalVeiculo ??
+        extrairNumero(
+          finalizacaoData?.kmFinalVeiculo,
+          finalizacaoData?.kmFinal,
+          finalizacaoData?.quilometragemFinal,
+          finalizacaoData?.totais?.kmFinalVeiculo,
+        );
 
       return montarMensagemFinalizacaoRoteiro({
         roteiroNome: roteiro?.nome,
@@ -853,6 +900,17 @@ export function Roteiros() {
         sobraValorDespesa,
         manutencoesRealizadas,
         manutencoesNaoRealizadas,
+        resumoConsumoProdutos:
+          saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null
+            ? {
+                estoqueInicialTotal: saldoPeluciasInicial,
+                estoqueFinalTotal: saldoPeluciasEstoque,
+                consumoTotalProdutos: Math.max(
+                  0,
+                  saldoPeluciasInicial - saldoPeluciasEstoque,
+                ),
+              }
+            : null,
       });
     };
 
@@ -864,6 +922,9 @@ export function Roteiros() {
       setModalFinalizar((prev) => ({ ...prev, loading: true }));
 
       const res = await api.post(`/roteiros/${roteiro.id}/finalizar`);
+      const usuarioReferenciaId = String(
+        roteiro?.funcionarioId || usuario?.id || "",
+      ).trim();
       const pendencias = res?.data?.pendencias || [];
 
       if (pendencias.length > 0) {
@@ -892,6 +953,11 @@ export function Roteiros() {
           "Roteiro finalizado, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
         );
       }
+
+      removerEstoqueInicialSnapshotRoteiro({
+        roteiroId: roteiro.id,
+        usuarioId: usuarioReferenciaId,
+      });
 
       setModalFinalizar({
         aberto: false,

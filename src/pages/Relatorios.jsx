@@ -634,8 +634,32 @@ export function Relatorios() {
     return toNumber(dadosRelatorio?.totais?.custoProdutosSairam);
   };
 
-  const calcularQuebraCaixaComoCusto = (fluxos = []) => {
+  const obterLojaIdDoFluxo = (fluxo) =>
+    String(
+      fluxo?.lojaId ??
+        fluxo?.loja?.id ??
+        fluxo?.movimentacao?.lojaId ??
+        fluxo?.movimentacao?.loja?.id ??
+        fluxo?.movimentacao?.maquina?.lojaId ??
+        fluxo?.movimentacao?.maquina?.loja?.id ??
+        "",
+    ).trim();
+
+  const calcularQuebraCaixaComoCusto = (fluxos = [], lojaIdAlvo = null) => {
+    const alvo =
+      lojaIdAlvo === null || lojaIdAlvo === undefined
+        ? ""
+        : String(lojaIdAlvo).trim();
+
     return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      if (alvo) {
+        const lojaDoFluxo = obterLojaIdDoFluxo(fluxo);
+        // Em relatório por loja, só aceita fluxos que comprovem pertencer à loja alvo.
+        if (lojaDoFluxo !== alvo) {
+          return acc;
+        }
+      }
+
       const conferencia = String(fluxo?.conferencia || "").toLowerCase();
       const valorRetiradoInformado =
         fluxo?.valorRetirado !== null &&
@@ -732,7 +756,7 @@ export function Relatorios() {
     try {
       const fluxos = await carregarFluxosCaixa({ inicio, fim, lojaId });
 
-      return calcularQuebraCaixaComoCusto(fluxos);
+      return calcularQuebraCaixaComoCusto(fluxos, lojaId);
     } catch (erroFluxo) {
       console.warn(
         `Não foi possível calcular quebra de caixa da loja ${lojaId}:`,
@@ -1790,7 +1814,7 @@ export function Relatorios() {
             const fluxosLoja = Array.isArray(fluxosPorLoja[idx])
               ? fluxosPorLoja[idx]
               : [];
-            const quebraLoja = calcularQuebraCaixaComoCusto(fluxosLoja);
+            const quebraLoja = calcularQuebraCaixaComoCusto(fluxosLoja, lojaId);
 
             return {
               lojaId,
