@@ -412,6 +412,201 @@ export function Dashboard() {
 
   // Função para remover produto do estoque da loja (usando o id do registro)
 
+  const carregarAlertasEstoqueLoja = async (lojasData) => {
+    try {
+      // Buscar alertas de todas as lojas
+      const alertasPromises = lojasData.map((loja) =>
+        api
+          .get(`/estoque-lojas/${loja.id}/alertas`)
+          .then((res) => ({
+            lojaId: loja.id,
+            lojaNome: loja.nome,
+            alertas: res.data || [],
+          }))
+          .catch((err) => {
+            console.error(
+              `Erro ao carregar alertas da loja ${loja.nome}:`,
+              err.message,
+            );
+            return { lojaId: loja.id, lojaNome: loja.nome, alertas: [] };
+          }),
+      );
+
+      const alertasTodasLojas = await Promise.all(alertasPromises);
+
+      // Agrupar todos os alertas
+      const todosAlertas = alertasTodasLojas.flatMap((lojaAlertas) => {
+        // Garantir que alertas seja um array
+        const alertasArray = Array.isArray(lojaAlertas.alertas)
+          ? lojaAlertas.alertas
+          : [];
+
+        return alertasArray.map((alerta) => ({
+          ...alerta,
+          lojaNome: lojaAlertas.lojaNome,
+        }));
+      });
+
+      setAlertasEstoqueLoja(todosAlertas);
+      console.log("Alertas de estoque de lojas:", todosAlertas);
+    } catch (error) {
+      console.error("Erro ao carregar alertas de estoque de lojas:", error);
+      setAlertasEstoqueLoja([]);
+    }
+  };
+
+  const carregarAlertasEstoqueUsuario = async () => {
+    try {
+      const response = await api.get("/estoque-usuarios/me/alertas");
+      const alertas = Array.isArray(response.data)
+        ? response.data
+        : response.data?.alertas || [];
+      setAlertasEstoqueUsuario(alertas);
+    } catch (error) {
+      console.error("Erro ao carregar alertas de estoque do usuario:", error);
+      setAlertasEstoqueUsuario([]);
+    }
+  };
+
+  const carregarAlertaInatividadeLojas = useCallback(
+    async (lojasData) => {
+      let lojasParaAnalise = Array.isArray(lojasData) ? lojasData : [];
+
+      if (lojasParaAnalise.length === 0 && usuario?.role === "FUNCIONARIO") {
+        try {
+          const lojasRes = await api.get("/lojas");
+          lojasParaAnalise = Array.isArray(lojasRes.data) ? lojasRes.data : [];
+        } catch {
+          lojasParaAnalise = [];
+        }
+      }
+
+      if (lojasParaAnalise.length === 0) {
+        setAlertaInatividadeLojas({ lojas: [], carregando: false });
+        return;
+      }
+
+      setAlertaInatividadeLojas((prev) => ({ ...prev, carregando: true }));
+
+      try {
+        const hoje = new Date();
+        const dataInicioBusca = new Date(
+          hoje.getTime() - 90 * 24 * 60 * 60 * 1000,
+        )
+          .toISOString()
+          .split("T")[0];
+        const dataFimBusca = hoje.toISOString().split("T")[0];
+
+        const [movRes, fluxoRes] = await Promise.all([
+          api
+            .get("/movimentacoes", {
+              params: {
+                dataInicio: dataInicioBusca,
+                dataFim: `${dataFimBusca}T23:59:59`,
+                limite: 50000,
+              },
+            })
+            .catch(() => ({ data: [] })),
+          api
+            .get(
+              `/fluxo-caixa?dataInicio=${dataInicioBusca}&dataFim=${dataFimBusca}&status=todos`,
+            )
+            .catch(() => ({ data: [] })),
+        ]);
+
+        const movimentacoes = Array.isArray(movRes?.data)
+          ? movRes.data
+          : movRes?.data?.movimentacoes || movRes?.data?.rows || [];
+        const fluxos = Array.isArray(fluxoRes?.data)
+          ? fluxoRes.data
+          : fluxoRes?.data?.fluxos || fluxoRes?.data?.rows || [];
+
+        const ultimaMovPorLoja = new Map();
+        const ultimaRetiradaPorLoja = new Map();
+
+        movimentacoes.forEach((mov) => {
+          const lojaId = String(
+            mov?.lojaId || mov?.maquina?.lojaId || mov?.maquina?.loja?.id || "",
+          );
+          if (!lojaId) return;
+
+          const dataMov = new Date(
+            mov?.dataColeta ||
+              mov?.data ||
+              mov?.dataMovimentacao ||
+              mov?.createdAt,
+          );
+          if (Number.isNaN(dataMov.getTime())) return;
+
+          const anterior = ultimaMovPorLoja.get(lojaId);
+          if (!anterior || dataMov > anterior) {
+            ultimaMovPorLoja.set(lojaId, dataMov);
+          }
+        });
+
+        fluxos.forEach((fluxo) => {
+          const lojaId = String(
+            fluxo?.lojaId ||
+              fluxo?.movimentacao?.maquina?.lojaId ||
+              fluxo?.movimentacao?.maquina?.loja?.id ||
+              "",
+          );
+          if (!lojaId) return;
+
+          const dataRetirada = new Date(
+            fluxo?.movimentacao?.dataColeta ||
+              fluxo?.dataRetirada ||
+              fluxo?.dataConferencia ||
+              fluxo?.createdAt ||
+              fluxo?.updatedAt,
+          );
+          if (Number.isNaN(dataRetirada.getTime())) return;
+
+          const anterior = ultimaRetiradaPorLoja.get(lojaId);
+          if (!anterior || dataRetirada > anterior) {
+            ultimaRetiradaPorLoja.set(lojaId, dataRetirada);
+          }
+        });
+
+        const MS_DIA = 24 * 60 * 60 * 1000;
+        const lojasComAlerta = lojasParaAnalise
+          .filter((loja) => !loja?.isDepositoPrincipal)
+          .map((loja) => {
+            const id = String(loja?.id || "");
+            const ultimaMov = ultimaMovPorLoja.get(id) || null;
+            const ultimaRetirada = ultimaRetiradaPorLoja.get(id) || null;
+
+            const diasSemMov = ultimaMov
+              ? Math.floor((hoje - ultimaMov) / MS_DIA)
+              : 9999;
+            const diasSemRetirada = ultimaRetirada
+              ? Math.floor((hoje - ultimaRetirada) / MS_DIA)
+              : 9999;
+
+            return {
+              lojaId: loja.id,
+              lojaNome: loja.nome,
+              ultimaMovimentacao: ultimaMov,
+              ultimaRetirada,
+              diasSemMov,
+              diasSemRetirada,
+            };
+          })
+          .filter((loja) => loja.diasSemMov > 15 && loja.diasSemRetirada > 15)
+          .sort((a, b) => b.diasSemMov - a.diasSemMov);
+
+        setAlertaInatividadeLojas({ lojas: lojasComAlerta, carregando: false });
+      } catch (error) {
+        console.error(
+          "Erro ao calcular alerta de inatividade das lojas:",
+          error,
+        );
+        setAlertaInatividadeLojas({ lojas: [], carregando: false });
+      }
+    },
+    [usuario?.role],
+  );
+
   const carregarDados = useCallback(async () => {
     try {
       const isAdmin =
@@ -659,201 +854,6 @@ export function Dashboard() {
 
     return () => clearInterval(interval);
   }, [usuario?.role]);
-
-  const carregarAlertasEstoqueLoja = async (lojasData) => {
-    try {
-      // Buscar alertas de todas as lojas
-      const alertasPromises = lojasData.map((loja) =>
-        api
-          .get(`/estoque-lojas/${loja.id}/alertas`)
-          .then((res) => ({
-            lojaId: loja.id,
-            lojaNome: loja.nome,
-            alertas: res.data || [],
-          }))
-          .catch((err) => {
-            console.error(
-              `Erro ao carregar alertas da loja ${loja.nome}:`,
-              err.message,
-            );
-            return { lojaId: loja.id, lojaNome: loja.nome, alertas: [] };
-          }),
-      );
-
-      const alertasTodasLojas = await Promise.all(alertasPromises);
-
-      // Agrupar todos os alertas
-      const todosAlertas = alertasTodasLojas.flatMap((lojaAlertas) => {
-        // Garantir que alertas seja um array
-        const alertasArray = Array.isArray(lojaAlertas.alertas)
-          ? lojaAlertas.alertas
-          : [];
-
-        return alertasArray.map((alerta) => ({
-          ...alerta,
-          lojaNome: lojaAlertas.lojaNome,
-        }));
-      });
-
-      setAlertasEstoqueLoja(todosAlertas);
-      console.log("Alertas de estoque de lojas:", todosAlertas);
-    } catch (error) {
-      console.error("Erro ao carregar alertas de estoque de lojas:", error);
-      setAlertasEstoqueLoja([]);
-    }
-  };
-
-  const carregarAlertasEstoqueUsuario = async () => {
-    try {
-      const response = await api.get("/estoque-usuarios/me/alertas");
-      const alertas = Array.isArray(response.data)
-        ? response.data
-        : response.data?.alertas || [];
-      setAlertasEstoqueUsuario(alertas);
-    } catch (error) {
-      console.error("Erro ao carregar alertas de estoque do usuario:", error);
-      setAlertasEstoqueUsuario([]);
-    }
-  };
-
-  const carregarAlertaInatividadeLojas = useCallback(
-    async (lojasData) => {
-      let lojasParaAnalise = Array.isArray(lojasData) ? lojasData : [];
-
-      if (lojasParaAnalise.length === 0 && usuario?.role === "FUNCIONARIO") {
-        try {
-          const lojasRes = await api.get("/lojas");
-          lojasParaAnalise = Array.isArray(lojasRes.data) ? lojasRes.data : [];
-        } catch {
-          lojasParaAnalise = [];
-        }
-      }
-
-      if (lojasParaAnalise.length === 0) {
-        setAlertaInatividadeLojas({ lojas: [], carregando: false });
-        return;
-      }
-
-      setAlertaInatividadeLojas((prev) => ({ ...prev, carregando: true }));
-
-      try {
-        const hoje = new Date();
-        const dataInicioBusca = new Date(
-          hoje.getTime() - 90 * 24 * 60 * 60 * 1000,
-        )
-          .toISOString()
-          .split("T")[0];
-        const dataFimBusca = hoje.toISOString().split("T")[0];
-
-        const [movRes, fluxoRes] = await Promise.all([
-          api
-            .get("/movimentacoes", {
-              params: {
-                dataInicio: dataInicioBusca,
-                dataFim: `${dataFimBusca}T23:59:59`,
-                limite: 50000,
-              },
-            })
-            .catch(() => ({ data: [] })),
-          api
-            .get(
-              `/fluxo-caixa?dataInicio=${dataInicioBusca}&dataFim=${dataFimBusca}&status=todos`,
-            )
-            .catch(() => ({ data: [] })),
-        ]);
-
-        const movimentacoes = Array.isArray(movRes?.data)
-          ? movRes.data
-          : movRes?.data?.movimentacoes || movRes?.data?.rows || [];
-        const fluxos = Array.isArray(fluxoRes?.data)
-          ? fluxoRes.data
-          : fluxoRes?.data?.fluxos || fluxoRes?.data?.rows || [];
-
-        const ultimaMovPorLoja = new Map();
-        const ultimaRetiradaPorLoja = new Map();
-
-        movimentacoes.forEach((mov) => {
-          const lojaId = String(
-            mov?.lojaId || mov?.maquina?.lojaId || mov?.maquina?.loja?.id || "",
-          );
-          if (!lojaId) return;
-
-          const dataMov = new Date(
-            mov?.dataColeta ||
-              mov?.data ||
-              mov?.dataMovimentacao ||
-              mov?.createdAt,
-          );
-          if (Number.isNaN(dataMov.getTime())) return;
-
-          const anterior = ultimaMovPorLoja.get(lojaId);
-          if (!anterior || dataMov > anterior) {
-            ultimaMovPorLoja.set(lojaId, dataMov);
-          }
-        });
-
-        fluxos.forEach((fluxo) => {
-          const lojaId = String(
-            fluxo?.lojaId ||
-              fluxo?.movimentacao?.maquina?.lojaId ||
-              fluxo?.movimentacao?.maquina?.loja?.id ||
-              "",
-          );
-          if (!lojaId) return;
-
-          const dataRetirada = new Date(
-            fluxo?.movimentacao?.dataColeta ||
-              fluxo?.dataRetirada ||
-              fluxo?.dataConferencia ||
-              fluxo?.createdAt ||
-              fluxo?.updatedAt,
-          );
-          if (Number.isNaN(dataRetirada.getTime())) return;
-
-          const anterior = ultimaRetiradaPorLoja.get(lojaId);
-          if (!anterior || dataRetirada > anterior) {
-            ultimaRetiradaPorLoja.set(lojaId, dataRetirada);
-          }
-        });
-
-        const MS_DIA = 24 * 60 * 60 * 1000;
-        const lojasComAlerta = lojasParaAnalise
-          .filter((loja) => !loja?.isDepositoPrincipal)
-          .map((loja) => {
-            const id = String(loja?.id || "");
-            const ultimaMov = ultimaMovPorLoja.get(id) || null;
-            const ultimaRetirada = ultimaRetiradaPorLoja.get(id) || null;
-
-            const diasSemMov = ultimaMov
-              ? Math.floor((hoje - ultimaMov) / MS_DIA)
-              : 9999;
-            const diasSemRetirada = ultimaRetirada
-              ? Math.floor((hoje - ultimaRetirada) / MS_DIA)
-              : 9999;
-
-            return {
-              lojaId: loja.id,
-              lojaNome: loja.nome,
-              ultimaMovimentacao: ultimaMov,
-              ultimaRetirada,
-              diasSemMov,
-              diasSemRetirada,
-            };
-          })
-          .filter((loja) => loja.diasSemMov > 15 && loja.diasSemRetirada > 15)
-          .sort((a, b) => b.diasSemMov - a.diasSemMov);
-
-        setAlertaInatividadeLojas({ lojas: lojasComAlerta, carregando: false });
-      } catch (error) {
-        console.error(
-          "Erro ao calcular alerta de inatividade das lojas:",
-          error,
-        );
-        setAlertaInatividadeLojas({ lojas: [], carregando: false });
-      }
-    },
-    [usuario?.role],
-  );
 
   const abrirDetalheAlertaInatividade = () => {
     const linhasHtml = alertaInatividadeLojas.lojas
