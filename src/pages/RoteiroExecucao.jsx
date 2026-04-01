@@ -11,9 +11,13 @@ import {
   extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
+  obterKmInicialPilotagemAtiva,
   obterEstoqueInicialSnapshotRoteiro,
+  obterKmInicialPilotagemSnapshotRoteiro,
   removerEstoqueInicialSnapshotRoteiro,
+  removerKmInicialPilotagemSnapshotRoteiro,
   salvarEstoqueInicialSnapshotRoteiro,
+  salvarKmInicialPilotagemSnapshotRoteiro,
   somarPeluciasUsadasMovimentacoes,
   somarSaldoEstoqueUsuario,
 } from "../lib/roteiroFinalizacaoWhatsApp";
@@ -214,6 +218,10 @@ export default function RoteiroExecucao() {
       const usuarioReferenciaId = String(
         res?.data?.funcionarioId || usuario?.id || "",
       ).trim();
+      let kmInicialSnapshotExistente = obterKmInicialPilotagemSnapshotRoteiro({
+        roteiroId: id,
+        usuarioId: usuarioReferenciaId,
+      });
       const snapshotExistente = obterEstoqueInicialSnapshotRoteiro({
         roteiroId: id,
         usuarioId: usuarioReferenciaId,
@@ -232,6 +240,68 @@ export default function RoteiroExecucao() {
           });
         } catch {
           // Sem bloqueio de fluxo caso a captura inicial falhe.
+        }
+      }
+
+      if (!Number.isFinite(kmInicialSnapshotExistente) && usuarioReferenciaId) {
+        const kmInicialPilotagemAtiva = obterKmInicialPilotagemAtiva({
+          usuarioId: usuarioReferenciaId,
+          veiculoId: res?.data?.veiculoId || res?.data?.veiculo?.id,
+        });
+
+        if (Number.isFinite(kmInicialPilotagemAtiva)) {
+          salvarKmInicialPilotagemSnapshotRoteiro({
+            roteiroId: id,
+            usuarioId: usuarioReferenciaId,
+            kmInicial: kmInicialPilotagemAtiva,
+            sobrescrever: false,
+          });
+          kmInicialSnapshotExistente = kmInicialPilotagemAtiva;
+        }
+      }
+
+      if (!Number.isFinite(kmInicialSnapshotExistente) && usuarioReferenciaId) {
+        try {
+          const ultimasRes = await api.get("/movimentacao-veiculos/ultimas");
+          const ultimasObj = ultimasRes?.data || {};
+          const ultimasMovs = Array.isArray(ultimasObj)
+            ? ultimasObj
+            : Object.values(ultimasObj);
+
+          const retiradaAtiva = ultimasMovs.find((mov) => {
+            const tipoMov = String(mov?.tipo || "").toLowerCase();
+            const usuarioMovId = String(
+              mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+            );
+            const veiculoMovId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+            const veiculoRoteiroId = String(
+              res?.data?.veiculoId || res?.data?.veiculo?.id || "",
+            );
+
+            if (tipoMov !== "retirada") return false;
+            if (usuarioMovId !== usuarioReferenciaId) return false;
+            if (veiculoRoteiroId && veiculoMovId !== veiculoRoteiroId) return false;
+            return true;
+          });
+
+          const kmInicialPilotagem = Number(
+            retiradaAtiva?.kmInicial ??
+              retiradaAtiva?.quilometragemInicial ??
+              retiradaAtiva?.kmRetirada ??
+              retiradaAtiva?.odometroInicial ??
+              retiradaAtiva?.km,
+          );
+
+          if (Number.isFinite(kmInicialPilotagem)) {
+            salvarKmInicialPilotagemSnapshotRoteiro({
+              roteiroId: id,
+              usuarioId: usuarioReferenciaId,
+              kmInicial: kmInicialPilotagem,
+              sobrescrever: false,
+            });
+          }
+        } catch {
+          // Sem bloqueio de fluxo caso a captura do KM inicial falhe.
         }
       }
 
@@ -692,6 +762,10 @@ export default function RoteiroExecucao() {
         finalizacaoData?.funcionario?.id ||
         roteiro?.funcionarioId ||
         usuario?.id;
+      const kmInicialPilotagemSnapshot = obterKmInicialPilotagemSnapshotRoteiro({
+        roteiroId: id,
+        usuarioId: funcionarioDoRoteiro,
+      });
 
       let totalPeluciasUsadas = extrairNumero(
         finalizacaoData?.totalPeluciasUsadas,
@@ -896,8 +970,14 @@ export default function RoteiroExecucao() {
         }
       }
 
-      let kmInicialVeiculo = null;
+      let kmInicialVeiculo = Number.isFinite(kmInicialPilotagemSnapshot)
+        ? kmInicialPilotagemSnapshot
+        : null;
       let kmFinalVeiculo = null;
+      let fonteKmInicial = Number.isFinite(kmInicialPilotagemSnapshot)
+        ? "snapshot_pilotagem_usuario"
+        : "indefinida";
+      let fonteKmFinal = "indefinida";
 
       try {
         const movVeiculoRes = await api.get("/movimentacao-veiculos", {
@@ -919,30 +999,60 @@ export default function RoteiroExecucao() {
           },
         );
 
-        kmInicialVeiculo = resumoKm.kmInicial;
-        kmFinalVeiculo = resumoKm.kmFinal;
+        if (kmInicialVeiculo === null && Number.isFinite(resumoKm.kmInicial)) {
+          kmInicialVeiculo = resumoKm.kmInicial;
+          fonteKmInicial = "movimentacao_veiculo_retirada";
+        }
+
+        if (Number.isFinite(resumoKm.kmFinal)) {
+          kmFinalVeiculo = resumoKm.kmFinal;
+          fonteKmFinal = "movimentacao_veiculo_devolucao";
+        }
       } catch {
-        kmInicialVeiculo = null;
-        kmFinalVeiculo = null;
+        if (kmInicialVeiculo === null) {
+          fonteKmInicial = "erro_busca_movimentacao";
+        }
+        fonteKmFinal = "erro_busca_movimentacao";
       }
 
-      kmInicialVeiculo =
-        kmInicialVeiculo ??
-        extrairNumero(
-          finalizacaoData?.kmInicialVeiculo,
-          finalizacaoData?.kmInicial,
-          finalizacaoData?.quilometragemInicial,
-          finalizacaoData?.totais?.kmInicialVeiculo,
-        );
-
-      kmFinalVeiculo =
-        kmFinalVeiculo ??
-        extrairNumero(
+      if (kmFinalVeiculo === null) {
+        const kmFinalFallback = extrairNumero(
           finalizacaoData?.kmFinalVeiculo,
           finalizacaoData?.kmFinal,
           finalizacaoData?.quilometragemFinal,
           finalizacaoData?.totais?.kmFinalVeiculo,
         );
+
+        if (kmFinalFallback !== null) {
+          kmFinalVeiculo = kmFinalFallback;
+          fonteKmFinal = "finalizacao_data";
+        }
+      }
+
+      if (kmInicialVeiculo === null) {
+        fonteKmInicial =
+          fonteKmInicial === "indefinida"
+            ? "sem_dados_km_inicial"
+            : fonteKmInicial;
+      }
+
+      if (kmFinalVeiculo === null) {
+        fonteKmFinal =
+          fonteKmFinal === "indefinida" ? "sem_dados_km_final" : fonteKmFinal;
+      }
+
+      if (import.meta.env.DEV) {
+        console.log("[ResumoFinalizacao][KM][RoteiroExecucao]", {
+          roteiroId: id,
+          usuarioId: funcionarioDoRoteiro,
+          veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id || null,
+          kmInicialVeiculo,
+          kmFinalVeiculo,
+          fonteKmInicial,
+          fonteKmFinal,
+          kmInicialSnapshot: kmInicialPilotagemSnapshot,
+        });
+      }
 
       return montarMensagemFinalizacaoRoteiro({
         roteiroNome: roteiro?.nome,
@@ -1028,6 +1138,10 @@ export default function RoteiroExecucao() {
       }
 
       removerEstoqueInicialSnapshotRoteiro({
+        roteiroId: id,
+        usuarioId: usuarioReferenciaId,
+      });
+      removerKmInicialPilotagemSnapshotRoteiro({
         roteiroId: id,
         usuarioId: usuarioReferenciaId,
       });

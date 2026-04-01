@@ -8,6 +8,10 @@ const STATUS_CONCLUIDO = new Set([
 
 const ESTOQUE_INICIAL_ROTEIRO_STORAGE_PREFIX =
   "starbox:roteiro:estoque-inicial:";
+const KM_INICIAL_PILOTAGEM_ROTEIRO_STORAGE_PREFIX =
+  "starbox:roteiro:km-inicial-pilotagem:";
+const KM_INICIAL_PILOTAGEM_ATIVA_STORAGE_PREFIX =
+  "starbox:pilotagem:km-inicial:";
 
 const normalizarTexto = (valor) => String(valor || "").trim();
 
@@ -69,6 +73,140 @@ export const salvarEstoqueInicialSnapshotRoteiro = ({
 
 export const removerEstoqueInicialSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
   const chave = montarChaveEstoqueInicialRoteiro({ roteiroId, usuarioId });
+  if (!chave) return false;
+
+  try {
+    window.localStorage.removeItem(chave);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const montarChaveKmInicialPilotagemRoteiro = ({ roteiroId, usuarioId }) => {
+  const roteiroNormalizado = normalizarTexto(roteiroId);
+  const usuarioNormalizado = normalizarTexto(usuarioId);
+
+  if (!roteiroNormalizado || !usuarioNormalizado) return "";
+  return `${KM_INICIAL_PILOTAGEM_ROTEIRO_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}`;
+};
+
+export const obterKmInicialPilotagemSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+  const chave = montarChaveKmInicialPilotagemRoteiro({ roteiroId, usuarioId });
+  if (!chave) return null;
+
+  try {
+    const bruto = window.localStorage.getItem(chave);
+    if (!bruto) return null;
+
+    const payload = JSON.parse(bruto);
+    const kmInicial = Number(payload?.kmInicial);
+    return Number.isFinite(kmInicial) ? kmInicial : null;
+  } catch {
+    return null;
+  }
+};
+
+export const salvarKmInicialPilotagemSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+  kmInicial,
+  sobrescrever = false,
+}) => {
+  const chave = montarChaveKmInicialPilotagemRoteiro({ roteiroId, usuarioId });
+  const kmInicialNumero = Number(kmInicial);
+
+  if (!chave || !Number.isFinite(kmInicialNumero)) return false;
+
+  try {
+    if (!sobrescrever && window.localStorage.getItem(chave)) {
+      return true;
+    }
+
+    window.localStorage.setItem(
+      chave,
+      JSON.stringify({
+        kmInicial: kmInicialNumero,
+        roteiroId: String(roteiroId),
+        usuarioId: String(usuarioId),
+        capturedAt: new Date().toISOString(),
+      }),
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const removerKmInicialPilotagemSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
+  const chave = montarChaveKmInicialPilotagemRoteiro({ roteiroId, usuarioId });
+  if (!chave) return false;
+
+  try {
+    window.localStorage.removeItem(chave);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const montarChaveKmInicialPilotagemAtiva = ({ usuarioId, veiculoId }) => {
+  const usuarioNormalizado = normalizarTexto(usuarioId);
+  const veiculoNormalizado = normalizarTexto(veiculoId);
+
+  if (!usuarioNormalizado || !veiculoNormalizado) return "";
+  return `${KM_INICIAL_PILOTAGEM_ATIVA_STORAGE_PREFIX}${usuarioNormalizado}:${veiculoNormalizado}`;
+};
+
+export const obterKmInicialPilotagemAtiva = ({ usuarioId, veiculoId }) => {
+  const chave = montarChaveKmInicialPilotagemAtiva({ usuarioId, veiculoId });
+  if (!chave) return null;
+
+  try {
+    const bruto = window.localStorage.getItem(chave);
+    if (!bruto) return null;
+
+    const payload = JSON.parse(bruto);
+    const kmInicial = Number(payload?.kmInicial);
+    return Number.isFinite(kmInicial) ? kmInicial : null;
+  } catch {
+    return null;
+  }
+};
+
+export const salvarKmInicialPilotagemAtiva = ({
+  usuarioId,
+  veiculoId,
+  kmInicial,
+}) => {
+  const chave = montarChaveKmInicialPilotagemAtiva({ usuarioId, veiculoId });
+  const kmInicialNumero = Number(kmInicial);
+
+  if (!chave || !Number.isFinite(kmInicialNumero)) return false;
+
+  try {
+    window.localStorage.setItem(
+      chave,
+      JSON.stringify({
+        kmInicial: kmInicialNumero,
+        usuarioId: String(usuarioId),
+        veiculoId: String(veiculoId),
+        capturedAt: new Date().toISOString(),
+      }),
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const removerKmInicialPilotagemAtiva = ({ usuarioId, veiculoId }) => {
+  const chave = montarChaveKmInicialPilotagemAtiva({ usuarioId, veiculoId });
   if (!chave) return false;
 
   try {

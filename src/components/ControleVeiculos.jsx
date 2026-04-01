@@ -35,6 +35,10 @@ const excluirVeiculo = async (veiculo) => {
 };
 import { AuthContext } from "../contexts/AuthContext";
 import { reconhecerAlertaRevisao } from "../services/revisoesVeiculos";
+import {
+  removerKmInicialPilotagemAtiva,
+  salvarKmInicialPilotagemAtiva,
+} from "../lib/roteiroFinalizacaoWhatsApp";
 
 import api from "../services/api";
 const emojiVeiculo = (tipo, emoji) => emoji || (tipo === "moto" ? "🏍️" : "🚗");
@@ -292,6 +296,13 @@ export default function ControleVeiculos({
         obs: form.obs || undefined,
         km: kmValue,
       });
+
+      salvarKmInicialPilotagemAtiva({
+        usuarioId: usuario?.id,
+        veiculoId: veiculoSelecionado.id,
+        kmInicial: kmValue,
+      });
+
       if (onRefresh) onRefresh();
       fecharModal();
 
@@ -347,6 +358,12 @@ export default function ControleVeiculos({
         obs: formFinalizar.obs || undefined,
         km: kmValue,
       });
+
+      removerKmInicialPilotagemAtiva({
+        usuarioId: usuario?.id,
+        veiculoId: veiculoSelecionado.id,
+      });
+
       if (onRefresh) onRefresh();
       Swal.fire({
         icon: "success",
