@@ -865,9 +865,9 @@ export function Dashboard() {
             <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${loja.diasSemMov}</td>
             <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${loja.diasSemRetirada}</td>
             <td style="padding:8px;border:1px solid #e5e7eb;">${ultimaMov}</td>
-                                    {mov.totalPos ??
-                                      (mov.totalPre || 0) +
-                                        (mov.abastecidas || 0)}
+            <td style="padding:8px;border:1px solid #e5e7eb;">${ultimaRetirada}</td>
+          </tr>
+        `;
       })
       .join("");
 
@@ -3732,8 +3732,9 @@ export function Dashboard() {
                                     <span>📦</span> Total Atual
                                   </p>
                                   <p className="font-semibold text-purple-600">
-                                    {(mov.totalPre || 0) +
-                                      (mov.abastecidas || 0)}
+                                    {mov.totalPos ??
+                                      (mov.totalPre || 0) +
+                                        (mov.abastecidas || 0)}
                                   </p>
                                 </div>
                                 <div>
