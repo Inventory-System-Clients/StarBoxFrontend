@@ -497,6 +497,11 @@ export function Dashboard() {
           .split("T")[0];
         const dataFimBusca = hoje.toISOString().split("T")[0];
 
+        const paramsFluxo = new URLSearchParams({
+          dataInicio: dataInicioBusca,
+          dataFim: dataFimBusca,
+        });
+
         const [movRes, fluxoRes] = await Promise.all([
           api
             .get("/movimentacoes", {
@@ -508,9 +513,7 @@ export function Dashboard() {
             })
             .catch(() => ({ data: [] })),
           api
-            .get(
-              `/fluxo-caixa?dataInicio=${dataInicioBusca}&dataFim=${dataFimBusca}&status=todos`,
-            )
+            .get(`/fluxo-caixa?${paramsFluxo.toString()}`)
             .catch(() => ({ data: [] })),
         ]);
 
