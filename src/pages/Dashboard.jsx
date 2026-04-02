@@ -3763,7 +3763,7 @@ export function Dashboard() {
                                     <span className="text-lg">📥</span>
                                     <div>
                                       <p className="text-xs text-gray-600">
-                                        Contador IN
+                                        Contador Entrada
                                       </p>
                                       <p className="font-bold text-green-700">
                                         {mov.contadorIn || "-"}
@@ -3774,7 +3774,7 @@ export function Dashboard() {
                                     <span className="text-lg">📤</span>
                                     <div>
                                       <p className="text-xs text-gray-600">
-                                        Contador OUT
+                                        Contador Saída
                                       </p>
                                       <p className="font-bold text-orange-700">
                                         {mov.contadorOut || "-"}

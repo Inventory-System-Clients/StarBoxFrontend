@@ -1097,7 +1097,7 @@ export function LojaDetalhes() {
                                 <span className="text-lg">⬆️</span>
                                 <div>
                                   <p className="text-xs text-gray-600">
-                                    Contador IN
+                                    Contador Entrada
                                   </p>
                                   <p className="font-bold text-blue-600">
                                     {mov.contadorIn?.toLocaleString("pt-BR") ||
@@ -1109,7 +1109,7 @@ export function LojaDetalhes() {
                                 <span className="text-lg">⬇️</span>
                                 <div>
                                   <p className="text-xs text-gray-600">
-                                    Contador OUT
+                                    Contador Saída
                                   </p>
                                   <p className="font-bold text-purple-600">
                                     {mov.contadorOut?.toLocaleString("pt-BR") ||

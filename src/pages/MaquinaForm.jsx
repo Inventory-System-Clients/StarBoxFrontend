@@ -706,7 +706,7 @@ export function MaquinaForm() {
                   <>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Contador IN Inicial
+                        Contador Entrada Inicial
                       </label>
                       <input
                         type="number"
@@ -724,7 +724,7 @@ export function MaquinaForm() {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Contador OUT Inicial
+                        Contador Saída Inicial
                       </label>
                       <input
                         type="number"

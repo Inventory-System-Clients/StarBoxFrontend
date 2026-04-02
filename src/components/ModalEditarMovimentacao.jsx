@@ -241,7 +241,7 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contador IN
+                  Contador Entrada
                 </label>
                 <input
                   type="number"
@@ -255,7 +255,7 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contador OUT
+                  Contador Saída
                 </label>
                 <input
                   type="number"

@@ -1111,7 +1111,7 @@ export function Movimentacoes() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        📥 Contador IN (Entrada)
+                        📥 Contador Entrada (Entrada)
                       </label>
                       <input
                         type="number"
@@ -1125,13 +1125,13 @@ export function Movimentacoes() {
                         disabled={formData.ignoreInOut}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Número do contador IN da máquina
+                        Número do contador Entrada da máquina
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        📤 Contador OUT (Saída)
+                        📤 Contador Saída (Saída)
                       </label>
                       <input
                         type="number"
@@ -1145,7 +1145,7 @@ export function Movimentacoes() {
                         disabled={formData.ignoreInOut}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Número do contador OUT da máquina
+                        Número do contador Saída da máquina
                       </p>
                     </div>
                   </div>
