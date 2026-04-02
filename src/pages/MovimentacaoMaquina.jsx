@@ -581,10 +581,10 @@ export default function MovimentacaoMaquina() {
           "Qtde Maqs....: 01",
           `Entradas.....: ${formatarInteiro(diferencaIn)}`,
           `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
-          `Jogado.......: ${formatarMoeda(jogado)}`,
-          "Cliente....: 0,00",
-          `Liquido.....: ${formatarMoeda(saldo)}`,
-          `Especie.....: ${formatarMoeda(saldo)}`,
+          `Jogado.......: ${formatarInteiro(jogado)}`,
+          "Cliente....: 0",
+          `Liquido.....: ${formatarInteiro(saldo)}`,
+          `Especie.....: ${formatarInteiro(saldo)}`,
         ];
 
     return [
