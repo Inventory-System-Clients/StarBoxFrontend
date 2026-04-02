@@ -151,6 +151,11 @@ export function Roteiros() {
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
 
+  const roteiroTemVeiculoAssociado = (roteiroAtual) =>
+    Boolean(
+      String(roteiroAtual?.veiculoId || roteiroAtual?.veiculo?.id || "").trim(),
+    );
+
   const normalizarIdOpcional = (valor) => {
     const texto = String(valor || "").trim();
     return texto || null;
@@ -512,26 +517,29 @@ export function Roteiros() {
   const iniciarOuContinuarRoteiro = async (roteiroId) => {
     setError("");
 
-    const podeProsseguir = await usuarioTemPilotagemAtiva();
-    if (!podeProsseguir) {
-      const mensagemBloqueio =
-        "Voce precisa iniciar a pilotagem de um veiculo antes de comecar o roteiro. Voce sera redirecionado para a aba de veiculos.";
-
-      setError(mensagemBloqueio);
-      window.alert(mensagemBloqueio);
-      navigate("/veiculos", {
-        state: {
-          origem: "roteiros",
-          retornarPara: "/roteiros",
-        },
-      });
-      return;
-    }
-
-    const usuarioReferenciaId = String(usuario?.id || "").trim();
     const roteiroAtual = (Array.isArray(roteiros) ? roteiros : []).find(
       (item) => String(item?.id) === String(roteiroId),
     );
+
+    if (roteiroTemVeiculoAssociado(roteiroAtual)) {
+      const podeProsseguir = await usuarioTemPilotagemAtiva();
+      if (!podeProsseguir) {
+        const mensagemBloqueio =
+          "Voce precisa iniciar a pilotagem de um veiculo antes de comecar o roteiro. Voce sera redirecionado para a aba de veiculos.";
+
+        setError(mensagemBloqueio);
+        window.alert(mensagemBloqueio);
+        navigate("/veiculos", {
+          state: {
+            origem: "roteiros",
+            retornarPara: "/roteiros",
+          },
+        });
+        return;
+      }
+    }
+
+    const usuarioReferenciaId = String(usuario?.id || "").trim();
     const snapshotExistente = obterEstoqueInicialSnapshotRoteiro({
       roteiroId,
       usuarioId: usuarioReferenciaId,
@@ -622,6 +630,11 @@ export function Roteiros() {
   };
 
   const exigirFinalizarPilotagemAntesDaRota = async (roteiroId) => {
+    const roteiroAtual = getRoteiroById(roteiroId);
+    if (!roteiroTemVeiculoAssociado(roteiroAtual)) {
+      return true;
+    }
+
     const temPilotagemAtiva = await usuarioTemPilotagemAtiva(true);
     if (!temPilotagemAtiva) return true;
 

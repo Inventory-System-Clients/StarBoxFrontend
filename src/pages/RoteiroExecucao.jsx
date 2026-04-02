@@ -104,6 +104,11 @@ export default function RoteiroExecucao() {
     });
   };
 
+  const roteiroTemVeiculoAssociado = (roteiroAtual) =>
+    Boolean(
+      String(roteiroAtual?.veiculoId || roteiroAtual?.veiculo?.id || "").trim(),
+    );
+
   const formatarMoedaBRL = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
       style: "currency",
@@ -159,6 +164,7 @@ export default function RoteiroExecucao() {
   useEffect(() => {
     if (!roteiro || !roteiroEstaFinalizado(roteiro.status)) return;
     if (roteiroTemPendencias(roteiro)) return;
+    if (!roteiroTemVeiculoAssociado(roteiro)) return;
     if (!location.state?.origemMovimentacao) return;
     if (location.state?.pilotagemFinalizada) return;
 
@@ -709,23 +715,25 @@ export default function RoteiroExecucao() {
       }
     };
 
-    const temPilotagemAtiva = await validarPilotagemAtivaUsuario();
-    if (temPilotagemAtiva) {
-      const mensagemBloqueio =
-        "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
+    if (roteiroTemVeiculoAssociado(roteiro)) {
+      const temPilotagemAtiva = await validarPilotagemAtivaUsuario();
+      if (temPilotagemAtiva) {
+        const mensagemBloqueio =
+          "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
 
-      setError(mensagemBloqueio);
-      setModalFinalizar({ aberto: false, etapa: 1, loading: false });
-      navigate("/veiculos", {
-        state: {
-          origem: "roteiros-finalizacao",
-          retornarPara: `/roteiros/${id}/executar`,
-          roteiroIdParaFinalizar: id,
-          alertaFinalizarVeiculo: mensagemBloqueio,
-          alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
-        },
-      });
-      return;
+        setError(mensagemBloqueio);
+        setModalFinalizar({ aberto: false, etapa: 1, loading: false });
+        navigate("/veiculos", {
+          state: {
+            origem: "roteiros-finalizacao",
+            retornarPara: `/roteiros/${id}/executar`,
+            roteiroIdParaFinalizar: id,
+            alertaFinalizarVeiculo: mensagemBloqueio,
+            alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
+          },
+        });
+        return;
+      }
     }
 
     const extrairNumero = (...valores) => {
@@ -1207,70 +1215,72 @@ export default function RoteiroExecucao() {
   };
 
   const abrirModalFinalizacao = async () => {
-    try {
-      const [ultimasMovRes, veiculosRes] = await Promise.all([
-        api.get("/movimentacao-veiculos/ultimas"),
-        api.get("/veiculos"),
-      ]);
+    if (roteiroTemVeiculoAssociado(roteiro)) {
+      try {
+        const [ultimasMovRes, veiculosRes] = await Promise.all([
+          api.get("/movimentacao-veiculos/ultimas"),
+          api.get("/veiculos"),
+        ]);
 
-      const usuarioId = String(usuario?.id || "");
-      const veiculosLista = Array.isArray(veiculosRes.data)
-        ? veiculosRes.data
-        : [];
+        const usuarioId = String(usuario?.id || "");
+        const veiculosLista = Array.isArray(veiculosRes.data)
+          ? veiculosRes.data
+          : [];
 
-      const ultimasMovObj = ultimasMovRes.data || {};
-      const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
-        ? ultimasMovObj
-        : Object.values(ultimasMovObj);
+        const ultimasMovObj = ultimasMovRes.data || {};
+        const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
+          ? ultimasMovObj
+          : Object.values(ultimasMovObj);
 
-      const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
-        const usuarioMovId = String(
-          mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
-        );
-        const tipoMov = String(mov?.tipo || "").toLowerCase();
-        const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
-        const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
+        const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
+          const usuarioMovId = String(
+            mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
+          );
+          const tipoMov = String(mov?.tipo || "").toLowerCase();
+          const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+          const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
 
-        return (
-          usuarioMovId === usuarioId &&
-          tipoMov === "retirada" &&
-          Boolean(veiculo?.emUso)
-        );
-      });
-
-      const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
-        const usuarioVeiculoId = String(
-          veiculo?.usuario?.id ||
-            veiculo?.usuarioId ||
-            veiculo?.funcionarioId ||
-            veiculo?.condutorId ||
-            "",
-        );
-
-        return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
-      });
-
-      if (temRetiradaAtiva || temVinculoDiretoNoVeiculo) {
-        const mensagemBloqueio =
-          "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
-
-        setError(mensagemBloqueio);
-        navigate("/veiculos", {
-          state: {
-            origem: "roteiros-finalizacao",
-            retornarPara: `/roteiros/${id}/executar`,
-            roteiroIdParaFinalizar: id,
-            alertaFinalizarVeiculo: mensagemBloqueio,
-            alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
-          },
+          return (
+            usuarioMovId === usuarioId &&
+            tipoMov === "retirada" &&
+            Boolean(veiculo?.emUso)
+          );
         });
+
+        const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
+          const usuarioVeiculoId = String(
+            veiculo?.usuario?.id ||
+              veiculo?.usuarioId ||
+              veiculo?.funcionarioId ||
+              veiculo?.condutorId ||
+              "",
+          );
+
+          return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
+        });
+
+        if (temRetiradaAtiva || temVinculoDiretoNoVeiculo) {
+          const mensagemBloqueio =
+            "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
+
+          setError(mensagemBloqueio);
+          navigate("/veiculos", {
+            state: {
+              origem: "roteiros-finalizacao",
+              retornarPara: `/roteiros/${id}/executar`,
+              roteiroIdParaFinalizar: id,
+              alertaFinalizarVeiculo: mensagemBloqueio,
+              alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
+            },
+          });
+          return;
+        }
+      } catch {
+        setError(
+          "Não foi possível validar a pilotagem do veículo. Tente novamente em instantes.",
+        );
         return;
       }
-    } catch {
-      setError(
-        "Não foi possível validar a pilotagem do veículo. Tente novamente em instantes.",
-      );
-      return;
     }
 
     setModalFinalizar({ aberto: true, etapa: 1, loading: false });
