@@ -389,6 +389,9 @@ export default function RoteiroExecucao() {
       return;
     }
 
+    // Reserva popup no clique para evitar bloqueio ao abrir WhatsApp apos chamada async.
+    const popupReservado = window.open("about:blank", "_blank");
+
     try {
       // Salvar justificativa via API
       await api.post(`/roteiros/${id}/justificar-ordem`, {
@@ -396,6 +399,29 @@ export default function RoteiroExecucao() {
         lojaIdEsperada: modalJustificativa.lojaIdEsperada,
         justificativa: modalJustificativa.justificativa,
       });
+
+      const mensagemWhatsAppQuebraOrdem = [
+        "STAR BOX",
+        "*Quebra de ordem do roteiro*",
+        `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+        `Roteiro: ${roteiro?.nome || "-"}`,
+        `Funcionario: ${usuario?.nome || "-"}`,
+        "___________________________________",
+        `Ponto esperado: ${modalJustificativa.lojaEsperadaNome || "-"}`,
+        `Ponto selecionado: ${modalJustificativa.lojaNome || "-"}`,
+        `Justificativa: ${modalJustificativa.justificativa.trim()}`,
+      ].join("\n");
+
+      const abriuWhatsApp = abrirWhatsAppComMensagem(
+        mensagemWhatsAppQuebraOrdem,
+        popupReservado,
+      );
+
+      if (!abriuWhatsApp) {
+        setSuccess(
+          "Justificativa salva, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
+        );
+      }
 
       const loja = roteiro.lojas.find(
         (l) => l.id === modalJustificativa.lojaId,
@@ -416,6 +442,9 @@ export default function RoteiroExecucao() {
         justificativa: "",
       });
     } catch (err) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
       setError("Erro ao salvar justificativa.");
     }
   };
