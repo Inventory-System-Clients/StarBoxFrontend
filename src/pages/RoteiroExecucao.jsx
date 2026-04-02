@@ -977,7 +977,33 @@ export default function RoteiroExecucao() {
           return false;
         });
 
-        const feitas = relacionadasRoteiro.filter((item) => {
+        const inicioSemanaAtual = new Date();
+        inicioSemanaAtual.setHours(0, 0, 0, 0);
+        inicioSemanaAtual.setDate(
+          inicioSemanaAtual.getDate() - inicioSemanaAtual.getDay(),
+        );
+
+        const relacionadasRoteiroSemanaAtual = relacionadasRoteiro.filter(
+          (item) => {
+            const status = String(item?.status || "").toLowerCase();
+            const dataReferencia = [
+              "feito",
+              "concluida",
+              "concluido",
+              "finalizada",
+              "finalizado",
+            ].includes(status)
+              ? item?.concluidoEm || item?.updatedAt || item?.createdAt
+              : item?.createdAt || item?.updatedAt || item?.verificadoEm;
+
+            const dataMs = new Date(dataReferencia).getTime();
+            if (!Number.isFinite(dataMs)) return false;
+
+            return dataMs >= inicioSemanaAtual.getTime();
+          },
+        );
+
+        const feitas = relacionadasRoteiroSemanaAtual.filter((item) => {
           const status = String(item?.status || "").toLowerCase();
           return [
             "feito",
@@ -988,7 +1014,7 @@ export default function RoteiroExecucao() {
           ].includes(status);
         });
 
-        const pendentes = relacionadasRoteiro.filter((item) => {
+        const pendentes = relacionadasRoteiroSemanaAtual.filter((item) => {
           const status = String(item?.status || "").toLowerCase();
           return ![
             "feito",
