@@ -528,6 +528,7 @@ const formatarMoedaBRL = (valor) => {
 
 export const montarMensagemFinalizacaoRoteiro = ({
   roteiroNome,
+  possuiVeiculoAssociado = true,
   kmInicialVeiculo,
   kmFinalVeiculo,
   lojasFeitas,
@@ -595,15 +596,20 @@ export const montarMensagemFinalizacaoRoteiro = ({
     Number.isFinite(consumoResumo.estoqueInicialTotal) &&
     Number.isFinite(consumoResumo.estoqueFinalTotal) &&
     Number.isFinite(consumoResumo.consumoTotalProdutos);
+  const linhasKm = possuiVeiculoAssociado
+    ? [
+        `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
+        `KM final (devolucao): ${kmFinal !== null ? kmFinal : "Nao informado"}`,
+        `KM rodado: ${kmRodado !== null ? kmRodado : "Nao informado"}`,
+      ]
+    : [];
 
   return [
     "STAR BOX",
     "*Resumo de Finalizacao de Roteiro*",
     "___________________________________",
     `Roteiro: ${normalizarTexto(roteiroNome) || "-"}`,
-    `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
-    `KM final (devolucao): ${kmFinal !== null ? kmFinal : "Nao informado"}`,
-    `KM rodado: ${kmRodado !== null ? kmRodado : "Nao informado"}`,
+    ...linhasKm,
     `Pontos feitos: ${formatarLista(lojasFeitas)}`,
     `Pontos nao feitos: ${formatarLista(lojasNaoFeitas)}`,
     `Maquinas feitas: ${formatarLista(maquinasFeitas)}`,

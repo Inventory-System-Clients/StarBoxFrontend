@@ -1097,6 +1097,7 @@ export default function RoteiroExecucao() {
 
       return montarMensagemFinalizacaoRoteiro({
         roteiroNome: roteiro?.nome,
+        possuiVeiculoAssociado: roteiroTemVeiculoAssociado(roteiro),
         kmInicialVeiculo,
         kmFinalVeiculo,
         lojasFeitas: resumoExecucao.lojasFeitas,
