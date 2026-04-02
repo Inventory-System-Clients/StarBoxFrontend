@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
@@ -11,6 +11,10 @@ export default function MovimentacaoMaquina() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
+  const isPerfilFuncionario = [
+    "FUNCIONARIO",
+    "FUNCIONARIO_TODAS_LOJAS",
+  ].includes(usuario?.role);
   const podeVerCamposFinanceirosEObservacao = !isFuncionarioAbastecedor;
 
   // Estados para formulário
@@ -34,6 +38,8 @@ export default function MovimentacaoMaquina() {
     retiradaDinheiro: false,
   });
   const [produtos, setProdutos] = useState([]);
+  const [produtoIdsEstoqueUsuario, setProdutoIdsEstoqueUsuario] = useState([]);
+  const [produtoIdsEstoqueLoja, setProdutoIdsEstoqueLoja] = useState([]);
   const [maquina, setMaquina] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -47,7 +53,8 @@ export default function MovimentacaoMaquina() {
     async function fetchData() {
       setLoading(true);
       try {
-        const [maqRes, prodRes, ultimoProdRes, movRes] = await Promise.all([
+        const [maqRes, prodRes, ultimoProdRes, movRes, estoqueUsuarioRes] =
+          await Promise.all([
           api.get(`/maquinas/${maquinaId}`),
           api.get("/produtos"),
           api
@@ -56,9 +63,50 @@ export default function MovimentacaoMaquina() {
           api
             .get(`/movimentacoes?maquinaId=${maquinaId}&limite=1`)
             .catch(() => ({ data: [] })),
+          isPerfilFuncionario
+            ? api
+                .get("/estoque-usuarios/me")
+                .catch(() => ({ data: { estoque: [] } }))
+            : Promise.resolve({ data: { estoque: [] } }),
         ]);
         setMaquina(maqRes.data);
-        setProdutos(prodRes.data);
+
+        const listaProdutos = Array.isArray(prodRes.data) ? prodRes.data : [];
+        const estoqueUsuarioData = Array.isArray(estoqueUsuarioRes?.data?.estoque)
+          ? estoqueUsuarioRes.data.estoque
+          : Array.isArray(estoqueUsuarioRes?.data)
+            ? estoqueUsuarioRes.data
+            : [];
+
+        const produtoIdsUsuario = estoqueUsuarioData
+          .filter((item) => Number(item?.quantidade || 0) > 0)
+          .map((item) => String(item.produtoId));
+
+        setProdutos(listaProdutos);
+        setProdutoIdsEstoqueUsuario(produtoIdsUsuario);
+
+        const lojaDaMaquinaId =
+          maqRes.data?.lojaId || maqRes.data?.loja?.id || lojaId || null;
+        if (isPerfilFuncionario && lojaDaMaquinaId) {
+          const estoqueLojaRes = await api
+            .get(`/estoque-lojas/${lojaDaMaquinaId}`)
+            .catch(() => ({ data: [] }));
+          const estoqueLojaData = Array.isArray(estoqueLojaRes.data)
+            ? estoqueLojaRes.data
+            : [];
+          const produtoIdsLoja = estoqueLojaData.map((item) =>
+            String(item?.produtoId),
+          );
+          setProdutoIdsEstoqueLoja(produtoIdsLoja);
+        } else {
+          setProdutoIdsEstoqueLoja([]);
+        }
+
+        const produtosDisponiveisIniciais = isPerfilFuncionario
+          ? listaProdutos.filter((produto) =>
+              produtoIdsUsuario.includes(String(produto.id)),
+            )
+          : listaProdutos;
 
         const movimentacoesMaquina = Array.isArray(movRes.data)
           ? movRes.data
@@ -78,7 +126,25 @@ export default function MovimentacaoMaquina() {
 
         setFormData((prev) => ({
           ...prev,
-          produto_id: ultimoProdRes.data?.produtoId || prev.produto_id,
+          produto_id: (() => {
+            const ultimoProdutoId = ultimoProdRes.data?.produtoId;
+            const produtoAnteriorValido = produtosDisponiveisIniciais.some(
+              (produto) => String(produto.id) === String(prev.produto_id),
+            )
+              ? prev.produto_id
+              : "";
+            const ultimoProdutoValido = produtosDisponiveisIniciais.some(
+              (produto) => String(produto.id) === String(ultimoProdutoId),
+            )
+              ? String(ultimoProdutoId)
+              : "";
+
+            return (
+              ultimoProdutoValido ||
+              produtoAnteriorValido ||
+              String(produtosDisponiveisIniciais[0]?.id || "")
+            );
+          })(),
           quantidadeAtualMaquina: prev.quantidadeAtualMaquina,
         }));
       } catch {
@@ -88,7 +154,42 @@ export default function MovimentacaoMaquina() {
       }
     }
     fetchData();
-  }, [maquinaId, usuario]);
+  }, [maquinaId, usuario, lojaId, isPerfilFuncionario]);
+
+  const produtosDisponiveis = useMemo(() => {
+    if (!isPerfilFuncionario) return produtos;
+
+    const origemSelecionada = formData.origemEstoque || "usuario";
+    const idsPermitidos =
+      origemSelecionada === "loja"
+        ? produtoIdsEstoqueLoja
+        : produtoIdsEstoqueUsuario;
+
+    return produtos.filter((produto) =>
+      idsPermitidos.includes(String(produto.id)),
+    );
+  }, [
+    produtos,
+    formData.origemEstoque,
+    isPerfilFuncionario,
+    produtoIdsEstoqueUsuario,
+    produtoIdsEstoqueLoja,
+  ]);
+
+  useEffect(() => {
+    if (!formData.produto_id) return;
+
+    const produtoAindaDisponivel = produtosDisponiveis.some(
+      (produto) => String(produto.id) === String(formData.produto_id),
+    );
+
+    if (!produtoAindaDisponivel) {
+      setFormData((prev) => ({
+        ...prev,
+        produto_id: "",
+      }));
+    }
+  }, [produtosDisponiveis, formData.produto_id]);
 
   useEffect(() => {
     if (!isFuncionarioAbastecedor || isPrimeiraMovimentacao) return;
@@ -1091,12 +1192,19 @@ export default function MovimentacaoMaquina() {
                 required
               >
                 <option value="">Selecione um produto</option>
-                {produtos.map((prod) => (
+                {produtosDisponiveis.map((prod) => (
                   <option key={prod.id} value={prod.id}>
                     {prod.nome}
                   </option>
                 ))}
               </select>
+              {isPerfilFuncionario && produtosDisponiveis.length === 0 && (
+                <p className="text-xs text-orange-600 mt-1">
+                  {formData.origemEstoque === "loja"
+                    ? "Nenhum produto cadastrado no estoque desta loja."
+                    : "Nenhum produto com saldo disponível no seu estoque."}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">

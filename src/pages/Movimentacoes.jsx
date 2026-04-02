@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
@@ -19,7 +19,11 @@ import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 export function Movimentacoes() {
   const [modalRegistrarDinheiro, setModalRegistrarDinheiro] = useState(false);
   const { usuario } = useAuth();
-  const isFuncionarioNormal = usuario?.role === "FUNCIONARIO";
+  const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
+  const isPerfilFuncionario = [
+    "FUNCIONARIO",
+    "FUNCIONARIO_TODAS_LOJAS",
+  ].includes(usuario?.role);
 
   // --- ESTADOS ---
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -37,6 +41,8 @@ export function Movimentacoes() {
   // Dados Gerais
   const [maquinas, setMaquinas] = useState([]);
   const [produtos, setProdutos] = useState([]);
+  const [produtoIdsEstoqueUsuario, setProdutoIdsEstoqueUsuario] = useState([]);
+  const [produtoIdsEstoqueLoja, setProdutoIdsEstoqueLoja] = useState([]);
   const [lojas, setLojas] = useState([]);
 
   // UI States
@@ -92,7 +98,7 @@ export function Movimentacoes() {
   }, []);
 
   useEffect(() => {
-    if (!showForm || !isFuncionarioNormal) return;
+    if (!showForm || !isFuncionarioAbastecedor) return;
 
     setFormData((prev) => ({
       ...prev,
@@ -100,7 +106,7 @@ export function Movimentacoes() {
       contadorOut: "",
       ignoreInOut: true,
     }));
-  }, [showForm, isFuncionarioNormal]);
+  }, [showForm, isFuncionarioAbastecedor]);
 
   // Atualizar estoque anterior quando seleciona máquina
   useEffect(() => {
@@ -115,7 +121,7 @@ export function Movimentacoes() {
   // Verificar divergência entre contador OUT e total pre informado
   useEffect(() => {
     const verificarDivergencia = async () => {
-      if (isFuncionarioNormal || !formData.maquina_id) {
+      if (isFuncionarioAbastecedor || !formData.maquina_id) {
         setAlertaDivergencia(null);
         setResumoContadores(null);
         return;
@@ -196,7 +202,7 @@ export function Movimentacoes() {
 
     verificarDivergencia();
   }, [
-    isFuncionarioNormal,
+    isFuncionarioAbastecedor,
     formData.maquina_id,
     formData.contadorIn,
     formData.contadorOut,
@@ -208,12 +214,18 @@ export function Movimentacoes() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [movRes, maqRes, prodRes, lojasRes] = await Promise.all([
-        api.get("/movimentacoes"),
-        api.get("/maquinas"),
-        api.get("/produtos"),
-        api.get("/lojas"),
-      ]);
+      const [movRes, maqRes, prodRes, lojasRes, estoqueUsuarioRes] =
+        await Promise.all([
+          api.get("/movimentacoes"),
+          api.get("/maquinas"),
+          api.get("/produtos"),
+          api.get("/lojas"),
+          isPerfilFuncionario
+            ? api
+                .get("/estoque-usuarios/me")
+                .catch(() => ({ data: { estoque: [] } }))
+            : Promise.resolve({ data: { estoque: [] } }),
+        ]);
 
       console.log("🔍 Movimentações carregadas:", movRes.data);
       console.log(
@@ -227,9 +239,21 @@ export function Movimentacoes() {
           })),
       );
 
+      const produtosData = Array.isArray(prodRes.data) ? prodRes.data : [];
+      const estoqueUsuarioData = Array.isArray(estoqueUsuarioRes?.data?.estoque)
+        ? estoqueUsuarioRes.data.estoque
+        : Array.isArray(estoqueUsuarioRes?.data)
+          ? estoqueUsuarioRes.data
+          : [];
+
+      const produtoIdsUsuario = estoqueUsuarioData
+        .filter((item) => Number(item?.quantidade || 0) > 0)
+        .map((item) => String(item?.produtoId));
+
       setMovimentacoes(movRes.data || []);
       setMaquinas(maqRes.data || []);
-      setProdutos(prodRes.data || []);
+      setProdutos(produtosData);
+      setProdutoIdsEstoqueUsuario(produtoIdsUsuario);
       setLojas(lojasRes.data || []);
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
@@ -263,6 +287,74 @@ export function Movimentacoes() {
     if (error) setError("");
     if (success) setSuccess("");
   };
+
+  useEffect(() => {
+    const carregarEstoqueLojaMaquina = async () => {
+      if (!isPerfilFuncionario || !formData.maquina_id) {
+        setProdutoIdsEstoqueLoja([]);
+        return;
+      }
+
+      const maquinaSelecionada = maquinas.find(
+        (m) => String(m.id) === String(formData.maquina_id),
+      );
+      const lojaDaMaquinaId =
+        maquinaSelecionada?.lojaId || maquinaSelecionada?.loja?.id || null;
+
+      if (!lojaDaMaquinaId) {
+        setProdutoIdsEstoqueLoja([]);
+        return;
+      }
+
+      const estoqueLojaRes = await api
+        .get(`/estoque-lojas/${lojaDaMaquinaId}`)
+        .catch(() => ({ data: [] }));
+      const estoqueLojaData = Array.isArray(estoqueLojaRes.data)
+        ? estoqueLojaRes.data
+        : [];
+
+      setProdutoIdsEstoqueLoja(
+        estoqueLojaData.map((item) => String(item?.produtoId)),
+      );
+    };
+
+    carregarEstoqueLojaMaquina();
+  }, [isPerfilFuncionario, maquinas, formData.maquina_id]);
+
+  const produtosDisponiveis = useMemo(() => {
+    if (!isPerfilFuncionario) return produtos;
+
+    const origemSelecionada = formData.origemEstoque || "usuario";
+    const idsPermitidos =
+      origemSelecionada === "loja"
+        ? produtoIdsEstoqueLoja
+        : produtoIdsEstoqueUsuario;
+
+    return produtos.filter((produto) =>
+      idsPermitidos.includes(String(produto.id)),
+    );
+  }, [
+    produtos,
+    isPerfilFuncionario,
+    formData.origemEstoque,
+    produtoIdsEstoqueUsuario,
+    produtoIdsEstoqueLoja,
+  ]);
+
+  useEffect(() => {
+    if (!formData.produto_id) return;
+
+    const produtoAindaDisponivel = produtosDisponiveis.some(
+      (produto) => String(produto.id) === String(formData.produto_id),
+    );
+
+    if (!produtoAindaDisponivel) {
+      setFormData((prev) => ({
+        ...prev,
+        produto_id: "",
+      }));
+    }
+  }, [produtosDisponiveis, formData.produto_id]);
 
   // --- CORREÇÃO AQUI: Função handleSubmit recriada com o TRY ---
   const handleSubmit = async (e) => {
@@ -323,7 +415,8 @@ export function Movimentacoes() {
           : notaRetirada;
       }
 
-      const deveIgnorarContadores = isFuncionarioNormal || formData.ignoreInOut;
+      const deveIgnorarContadores =
+        isFuncionarioAbastecedor || formData.ignoreInOut;
 
       // Transformar para o formato do backend
       const data = {
@@ -447,7 +540,7 @@ export function Movimentacoes() {
         retiradaProduto: 0,
         retiradaProdutoDevolverEstoque: false,
         origemEstoque: "usuario",
-        ignoreInOut: isFuncionarioNormal,
+        ignoreInOut: isFuncionarioAbastecedor,
       });
       setEstoqueAnterior(0);
       setFiltroLojaForm("");
@@ -1012,7 +1105,7 @@ export function Movimentacoes() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isFuncionarioNormal ? (
+              {!isFuncionarioAbastecedor ? (
                 <>
                   {/* Contadores da Máquina */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1328,12 +1421,19 @@ export function Movimentacoes() {
                     className="select-field"
                   >
                     <option value="">Nenhum produto</option>
-                    {produtos.map((produto) => (
+                    {produtosDisponiveis.map((produto) => (
                       <option key={produto.id} value={produto.id}>
                         {produto.emoji || "🧸"} {produto.nome}
                       </option>
                     ))}
                   </select>
+                  {isPerfilFuncionario && produtosDisponiveis.length === 0 && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      {formData.origemEstoque === "loja"
+                        ? "Nenhum produto cadastrado no estoque desta loja."
+                        : "Nenhum produto com saldo disponível no seu estoque."}
+                    </p>
+                  )}
                 </div>
 
                 <div>

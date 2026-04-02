@@ -442,7 +442,6 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
 
   const calcularValorEsperadoPorContador = () => {
     const movimentacao = fluxo?.movimentacao || {};
-    const maquina = movimentacao?.maquina || {};
 
     const contadorInAtual = parseNumero(
       movimentacao?.contadorIn ?? movimentacao?.contadorInDigital,
@@ -475,18 +474,12 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     const diferencaBase =
       diferencaContadorIn !== null ? diferencaContadorIn : diferencaContadorOut;
 
-    const valorJogada = parseNumero(
-      maquina?.valorFicha ??
-        maquina?.valorJogada ??
-        movimentacao?.valorJogada ??
-        fluxo?.valorJogada,
-    );
-
-    if (diferencaBase === null || valorJogada === null || valorJogada <= 0) {
+    if (diferencaBase === null) {
       return null;
     }
 
-    return diferencaBase / valorJogada;
+    // Nova regra: valor esperado segue diretamente a diferenca de contador.
+    return diferencaBase;
   };
 
   const valorEsperadoCalculadoLocal = calcularValorEsperadoPorContador();
