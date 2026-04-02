@@ -979,19 +979,9 @@ export function Roteiros() {
           ? manutRes.data
           : manutRes.data?.rows || [];
 
-        const idsLojasRoteiro = new Set(
-          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
-            .map((loja) => String(loja?.id || ""))
-            .filter(Boolean),
-        );
-
         const relacionadasRoteiro = listaManut.filter((item) => {
           const rotaId = String(item?.roteiroId || item?.roteiro?.id || "");
-          const lojaIdItem = String(item?.lojaId || item?.loja?.id || "");
-
-          if (rotaId && rotaId === String(roteiro?.id || "")) return true;
-          if (idsLojasRoteiro.has(lojaIdItem)) return true;
-          return false;
+          return rotaId && rotaId === String(roteiro?.id || "");
         });
 
         const inicioSemanaAtual = new Date();
