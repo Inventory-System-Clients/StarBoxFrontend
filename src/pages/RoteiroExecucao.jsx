@@ -999,14 +999,10 @@ export default function RoteiroExecucao() {
           ].includes(status);
         });
 
-        manutencoesRealizadas = normalizarListaResumo([
-          ...manutencoesRealizadas,
-          ...feitas,
-        ]);
-        manutencoesNaoRealizadas = normalizarListaResumo([
-          ...manutencoesNaoRealizadas,
-          ...pendentes,
-        ]);
+        // Fonte de verdade: quando a API responde, o resumo deve refletir
+        // exclusivamente o estado real das manutencoes do roteiro/pontos.
+        manutencoesRealizadas = normalizarListaResumo(feitas);
+        manutencoesNaoRealizadas = normalizarListaResumo(pendentes);
       } catch {
         // Sem fallback adicional.
       }
