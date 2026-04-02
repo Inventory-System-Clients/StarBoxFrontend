@@ -1020,7 +1020,10 @@ export default function RoteiroExecucao() {
         // exclusivamente o estado real das manutencoes do roteiro/pontos.
         manutencoesRealizadas = normalizarListaResumo(feitas);
         manutencoesNaoRealizadas = normalizarListaResumo(pendentes);
-      } catch {
+      } catch (err) {
+        if ([401, 403].includes(err?.response?.status)) {
+          throw err;
+        }
         // Sem fallback adicional.
       }
 
