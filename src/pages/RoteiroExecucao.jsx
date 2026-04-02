@@ -273,14 +273,17 @@ export default function RoteiroExecucao() {
             const usuarioMovId = String(
               mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
             );
-            const veiculoMovId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+            const veiculoMovId = String(
+              mov?.veiculoId || mov?.veiculo?.id || "",
+            );
             const veiculoRoteiroId = String(
               res?.data?.veiculoId || res?.data?.veiculo?.id || "",
             );
 
             if (tipoMov !== "retirada") return false;
             if (usuarioMovId !== usuarioReferenciaId) return false;
-            if (veiculoRoteiroId && veiculoMovId !== veiculoRoteiroId) return false;
+            if (veiculoRoteiroId && veiculoMovId !== veiculoRoteiroId)
+              return false;
             return true;
           });
 
@@ -366,7 +369,7 @@ export default function RoteiroExecucao() {
 
     setLojaSelecionada(loja);
     setNovaManutencaoRoteiro({ maquinaId: "", descricao: "" });
-  setManutencaoRecemCriada(null);
+    setManutencaoRecemCriada(null);
 
     // Verificar se há manutenções pendentes nesta loja
     if (loja && loja.id) {
@@ -495,19 +498,24 @@ export default function RoteiroExecucao() {
           },
         });
 
-        const pendentes = Array.isArray(resPendentes?.data) ? resPendentes.data : [];
+        const pendentes = Array.isArray(resPendentes?.data)
+          ? resPendentes.data
+          : [];
         manutencaoCriada =
           pendentes.find(
             (item) =>
               String(item?.maquinaId || item?.maquina_id || "") ===
                 String(maquinaIdSelecionada || "") &&
               String(item?.descricao || "").trim() === descricaoLimpa,
-          ) || pendentes[0] || null;
+          ) ||
+          pendentes[0] ||
+          null;
       }
 
       if (manutencaoCriada?.id) {
         const maquinaSelecionada = (lojaSelecionada?.maquinas || []).find(
-          (item) => String(item?.id || "") === String(maquinaIdSelecionada || ""),
+          (item) =>
+            String(item?.id || "") === String(maquinaIdSelecionada || ""),
         );
 
         setManutencaoRecemCriada({
@@ -732,24 +740,51 @@ export default function RoteiroExecucao() {
       const normalizarListaResumo = (lista) => {
         if (!Array.isArray(lista)) return [];
 
-        return Array.from(
-          new Set(
-            lista
-              .map((item) => {
-                if (typeof item === "string") return item.trim();
-                if (!item || typeof item !== "object") return "";
+        const itensNormalizados = lista
+          .map((item) => {
+            if (typeof item === "string") {
+              const valor = item.trim();
+              return valor ? valor : null;
+            }
 
-                return String(
-                  item.nome ||
-                    item.descricao ||
-                    item.manutencaoNome ||
-                    item.maquinaNome ||
-                    "",
-                ).trim();
-              })
-              .filter(Boolean),
-          ),
-        );
+            if (!item || typeof item !== "object") return null;
+
+            const descricao = String(
+              item.nome ||
+                item.descricao ||
+                item.manutencaoNome ||
+                item.maquinaNome ||
+                "",
+            ).trim();
+            const pontoNome = String(
+              item.pontoNome ||
+                item.lojaNome ||
+                item.loja?.nome ||
+                item.ponto?.nome ||
+                "",
+            ).trim();
+
+            if (!descricao && !pontoNome) return null;
+
+            return {
+              ...item,
+              descricao,
+              pontoNome,
+            };
+          })
+          .filter(Boolean);
+
+        const chaves = new Set();
+        return itensNormalizados.filter((item) => {
+          const chave =
+            typeof item === "string"
+              ? `str:${item}`
+              : `obj:${String(item.id || "")}:${item.descricao || ""}:${item.pontoNome || ""}`;
+
+          if (chaves.has(chave)) return false;
+          chaves.add(chave);
+          return true;
+        });
       };
 
       const resumoExecucao = extrairResumoExecucaoRoteiro({
@@ -762,10 +797,12 @@ export default function RoteiroExecucao() {
         finalizacaoData?.funcionario?.id ||
         roteiro?.funcionarioId ||
         usuario?.id;
-      const kmInicialPilotagemSnapshot = obterKmInicialPilotagemSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: funcionarioDoRoteiro,
-      });
+      const kmInicialPilotagemSnapshot = obterKmInicialPilotagemSnapshotRoteiro(
+        {
+          roteiroId: id,
+          usuarioId: funcionarioDoRoteiro,
+        },
+      );
 
       let totalPeluciasUsadas = extrairNumero(
         finalizacaoData?.totalPeluciasUsadas,
@@ -790,12 +827,19 @@ export default function RoteiroExecucao() {
           const estoqueResUsuario = await api.get(
             `/estoque-usuarios/${funcionarioDoRoteiro}`,
           );
-          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResUsuario.data);
+          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(
+            estoqueResUsuario.data,
+          );
         } catch {
-          if (funcionarioDoRoteiro && String(usuario?.id || "") === String(funcionarioDoRoteiro)) {
+          if (
+            funcionarioDoRoteiro &&
+            String(usuario?.id || "") === String(funcionarioDoRoteiro)
+          ) {
             try {
               const estoqueResMe = await api.get("/estoque-usuarios/me");
-              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResMe.data);
+              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(
+                estoqueResMe.data,
+              );
             } catch {
               saldoPeluciasEstoque = null;
             }
@@ -812,19 +856,19 @@ export default function RoteiroExecucao() {
 
       if (saldoPeluciasInicial === null) {
         saldoPeluciasInicial = extrairNumero(
-        finalizacaoData?.saldoPeluciasInicialUsuario,
-        finalizacaoData?.saldoInicialEstoqueUsuario,
-        finalizacaoData?.peluciasIniciaisRoteiro,
-        finalizacaoData?.peluciasInicioRoteiro,
-        finalizacaoData?.estoqueInicialUsuario,
-        finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
-        finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
-        finalizacaoData?.totais?.peluciasIniciaisRoteiro,
-        roteiro?.saldoPeluciasInicialUsuario,
-        roteiro?.saldoInicialEstoqueUsuario,
-        roteiro?.peluciasIniciaisRoteiro,
-        roteiro?.peluciasInicioRoteiro,
-        roteiro?.estoqueInicialUsuario,
+          finalizacaoData?.saldoPeluciasInicialUsuario,
+          finalizacaoData?.saldoInicialEstoqueUsuario,
+          finalizacaoData?.peluciasIniciaisRoteiro,
+          finalizacaoData?.peluciasInicioRoteiro,
+          finalizacaoData?.estoqueInicialUsuario,
+          finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
+          finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
+          finalizacaoData?.totais?.peluciasIniciaisRoteiro,
+          roteiro?.saldoPeluciasInicialUsuario,
+          roteiro?.saldoInicialEstoqueUsuario,
+          roteiro?.peluciasIniciaisRoteiro,
+          roteiro?.peluciasInicioRoteiro,
+          roteiro?.estoqueInicialUsuario,
         );
       }
 
@@ -845,7 +889,10 @@ export default function RoteiroExecucao() {
             funcionarioDoRoteiro,
           );
 
-          if (Number.isFinite(totalPorMovimentacoes) && totalPorMovimentacoes > 0) {
+          if (
+            Number.isFinite(totalPorMovimentacoes) &&
+            totalPorMovimentacoes > 0
+          ) {
             totalPeluciasUsadas = totalPorMovimentacoes;
           }
         } catch {
@@ -936,35 +983,36 @@ export default function RoteiroExecucao() {
                 "",
             );
 
-            return !funcionarioDoRoteiro || funcionarioId === String(funcionarioDoRoteiro);
+            return (
+              !funcionarioDoRoteiro ||
+              funcionarioId === String(funcionarioDoRoteiro)
+            );
           });
 
-          const feitas = doFuncionarioRota
-            .filter((item) => {
-              const status = String(item?.status || "").toLowerCase();
-              return ["feito", "concluida", "concluido", "finalizada", "finalizado"].includes(
-                status,
-              );
-            })
-            .map(
-              (item) => item?.descricao || item?.maquina?.nome || item?.maquinaNome,
-            )
-            .filter(Boolean);
+          const feitas = doFuncionarioRota.filter((item) => {
+            const status = String(item?.status || "").toLowerCase();
+            return [
+              "feito",
+              "concluida",
+              "concluido",
+              "finalizada",
+              "finalizado",
+            ].includes(status);
+          });
 
-          const pendentes = doFuncionarioRota
-            .filter((item) => {
-              const status = String(item?.status || "").toLowerCase();
-              return !["feito", "concluida", "concluido", "finalizada", "finalizado"].includes(
-                status,
-              );
-            })
-            .map(
-              (item) => item?.descricao || item?.maquina?.nome || item?.maquinaNome,
-            )
-            .filter(Boolean);
+          const pendentes = doFuncionarioRota.filter((item) => {
+            const status = String(item?.status || "").toLowerCase();
+            return ![
+              "feito",
+              "concluida",
+              "concluido",
+              "finalizada",
+              "finalizado",
+            ].includes(status);
+          });
 
-          manutencoesRealizadas.push(...Array.from(new Set(feitas)));
-          manutencoesNaoRealizadas.push(...Array.from(new Set(pendentes)));
+          manutencoesRealizadas.push(...feitas);
+          manutencoesNaoRealizadas.push(...pendentes);
         } catch {
           // Sem fallback adicional.
         }
@@ -1090,7 +1138,8 @@ export default function RoteiroExecucao() {
       setModalFinalizar((prev) => ({ ...prev, loading: true }));
 
       if (roteiroEstaFinalizado(roteiro?.status)) {
-        const mensagemWhatsApp = await montarMensagemWhatsAppFinalizacao(roteiro);
+        const mensagemWhatsApp =
+          await montarMensagemWhatsAppFinalizacao(roteiro);
         const abriuWhatsApp = abrirWhatsAppComMensagem(
           mensagemWhatsApp,
           popupReservado,
@@ -1297,17 +1346,19 @@ export default function RoteiroExecucao() {
       <main className="max-w-3xl mx-auto px-4 py-8">
         <h1
           className={`text-2xl font-bold mb-6 flex items-center gap-2 ${
-            roteiroEstaFinalizado(roteiro.status) && !roteiroTemPendencias(roteiro)
+            roteiroEstaFinalizado(roteiro.status) &&
+            !roteiroTemPendencias(roteiro)
               ? "text-green-600"
               : ""
           }`}
         >
           Execução do Roteiro: {roteiro.nome}
-          {roteiroEstaFinalizado(roteiro.status) && !roteiroTemPendencias(roteiro) && (
-            <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold">
-              Finalizado
-            </span>
-          )}
+          {roteiroEstaFinalizado(roteiro.status) &&
+            !roteiroTemPendencias(roteiro) && (
+              <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold">
+                Finalizado
+              </span>
+            )}
         </h1>
         <p className="text-sm text-gray-600 mb-4">
           🚗 Veículo: {veiculoResumo}
@@ -1325,8 +1376,8 @@ export default function RoteiroExecucao() {
         {manutencaoRecemCriada?.id && (
           <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
             <p className="text-sm font-semibold text-blue-900">
-              Manutenção criada nesta loja. Se quiser, finalize agora para já registrar
-              peça/observação e disparar o WhatsApp.
+              Manutenção criada nesta loja. Se quiser, finalize agora para já
+              registrar peça/observação e disparar o WhatsApp.
             </p>
             <button
               className="btn-primary mt-3"
@@ -1683,36 +1734,38 @@ export default function RoteiroExecucao() {
             <div className="space-y-3">
               {lojaSelecionada.maquinas &&
               lojaSelecionada.maquinas.length > 0 ? (
-                lojaSelecionada.maquinas.map((maquina) => (
+                lojaSelecionada.maquinas.map((maquina) =>
                   (() => {
-                    const maquinaConcluida = maquinaEstaConcluida(maquina.status);
+                    const maquinaConcluida = maquinaEstaConcluida(
+                      maquina.status,
+                    );
                     return (
-                  <button
-                    key={maquina.id}
-                    className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
+                      <button
+                        key={maquina.id}
+                        className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
                       ${maquinaConcluida ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
                       ${maquinaConcluida ? "opacity-70 cursor-not-allowed" : ""}`}
-                    onClick={() => {
-                      if (maquinaConcluida) return;
-                      navigate(
-                        `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
-                      );
-                    }}
-                    disabled={maquinaConcluida}
-                  >
-                    <span>🖲️ {maquina.nome}</span>
-                    <span className="text-xs text-gray-500 ml-2">
-                      ({maquina.tipo})
-                    </span>
-                    {maquinaConcluida && (
-                      <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
-                        Finalizada
-                      </span>
-                    )}
-                  </button>
+                        onClick={() => {
+                          if (maquinaConcluida) return;
+                          navigate(
+                            `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
+                          );
+                        }}
+                        disabled={maquinaConcluida}
+                      >
+                        <span>🖲️ {maquina.nome}</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({maquina.tipo})
+                        </span>
+                        {maquinaConcluida && (
+                          <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
+                            Finalizada
+                          </span>
+                        )}
+                      </button>
                     );
-                  })()
-                ))
+                  })(),
+                )
               ) : (
                 <div className="text-gray-400">
                   Nenhuma máquina cadastrada nesta loja.
@@ -1722,7 +1775,8 @@ export default function RoteiroExecucao() {
           </div>
         )}
         <div className="flex gap-3">
-          {(!roteiroEstaFinalizado(roteiro.status) || roteiroTemPendencias(roteiro)) && (
+          {(!roteiroEstaFinalizado(roteiro.status) ||
+            roteiroTemPendencias(roteiro)) && (
             <button
               className="bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
               onClick={abrirModalFinalizacao}

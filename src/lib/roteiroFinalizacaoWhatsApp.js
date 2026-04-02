@@ -23,7 +23,10 @@ const montarChaveEstoqueInicialRoteiro = ({ roteiroId, usuarioId }) => {
   return `${ESTOQUE_INICIAL_ROTEIRO_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}`;
 };
 
-export const obterEstoqueInicialSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+export const obterEstoqueInicialSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveEstoqueInicialRoteiro({ roteiroId, usuarioId });
   if (!chave) return null;
 
@@ -71,7 +74,10 @@ export const salvarEstoqueInicialSnapshotRoteiro = ({
   }
 };
 
-export const removerEstoqueInicialSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+export const removerEstoqueInicialSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveEstoqueInicialRoteiro({ roteiroId, usuarioId });
   if (!chave) return false;
 
@@ -91,7 +97,10 @@ const montarChaveKmInicialPilotagemRoteiro = ({ roteiroId, usuarioId }) => {
   return `${KM_INICIAL_PILOTAGEM_ROTEIRO_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}`;
 };
 
-export const obterKmInicialPilotagemSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+export const obterKmInicialPilotagemSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveKmInicialPilotagemRoteiro({ roteiroId, usuarioId });
   if (!chave) return null;
 
@@ -255,10 +264,16 @@ export const extrairResumoExecucaoRoteiro = ({ roteiro, finalizacaoData }) => {
   const data = finalizacaoData || {};
 
   const lojasFeitas = new Set(
-    normalizarListaNomes(data.lojasFeitas || data.lojasConcluidas || [], "nome"),
+    normalizarListaNomes(
+      data.lojasFeitas || data.lojasConcluidas || [],
+      "nome",
+    ),
   );
   const lojasNaoFeitas = new Set(
-    normalizarListaNomes(data.lojasNaoFeitas || data.lojasPendentes || [], "nome"),
+    normalizarListaNomes(
+      data.lojasNaoFeitas || data.lojasPendentes || [],
+      "nome",
+    ),
   );
 
   const maquinasFeitas = new Set(
@@ -277,7 +292,9 @@ export const extrairResumoExecucaoRoteiro = ({ roteiro, finalizacaoData }) => {
   const pendencias = toArray(data.pendencias);
   for (const item of pendencias) {
     const nomeLoja = normalizarTexto(item?.lojaNome || item?.loja?.nome);
-    const nomeMaquina = normalizarTexto(item?.maquinaNome || item?.maquina?.nome);
+    const nomeMaquina = normalizarTexto(
+      item?.maquinaNome || item?.maquina?.nome,
+    );
 
     if (nomeLoja) lojasNaoFeitas.add(nomeLoja);
     if (nomeMaquina) maquinasNaoFeitas.add(nomeMaquina);
@@ -322,7 +339,10 @@ export const extrairResumoExecucaoRoteiro = ({ roteiro, finalizacaoData }) => {
   };
 };
 
-export const somarPeluciasUsadasMovimentacoes = (movimentacoes, usuarioId = null) => {
+export const somarPeluciasUsadasMovimentacoes = (
+  movimentacoes,
+  usuarioId = null,
+) => {
   const usuarioNormalizado =
     usuarioId === null || usuarioId === undefined ? null : String(usuarioId);
 
@@ -336,10 +356,15 @@ export const somarPeluciasUsadasMovimentacoes = (movimentacoes, usuarioId = null
     }
 
     const quantidadeAbastecida = Number(
-      mov?.abastecidas || mov?.quantidadeAdicionada || mov?.totalAbastecido || 0,
+      mov?.abastecidas ||
+        mov?.quantidadeAdicionada ||
+        mov?.totalAbastecido ||
+        0,
     );
 
-    return total + (Number.isFinite(quantidadeAbastecida) ? quantidadeAbastecida : 0);
+    return (
+      total + (Number.isFinite(quantidadeAbastecida) ? quantidadeAbastecida : 0)
+    );
   }, 0);
 };
 
@@ -354,7 +379,11 @@ export const somarSaldoEstoqueUsuario = (estoqueUsuarioData) => {
     return totalDireto;
   }
 
-  const lista = toArray(estoqueUsuarioData?.estoque || estoqueUsuarioData?.produtos || estoqueUsuarioData);
+  const lista = toArray(
+    estoqueUsuarioData?.estoque ||
+      estoqueUsuarioData?.produtos ||
+      estoqueUsuarioData,
+  );
 
   return lista.reduce((total, item) => {
     const quantidade = Number(
@@ -387,7 +416,11 @@ export const extrairKmMovimentacoesRoteiro = (
 
     if (usuarioNormalizado && movUsuarioId !== usuarioNormalizado) return false;
     if (veiculoNormalizado && movVeiculoId !== veiculoNormalizado) return false;
-    if (roteiroNormalizado && movRoteiroId && movRoteiroId !== roteiroNormalizado) {
+    if (
+      roteiroNormalizado &&
+      movRoteiroId &&
+      movRoteiroId !== roteiroNormalizado
+    ) {
       return false;
     }
 
@@ -455,6 +488,35 @@ const formatarLista = (itens) => {
   return lista.join(", ");
 };
 
+const extrairNomePonto = (item) => {
+  if (!item || typeof item !== "object") return "";
+
+  return normalizarTexto(
+    item.pontoNome ||
+      item.lojaNome ||
+      item.loja?.nome ||
+      item.ponto?.nome ||
+      item.localNome ||
+      item.local?.nome,
+  );
+};
+
+const montarResumoManutencoesPorPonto = (manutencoes = []) => {
+  const contadorPorPonto = new Map();
+
+  for (const item of toArray(manutencoes)) {
+    const nomePonto = extrairNomePonto(item);
+    if (!nomePonto) continue;
+
+    const quantidadeAtual = contadorPorPonto.get(nomePonto) || 0;
+    contadorPorPonto.set(nomePonto, quantidadeAtual + 1);
+  }
+
+  return Array.from(contadorPorPonto.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
+    .map(([nomePonto, quantidade]) => `${nomePonto} (${quantidade})`);
+};
+
 const formatarMoedaBRL = (valor) => {
   const numero = Number(valor);
   if (!Number.isFinite(numero)) return "Nao informado";
@@ -493,15 +555,39 @@ export const montarMensagemFinalizacaoRoteiro = ({
     ? Number(kmFinalVeiculo)
     : null;
   const kmRodado =
-    kmInicial !== null && kmFinal !== null ? Math.max(0, kmFinal - kmInicial) : null;
-  const manutencoesFeitasLista = toArray(manutencoesRealizadas).filter(Boolean);
-  const manutencoesNaoFeitasLista = toArray(manutencoesNaoRealizadas).filter(Boolean);
+    kmInicial !== null && kmFinal !== null
+      ? Math.max(0, kmFinal - kmInicial)
+      : null;
+  const manutencoesFeitasBrutas = toArray(manutencoesRealizadas).filter(
+    Boolean,
+  );
+  const manutencoesNaoFeitasBrutas = toArray(manutencoesNaoRealizadas).filter(
+    Boolean,
+  );
+  const manutencoesFeitasLista = normalizarListaNomes(
+    manutencoesFeitasBrutas,
+    "descricao",
+  );
+  const manutencoesNaoFeitasLista = normalizarListaNomes(
+    manutencoesNaoFeitasBrutas,
+    "descricao",
+  );
+  const manutencoesFeitasPorPonto = montarResumoManutencoesPorPonto(
+    manutencoesFeitasBrutas,
+  );
+  const manutencoesNaoFeitasPorPonto = montarResumoManutencoesPorPonto(
+    manutencoesNaoFeitasBrutas,
+  );
   const consumoResumo =
     resumoConsumoProdutos && typeof resumoConsumoProdutos === "object"
       ? {
-          estoqueInicialTotal: Number(resumoConsumoProdutos.estoqueInicialTotal),
+          estoqueInicialTotal: Number(
+            resumoConsumoProdutos.estoqueInicialTotal,
+          ),
           estoqueFinalTotal: Number(resumoConsumoProdutos.estoqueFinalTotal),
-          consumoTotalProdutos: Number(resumoConsumoProdutos.consumoTotalProdutos),
+          consumoTotalProdutos: Number(
+            resumoConsumoProdutos.consumoTotalProdutos,
+          ),
         }
       : null;
   const consumoResumoValido =
@@ -532,7 +618,9 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Despesa total: ${formatarMoedaBRL(despesaTotal)}`,
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
     `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,
+    `Manutencoes realizadas por ponto: ${formatarLista(manutencoesFeitasPorPonto)}`,
     `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,
+    `Manutencoes nao realizadas por ponto: ${formatarLista(manutencoesNaoFeitasPorPonto)}`,
   ].join("\n");
 };
 

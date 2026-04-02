@@ -386,9 +386,7 @@ export function Roteiros() {
         isGestorRoteiro
           ? api.get("/usuarios/funcionarios")
           : Promise.resolve({ data: [] }),
-        isGestorRoteiro
-          ? api.get("/veiculos")
-          : Promise.resolve({ data: [] }),
+        isGestorRoteiro ? api.get("/veiculos") : Promise.resolve({ data: [] }),
       ];
       const [resRoteiros, resLojas, resFuncionarios, resVeiculos] =
         await Promise.all(promises);
@@ -431,7 +429,9 @@ export function Roteiros() {
       );
       carregarDadosIniciais();
     } catch (err) {
-      setError(getMensagemErroVeiculo(err, "Erro ao atualizar veículo do roteiro."));
+      setError(
+        getMensagemErroVeiculo(err, "Erro ao atualizar veículo do roteiro."),
+      );
 
       setRoteiros((prev) =>
         prev.map((item) =>
@@ -448,7 +448,10 @@ export function Roteiros() {
   };
 
   const usuarioTemPilotagemAtiva = async (validarParaTodosPerfis = false) => {
-    if (!validarParaTodosPerfis && usuario?.role !== "FUNCIONARIO_TODAS_LOJAS") {
+    if (
+      !validarParaTodosPerfis &&
+      usuario?.role !== "FUNCIONARIO_TODAS_LOJAS"
+    ) {
       return true;
     }
 
@@ -459,7 +462,9 @@ export function Roteiros() {
       ]);
 
       const usuarioId = String(usuario?.id || "");
-      const veiculosLista = Array.isArray(veiculosRes.data) ? veiculosRes.data : [];
+      const veiculosLista = Array.isArray(veiculosRes.data)
+        ? veiculosRes.data
+        : [];
 
       const ultimasMovObj = ultimasMovRes.data || {};
       const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
@@ -587,7 +592,8 @@ export function Roteiros() {
 
           if (tipoMov !== "retirada") return false;
           if (usuarioMovId !== usuarioReferenciaId) return false;
-          if (veiculoRoteiroId && veiculoMovId !== veiculoRoteiroId) return false;
+          if (veiculoRoteiroId && veiculoMovId !== veiculoRoteiroId)
+            return false;
           return true;
         });
 
@@ -777,24 +783,51 @@ export function Roteiros() {
       const normalizarListaResumo = (lista) => {
         if (!Array.isArray(lista)) return [];
 
-        return Array.from(
-          new Set(
-            lista
-              .map((item) => {
-                if (typeof item === "string") return item.trim();
-                if (!item || typeof item !== "object") return "";
+        const itensNormalizados = lista
+          .map((item) => {
+            if (typeof item === "string") {
+              const valor = item.trim();
+              return valor ? valor : null;
+            }
 
-                return String(
-                  item.nome ||
-                    item.descricao ||
-                    item.manutencaoNome ||
-                    item.maquinaNome ||
-                    "",
-                ).trim();
-              })
-              .filter(Boolean),
-          ),
-        );
+            if (!item || typeof item !== "object") return null;
+
+            const descricao = String(
+              item.nome ||
+                item.descricao ||
+                item.manutencaoNome ||
+                item.maquinaNome ||
+                "",
+            ).trim();
+            const pontoNome = String(
+              item.pontoNome ||
+                item.lojaNome ||
+                item.loja?.nome ||
+                item.ponto?.nome ||
+                "",
+            ).trim();
+
+            if (!descricao && !pontoNome) return null;
+
+            return {
+              ...item,
+              descricao,
+              pontoNome,
+            };
+          })
+          .filter(Boolean);
+
+        const chaves = new Set();
+        return itensNormalizados.filter((item) => {
+          const chave =
+            typeof item === "string"
+              ? `str:${item}`
+              : `obj:${String(item.id || "")}:${item.descricao || ""}:${item.pontoNome || ""}`;
+
+          if (chaves.has(chave)) return false;
+          chaves.add(chave);
+          return true;
+        });
       };
 
       const resumoExecucao = extrairResumoExecucaoRoteiro({
@@ -810,10 +843,12 @@ export function Roteiros() {
           "",
       ).trim();
 
-      const kmInicialPilotagemSnapshot = obterKmInicialPilotagemSnapshotRoteiro({
-        roteiroId: roteiro?.id,
-        usuarioId: usuarioReferenciaId,
-      });
+      const kmInicialPilotagemSnapshot = obterKmInicialPilotagemSnapshotRoteiro(
+        {
+          roteiroId: roteiro?.id,
+          usuarioId: usuarioReferenciaId,
+        },
+      );
 
       let totalPeluciasUsadas = extrairNumero(
         finalizacaoData?.totalPeluciasUsadas,
@@ -838,12 +873,19 @@ export function Roteiros() {
           const estoqueResUsuario = await api.get(
             `/estoque-usuarios/${usuarioReferenciaId}`,
           );
-          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResUsuario.data);
+          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(
+            estoqueResUsuario.data,
+          );
         } catch {
-          if (usuarioReferenciaId && String(usuario?.id || "") === usuarioReferenciaId) {
+          if (
+            usuarioReferenciaId &&
+            String(usuario?.id || "") === usuarioReferenciaId
+          ) {
             try {
               const estoqueResMe = await api.get("/estoque-usuarios/me");
-              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(estoqueResMe.data);
+              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(
+                estoqueResMe.data,
+              );
             } catch {
               saldoPeluciasEstoque = null;
             }
@@ -860,19 +902,19 @@ export function Roteiros() {
 
       if (saldoPeluciasInicial === null) {
         saldoPeluciasInicial = extrairNumero(
-        finalizacaoData?.saldoPeluciasInicialUsuario,
-        finalizacaoData?.saldoInicialEstoqueUsuario,
-        finalizacaoData?.peluciasIniciaisRoteiro,
-        finalizacaoData?.peluciasInicioRoteiro,
-        finalizacaoData?.estoqueInicialUsuario,
-        finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
-        finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
-        finalizacaoData?.totais?.peluciasIniciaisRoteiro,
-        roteiro?.saldoPeluciasInicialUsuario,
-        roteiro?.saldoInicialEstoqueUsuario,
-        roteiro?.peluciasIniciaisRoteiro,
-        roteiro?.peluciasInicioRoteiro,
-        roteiro?.estoqueInicialUsuario,
+          finalizacaoData?.saldoPeluciasInicialUsuario,
+          finalizacaoData?.saldoInicialEstoqueUsuario,
+          finalizacaoData?.peluciasIniciaisRoteiro,
+          finalizacaoData?.peluciasInicioRoteiro,
+          finalizacaoData?.estoqueInicialUsuario,
+          finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
+          finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
+          finalizacaoData?.totais?.peluciasIniciaisRoteiro,
+          roteiro?.saldoPeluciasInicialUsuario,
+          roteiro?.saldoInicialEstoqueUsuario,
+          roteiro?.peluciasIniciaisRoteiro,
+          roteiro?.peluciasInicioRoteiro,
+          roteiro?.estoqueInicialUsuario,
         );
       }
 
@@ -1231,12 +1273,11 @@ export function Roteiros() {
         )}
 
         {/* Funcionários veem só os roteiros atribuídos a eles */}
-        {!isGestorRoteiro &&
-          roteirosDoUsuario.length === 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
-              Nenhuma rota atribuída a você no momento.
-            </div>
-          )}
+        {!isGestorRoteiro && roteirosDoUsuario.length === 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center text-yellow-700 font-medium mb-6">
+            Nenhuma rota atribuída a você no momento.
+          </div>
+        )}
 
         {roteirosDoUsuario.length > 0 && roteirosFiltrados.length === 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-600 font-medium mb-6">
@@ -1249,13 +1290,11 @@ export function Roteiros() {
             <div
               key={roteiro.id}
               onDragOver={(e) => {
-                if (!isGestorRoteiro || isRoteiroFinalizado(roteiro))
-                  return;
+                if (!isGestorRoteiro || isRoteiroFinalizado(roteiro)) return;
                 e.preventDefault();
               }}
               onDrop={(e) => {
-                if (!isGestorRoteiro || isRoteiroFinalizado(roteiro))
-                  return;
+                if (!isGestorRoteiro || isRoteiroFinalizado(roteiro)) return;
                 onDrop(e, roteiro.id);
               }}
               className={`rounded-xl shadow-lg p-6 border-2 transition-all 
@@ -1379,7 +1418,9 @@ export function Roteiros() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-sm font-medium">{getVeiculoResumoRoteiro(roteiro)}</p>
+                  <p className="text-sm font-medium">
+                    {getVeiculoResumoRoteiro(roteiro)}
+                  </p>
                 )}
               </div>
 
@@ -1410,16 +1451,15 @@ export function Roteiros() {
                     );
                   })}
                 </div>
-                {isGestorRoteiro &&
-                  diasPendentes[roteiro.id] !== undefined && (
-                    <button
-                      onClick={() => salvarDias(roteiro.id)}
-                      disabled={salvandoDias[roteiro.id]}
-                      className="mt-2 w-full py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
-                    >
-                      {salvandoDias[roteiro.id] ? "Salvando..." : "Salvar dias"}
-                    </button>
-                  )}
+                {isGestorRoteiro && diasPendentes[roteiro.id] !== undefined && (
+                  <button
+                    onClick={() => salvarDias(roteiro.id)}
+                    disabled={salvandoDias[roteiro.id]}
+                    className="mt-2 w-full py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                  >
+                    {salvandoDias[roteiro.id] ? "Salvando..." : "Salvar dias"}
+                  </button>
+                )}
               </div>
 
               {/* Seção Orçamento Diário */}
@@ -1515,19 +1555,18 @@ export function Roteiros() {
                   <span className="text-xs font-bold text-gray-400">
                     PONTOS NO DIA
                   </span>
-                  {isGestorRoteiro &&
-                    !isRoteiroFinalizado(roteiro) && (
-                      <button
-                        onClick={() => {
-                          setRoteiroParaAdicionar(roteiro);
-                          setFiltroLojaAdicionar("");
-                          setShowModalAdicionarLoja(true);
-                        }}
-                        className="text-blue-600 text-xs font-bold hover:underline"
-                      >
-                        + Adicionar
-                      </button>
-                    )}
+                  {isGestorRoteiro && !isRoteiroFinalizado(roteiro) && (
+                    <button
+                      onClick={() => {
+                        setRoteiroParaAdicionar(roteiro);
+                        setFiltroLojaAdicionar("");
+                        setShowModalAdicionarLoja(true);
+                      }}
+                      className="text-blue-600 text-xs font-bold hover:underline"
+                    >
+                      + Adicionar
+                    </button>
+                  )}
                 </div>
                 <div className="min-h-30 bg-gray-50 rounded-lg p-3 border border-gray-100">
                   {roteiro.lojas?.length > 0 ? (
@@ -1537,8 +1576,7 @@ export function Roteiros() {
                         <div
                           key={loja.id}
                           draggable={
-                            isGestorRoteiro &&
-                            !isRoteiroFinalizado(roteiro)
+                            isGestorRoteiro && !isRoteiroFinalizado(roteiro)
                           }
                           onDragStart={() => onDragStart(loja, roteiro.id)}
                           onDragOver={(e) => onDragOver(e, index, roteiro.id)}
@@ -1589,14 +1627,18 @@ export function Roteiros() {
                         disabled={Boolean(apagandoRoteiros[roteiro.id])}
                         className="bg-red-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {apagandoRoteiros[roteiro.id] ? "Apagando..." : "Apagar"}
+                        {apagandoRoteiros[roteiro.id]
+                          ? "Apagando..."
+                          : "Apagar"}
                       </button>
                     )}
                   </>
                 ) : isRoteiroFinalizado(roteiro) ? (
                   <>
                     <button
-                      onClick={() => navigate(`/roteiros/${roteiro.id}/executar`)}
+                      onClick={() =>
+                        navigate(`/roteiros/${roteiro.id}/executar`)
+                      }
                       className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
                     >
                       Abrir Rota
@@ -1607,7 +1649,9 @@ export function Roteiros() {
                         disabled={Boolean(apagandoRoteiros[roteiro.id])}
                         className="bg-red-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {apagandoRoteiros[roteiro.id] ? "Apagando..." : "Apagar"}
+                        {apagandoRoteiros[roteiro.id]
+                          ? "Apagando..."
+                          : "Apagar"}
                       </button>
                     )}
                   </>
