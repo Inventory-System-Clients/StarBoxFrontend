@@ -267,6 +267,8 @@ export function MaquinaForm() {
             contadorOutAnterior: contadorOutInicial,
             contadorIn: contadorInInicial,
             contadorOut: contadorOutInicial,
+            contadorInDigital: contadorInInicial,
+            contadorOutDigital: contadorOutInicial,
             quantidade_notas_entrada: null,
             valor_entrada_maquininha_pix: null,
             ignoreInOut: false,
@@ -278,6 +280,54 @@ export function MaquinaForm() {
             retiradaProduto: 0,
           };
 
+          const normalizarListaMovimentacoes = (resposta) =>
+            Array.isArray(resposta?.data)
+              ? resposta.data
+              : Array.isArray(resposta?.data?.rows)
+                ? resposta.data.rows
+                : Array.isArray(resposta?.data?.movimentacoes)
+                  ? resposta.data.movimentacoes
+                  : [];
+
+          const existeMovimentacaoInicial = (lista) =>
+            lista.some((mov) => {
+              const inAtual = Number(
+                mov?.contadorIn ?? mov?.contadorInDigital,
+              );
+              const outAtual = Number(
+                mov?.contadorOut ?? mov?.contadorOutDigital,
+              );
+              const inAnterior = Number(mov?.contadorInAnterior);
+              const outAnterior = Number(mov?.contadorOutAnterior);
+
+              return (
+                String(mov?.maquinaId || mov?.maquina_id) ===
+                  String(novaMaquinaId) &&
+                inAtual === contadorInInicial &&
+                outAtual === contadorOutInicial &&
+                (inAnterior === contadorInInicial || Number.isNaN(inAnterior)) &&
+                (outAnterior === contadorOutInicial || Number.isNaN(outAnterior))
+              );
+            });
+
+          const respostaAntesCriacaoMov = await api
+            .get("/movimentacoes", {
+              params: { maquinaId: novaMaquinaId, limite: 5 },
+            })
+            .catch(() => ({ data: [] }));
+
+          const listaAntesCriacao = normalizarListaMovimentacoes(
+            respostaAntesCriacaoMov,
+          );
+
+          // Se o backend já criou a movimentação inicial no fluxo de cadastro,
+          // não envia novamente para evitar duplicidade.
+          if (existeMovimentacaoInicial(listaAntesCriacao)) {
+            setSuccess("Máquina criada com sucesso!");
+            setTimeout(() => navigate("/maquinas"), 1500);
+            return;
+          }
+
           try {
             await api.post("/movimentacoes", payloadMovimentacaoInicial);
           } catch (erroMovimentacaoInicial) {
@@ -288,28 +338,12 @@ export function MaquinaForm() {
               })
               .catch(() => ({ data: [] }));
 
-            const listaMovimentacoes = Array.isArray(respostaConsulta.data)
-              ? respostaConsulta.data
-              : Array.isArray(respostaConsulta.data?.rows)
-                ? respostaConsulta.data.rows
-                : Array.isArray(respostaConsulta.data?.movimentacoes)
-                  ? respostaConsulta.data.movimentacoes
-                  : [];
+            const listaMovimentacoes = normalizarListaMovimentacoes(
+              respostaConsulta,
+            );
 
-            const movimentacaoInicialEncontrada = listaMovimentacoes.some((mov) => {
-              const inAtual = Number(mov?.contadorIn);
-              const outAtual = Number(mov?.contadorOut);
-              const inAnterior = Number(mov?.contadorInAnterior);
-              const outAnterior = Number(mov?.contadorOutAnterior);
-
-              return (
-                String(mov?.maquinaId || mov?.maquina_id) === String(novaMaquinaId) &&
-                inAtual === contadorInInicial &&
-                outAtual === contadorOutInicial &&
-                inAnterior === contadorInInicial &&
-                outAnterior === contadorOutInicial
-              );
-            });
+            const movimentacaoInicialEncontrada =
+              existeMovimentacaoInicial(listaMovimentacoes);
 
             if (!movimentacaoInicialEncontrada) {
               throw erroMovimentacaoInicial;
