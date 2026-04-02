@@ -9,6 +9,7 @@ import api from "../services/api";
  * @param {Function} props.onClose - Callback para fechar o modal
  * @param {Object} props.manutencao - Objeto da manutenção pendente
  * @param {number} props.lojaId - ID da loja
+ * @param {string|number} props.roteiroId - ID do roteiro em execução
  * @param {number} props.usuarioId - ID do funcionário/usuário
  * @param {Function} props.onManutencaoConcluida - Callback após conclusão
  */
@@ -17,6 +18,7 @@ export default function ManutencaoModal({
   onClose,
   manutencao,
   lojaId,
+  roteiroId,
   usuarioId,
   usuarioNome,
   onManutencaoConcluida,
@@ -182,7 +184,10 @@ export default function ManutencaoModal({
     const quantidadeSelecionada = Number.parseInt(quantidadePecaUsada, 10);
 
     if (pecaSelecionada !== "nao-usar") {
-      if (!Number.isInteger(quantidadeSelecionada) || quantidadeSelecionada <= 0) {
+      if (
+        !Number.isInteger(quantidadeSelecionada) ||
+        quantidadeSelecionada <= 0
+      ) {
         setError("Informe uma quantidade válida de peça para a manutenção.");
         return;
       }
@@ -209,11 +214,13 @@ export default function ManutencaoModal({
       const payload = {
         status: "feito",
         pecaId: pecaSelecionada !== "nao-usar" ? pecaSelecionada : null,
-        quantidade: pecaSelecionada !== "nao-usar" ? quantidadeSelecionada : null,
+        quantidade:
+          pecaSelecionada !== "nao-usar" ? quantidadeSelecionada : null,
         explicacao_sem_peca: explicacaoSemPeca.trim()
           ? explicacaoSemPeca
           : null,
         concluidoPorId: usuarioId,
+        roteiroId: roteiroId || null,
       };
 
       await api.put(`/manutencoes/${manutencao.id}/concluir`, payload);
@@ -265,6 +272,7 @@ export default function ManutencaoModal({
       const payload = {
         explicacao_nao_fazer: explicacaoNaoFazer,
         verificadoPorId: usuarioId,
+        roteiroId: roteiroId || null,
       };
 
       await api.put(`/manutencoes/${manutencao.id}/nao-fazer`, payload);
@@ -433,20 +441,23 @@ export default function ManutencaoModal({
                 <input
                   type="number"
                   min="1"
-                  max={Math.max(1, obterQuantidadeDisponivelDaPecaSelecionada())}
+                  max={Math.max(
+                    1,
+                    obterQuantidadeDisponivelDaPecaSelecionada(),
+                  )}
                   className="input-field w-full"
                   value={quantidadePecaUsada}
                   onChange={(e) => {
-                    const valorNormalizado = String(e.target.value || "").replace(
-                      /\D/g,
-                      "",
-                    );
+                    const valorNormalizado = String(
+                      e.target.value || "",
+                    ).replace(/\D/g, "");
                     setQuantidadePecaUsada(valorNormalizado || "1");
                     setError("");
                   }}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Disponível no carrinho: {obterQuantidadeDisponivelDaPecaSelecionada()}
+                  Disponível no carrinho:{" "}
+                  {obterQuantidadeDisponivelDaPecaSelecionada()}
                 </p>
               </div>
             )}

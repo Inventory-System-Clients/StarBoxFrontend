@@ -484,6 +484,7 @@ export default function RoteiroExecucao() {
         lojaId: lojaSelecionada.id,
         maquinaId: maquinaIdSelecionada,
         funcionarioId: usuario?.id || null,
+        roteiroId: id,
       });
 
       const payload = resCriacao?.data;
@@ -1991,6 +1992,7 @@ export default function RoteiroExecucao() {
           onClose={() => setModalManutencao(false)}
           manutencao={manutencaoPendente}
           lojaId={lojaSelecionada?.id}
+          roteiroId={id}
           usuarioId={usuario?.id}
           usuarioNome={usuario?.nome}
           onManutencaoConcluida={handleManutencaoConcluida}
