@@ -937,93 +937,78 @@ export default function RoteiroExecucao() {
         roteiro?.saldoGastoHoje,
       );
 
-      const manutencoesRealizadas = normalizarListaResumo(
+      let manutencoesRealizadas = normalizarListaResumo(
         finalizacaoData?.manutencoesRealizadas ||
           finalizacaoData?.manutencoesConcluidas ||
           finalizacaoData?.totais?.manutencoesRealizadas ||
           [],
       );
 
-      const manutencoesNaoRealizadas = normalizarListaResumo(
+      let manutencoesNaoRealizadas = normalizarListaResumo(
         finalizacaoData?.manutencoesNaoRealizadas ||
           finalizacaoData?.manutencoesPendentes ||
           finalizacaoData?.pendenciasManutencao ||
-          finalizacaoData?.pendencias ||
           [],
       );
 
-      if (
-        manutencoesRealizadas.length === 0 &&
-        manutencoesNaoRealizadas.length === 0
-      ) {
-        try {
-          const manutRes = await api.get("/manutencoes", {
-            params: {
-              roteiroId: id,
-            },
-          });
+      try {
+        const manutRes = await api.get("/manutencoes", {
+          params: {
+            roteiroId: id,
+          },
+        });
 
-          const listaManut = Array.isArray(manutRes.data)
-            ? manutRes.data
-            : manutRes.data?.rows || [];
+        const listaManut = Array.isArray(manutRes.data)
+          ? manutRes.data
+          : manutRes.data?.rows || [];
 
-          const idsLojasRoteiro = new Set(
-            (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
-              .map((loja) => String(loja?.id || ""))
-              .filter(Boolean),
-          );
+        const idsLojasRoteiro = new Set(
+          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
+            .map((loja) => String(loja?.id || ""))
+            .filter(Boolean),
+        );
 
-          const relacionadasRoteiro = listaManut.filter((item) => {
-            const rotaId = String(item?.roteiroId || item?.roteiro?.id || "");
-            const lojaIdItem = String(item?.lojaId || item?.loja?.id || "");
+        const relacionadasRoteiro = listaManut.filter((item) => {
+          const rotaId = String(item?.roteiroId || item?.roteiro?.id || "");
+          const lojaIdItem = String(item?.lojaId || item?.loja?.id || "");
 
-            if (rotaId && rotaId === String(id)) return true;
-            if (idsLojasRoteiro.has(lojaIdItem)) return true;
-            return false;
-          });
+          if (rotaId && rotaId === String(id)) return true;
+          if (idsLojasRoteiro.has(lojaIdItem)) return true;
+          return false;
+        });
 
-          const doFuncionarioRota = relacionadasRoteiro.filter((item) => {
-            const funcionarioId = String(
-              item?.funcionarioId ||
-                item?.funcionario?.id ||
-                item?.concluidoPorId ||
-                item?.concluidoPor?.id ||
-                "",
-            );
+        const feitas = relacionadasRoteiro.filter((item) => {
+          const status = String(item?.status || "").toLowerCase();
+          return [
+            "feito",
+            "concluida",
+            "concluido",
+            "finalizada",
+            "finalizado",
+          ].includes(status);
+        });
 
-            return (
-              !funcionarioDoRoteiro ||
-              funcionarioId === String(funcionarioDoRoteiro)
-            );
-          });
+        const pendentes = relacionadasRoteiro.filter((item) => {
+          const status = String(item?.status || "").toLowerCase();
+          return ![
+            "feito",
+            "concluida",
+            "concluido",
+            "finalizada",
+            "finalizado",
+          ].includes(status);
+        });
 
-          const feitas = doFuncionarioRota.filter((item) => {
-            const status = String(item?.status || "").toLowerCase();
-            return [
-              "feito",
-              "concluida",
-              "concluido",
-              "finalizada",
-              "finalizado",
-            ].includes(status);
-          });
-
-          const pendentes = doFuncionarioRota.filter((item) => {
-            const status = String(item?.status || "").toLowerCase();
-            return ![
-              "feito",
-              "concluida",
-              "concluido",
-              "finalizada",
-              "finalizado",
-            ].includes(status);
-          });
-
-          manutencoesRealizadas.push(...feitas);
-          manutencoesNaoRealizadas.push(...pendentes);
-        } catch {
-          // Sem fallback adicional.
-        }
+        manutencoesRealizadas = normalizarListaResumo([
+          ...manutencoesRealizadas,
+          ...feitas,
+        ]);
+        manutencoesNaoRealizadas = normalizarListaResumo([
+          ...manutencoesNaoRealizadas,
+          ...pendentes,
+        ]);
+      } catch {
+        // Sem fallback adicional.
       }
 
       let kmInicialVeiculo = Number.isFinite(kmInicialPilotagemSnapshot)

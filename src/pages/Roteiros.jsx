@@ -954,20 +954,79 @@ export function Roteiros() {
         roteiro?.saldoGastoHoje,
       );
 
-      const manutencoesRealizadas = normalizarListaResumo(
+      let manutencoesRealizadas = normalizarListaResumo(
         finalizacaoData?.manutencoesRealizadas ||
           finalizacaoData?.manutencoesConcluidas ||
           finalizacaoData?.totais?.manutencoesRealizadas ||
           [],
       );
 
-      const manutencoesNaoRealizadas = normalizarListaResumo(
+      let manutencoesNaoRealizadas = normalizarListaResumo(
         finalizacaoData?.manutencoesNaoRealizadas ||
           finalizacaoData?.manutencoesPendentes ||
           finalizacaoData?.pendenciasManutencao ||
-          finalizacaoData?.pendencias ||
           [],
       );
+
+      try {
+        const manutRes = await api.get("/manutencoes", {
+          params: {
+            roteiroId: roteiro?.id,
+          },
+        });
+
+        const listaManut = Array.isArray(manutRes.data)
+          ? manutRes.data
+          : manutRes.data?.rows || [];
+
+        const idsLojasRoteiro = new Set(
+          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
+            .map((loja) => String(loja?.id || ""))
+            .filter(Boolean),
+        );
+
+        const relacionadasRoteiro = listaManut.filter((item) => {
+          const rotaId = String(item?.roteiroId || item?.roteiro?.id || "");
+          const lojaIdItem = String(item?.lojaId || item?.loja?.id || "");
+
+          if (rotaId && rotaId === String(roteiro?.id || "")) return true;
+          if (idsLojasRoteiro.has(lojaIdItem)) return true;
+          return false;
+        });
+
+        const feitas = relacionadasRoteiro.filter((item) => {
+          const status = String(item?.status || "").toLowerCase();
+          return [
+            "feito",
+            "concluida",
+            "concluido",
+            "finalizada",
+            "finalizado",
+          ].includes(status);
+        });
+
+        const pendentes = relacionadasRoteiro.filter((item) => {
+          const status = String(item?.status || "").toLowerCase();
+          return ![
+            "feito",
+            "concluida",
+            "concluido",
+            "finalizada",
+            "finalizado",
+          ].includes(status);
+        });
+
+        manutencoesRealizadas = normalizarListaResumo([
+          ...manutencoesRealizadas,
+          ...feitas,
+        ]);
+        manutencoesNaoRealizadas = normalizarListaResumo([
+          ...manutencoesNaoRealizadas,
+          ...pendentes,
+        ]);
+      } catch {
+        // Sem fallback adicional.
+      }
 
       let kmInicialVeiculo = Number.isFinite(kmInicialPilotagemSnapshot)
         ? kmInicialPilotagemSnapshot
