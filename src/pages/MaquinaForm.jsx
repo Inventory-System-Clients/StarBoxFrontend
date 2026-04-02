@@ -25,6 +25,8 @@ export function MaquinaForm() {
     forcaPremium: "",
     jogadasPremium: "",
     percentualAlertaEstoque: "",
+    contadorInInicial: "",
+    contadorOutInicial: "",
     localizacao: "",
     ativo: true,
   });
@@ -133,6 +135,8 @@ export function MaquinaForm() {
         forcaPremium: response.data.forcaPremium || "",
         jogadasPremium: response.data.jogadasPremium || "",
         percentualAlertaEstoque: response.data.percentualAlertaEstoque || 20,
+        contadorInInicial: "",
+        contadorOutInicial: "",
         localizacao: response.data.localizacao || "",
         ativo: response.data.ativo !== undefined ? response.data.ativo : true,
       });
@@ -196,6 +200,19 @@ export function MaquinaForm() {
         return;
       }
 
+      const contadorInInicialInformado =
+        formData.contadorInInicial !== "" && formData.contadorInInicial !== null;
+      const contadorOutInicialInformado =
+        formData.contadorOutInicial !== "" && formData.contadorOutInicial !== null;
+
+      if (!isEdit && contadorInInicialInformado !== contadorOutInicialInformado) {
+        setError(
+          "Para lançar movimentação inicial, preencha IN e OUT inicial juntos.",
+        );
+        setLoading(false);
+        return;
+      }
+
       const data = {
         codigo: formData.codigo.trim(),
         nome: formData.nome.trim() || null,
@@ -224,7 +241,82 @@ export function MaquinaForm() {
         await api.put(`/maquinas/${id}`, data);
         setSuccess("Máquina atualizada com sucesso!");
       } else {
-        await api.post("/maquinas", data);
+        const responseNovaMaquina = await api.post("/maquinas", data);
+
+        if (contadorInInicialInformado && contadorOutInicialInformado) {
+          const novaMaquinaId =
+            responseNovaMaquina?.data?.id || responseNovaMaquina?.data?.maquina?.id;
+
+          if (!novaMaquinaId) {
+            throw new Error(
+              "Máquina criada, mas não foi possível identificar o ID para lançar movimentação inicial.",
+            );
+          }
+
+          const contadorInInicial = parseInt(formData.contadorInInicial, 10);
+          const contadorOutInicial = parseInt(formData.contadorOutInicial, 10);
+
+          const payloadMovimentacaoInicial = {
+            maquinaId: novaMaquinaId,
+            totalPre: 0,
+            sairam: 0,
+            abastecidas: 0,
+            totalPos: 0,
+            fichas: 0,
+            contadorInAnterior: contadorInInicial,
+            contadorOutAnterior: contadorOutInicial,
+            contadorIn: contadorInInicial,
+            contadorOut: contadorOutInicial,
+            quantidade_notas_entrada: null,
+            valor_entrada_maquininha_pix: null,
+            ignoreInOut: false,
+            retiradaEstoque: false,
+            origemEstoque: "usuario",
+            contadorMaquina: null,
+            observacoes: "Movimentação inicial automática no cadastro da máquina",
+            produtos: [],
+            retiradaProduto: 0,
+          };
+
+          try {
+            await api.post("/movimentacoes", payloadMovimentacaoInicial);
+          } catch (erroMovimentacaoInicial) {
+            // Alguns cenários retornam 500 mesmo com persistência concluída.
+            const respostaConsulta = await api
+              .get("/movimentacoes", {
+                params: { maquinaId: novaMaquinaId, limite: 5 },
+              })
+              .catch(() => ({ data: [] }));
+
+            const listaMovimentacoes = Array.isArray(respostaConsulta.data)
+              ? respostaConsulta.data
+              : Array.isArray(respostaConsulta.data?.rows)
+                ? respostaConsulta.data.rows
+                : Array.isArray(respostaConsulta.data?.movimentacoes)
+                  ? respostaConsulta.data.movimentacoes
+                  : [];
+
+            const movimentacaoInicialEncontrada = listaMovimentacoes.some((mov) => {
+              const inAtual = Number(mov?.contadorIn);
+              const outAtual = Number(mov?.contadorOut);
+              const inAnterior = Number(mov?.contadorInAnterior);
+              const outAnterior = Number(mov?.contadorOutAnterior);
+
+              return (
+                String(mov?.maquinaId || mov?.maquina_id) === String(novaMaquinaId) &&
+                inAtual === contadorInInicial &&
+                outAtual === contadorOutInicial &&
+                inAnterior === contadorInInicial &&
+                outAnterior === contadorOutInicial
+              );
+            });
+
+            if (!movimentacaoInicialEncontrada) {
+              throw erroMovimentacaoInicial;
+            }
+          }
+        }
+
         setSuccess("Máquina criada com sucesso!");
       }
 
@@ -575,6 +667,46 @@ export function MaquinaForm() {
                     Percentual mínimo para alerta (padrão: 20%)
                   </p>
                 </div>
+
+                {!isEdit && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Contador IN Inicial
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorInInicial"
+                        value={formData.contadorInInicial}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="Ex: 1000"
+                        min="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Opcional. Preencha junto com OUT para lançar movimentação inicial automática.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Contador OUT Inicial
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorOutInicial"
+                        value={formData.contadorOutInicial}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="Ex: 500"
+                        min="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Opcional. Se preencher um, preencha o outro também.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
