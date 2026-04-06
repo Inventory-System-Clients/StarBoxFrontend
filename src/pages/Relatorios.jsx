@@ -106,6 +106,45 @@ export function Relatorios() {
     return `${ano}-${mes}-${dia}`;
   };
 
+  const calcularCustoFixoProporcionalPeriodo = (
+    custoFixoMensal,
+    periodoInicio,
+    periodoFim,
+  ) => {
+    const custoMensal = toNumber(custoFixoMensal);
+    if (custoMensal <= 0) return 0;
+
+    if (!periodoInicio || !periodoFim) return custoMensal;
+
+    const inicio = new Date(`${periodoInicio}T12:00:00`);
+    const fim = new Date(`${periodoFim}T12:00:00`);
+
+    if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
+      return custoMensal;
+    }
+
+    if (fim < inicio) return 0;
+
+    const cursor = new Date(inicio);
+    let totalProporcional = 0;
+
+    while (cursor <= fim) {
+      const diasNoMes = new Date(
+        cursor.getFullYear(),
+        cursor.getMonth() + 1,
+        0,
+      ).getDate();
+
+      if (diasNoMes > 0) {
+        totalProporcional += custoMensal / diasNoMes;
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return totalProporcional;
+  };
+
   const obterMesmoDiaNoMesAnterior = (dataTexto) => {
     const dataBase = new Date(`${dataTexto}T00:00:00`);
     if (Number.isNaN(dataBase.getTime())) return dataTexto;
@@ -695,14 +734,15 @@ export function Relatorios() {
         }
       }
 
-      const conferencia = String(fluxo?.conferencia || "").toLowerCase();
-      const valorRetiradoInformado =
-        fluxo?.valorRetirado !== null &&
-        fluxo?.valorRetirado !== undefined &&
-        fluxo?.valorRetirado !== "";
+      const conferenciaNormalizada = String(fluxo?.conferencia || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "_");
 
-      // Só calcula quebra quando há conferência efetiva ou valor retirado explícito.
-      if (!valorRetiradoInformado && conferencia !== "nao_bateu") {
+      // Regra de negocio: quebra de caixa conta SOMENTE quando a conferencia e "nao bateu".
+      if (conferenciaNormalizada !== "nao_bateu") {
         return acc;
       }
 
@@ -721,7 +761,15 @@ export function Relatorios() {
         valorEsperadoReferencia !== undefined &&
         valorEsperadoReferencia !== "";
 
-      if (!temDiferencaDireta && (!valorRetiradoInformado || !valorEsperadoInformado)) {
+      const valorRetiradoInformado =
+        fluxo?.valorRetirado !== null &&
+        fluxo?.valorRetirado !== undefined &&
+        fluxo?.valorRetirado !== "";
+
+      if (
+        !temDiferencaDireta &&
+        (!valorRetiradoInformado || !valorEsperadoInformado)
+      ) {
         return acc;
       }
 
@@ -1195,9 +1243,14 @@ export function Relatorios() {
           const gastosFixosLista = extrairListaGastosFixos(
             gastosFixosResponse?.data,
           );
-          const custoFixo = gastosFixosLista.reduce(
+          const custoFixoMensal = gastosFixosLista.reduce(
             (acc, item) => acc + toNumber(item?.valor),
             0,
+          );
+          const custoFixo = calcularCustoFixoProporcionalPeriodo(
+            custoFixoMensal,
+            periodoInicio,
+            periodoFim,
           );
 
           const produtosSairamDireto = Array.isArray(dadosLoja?.produtosSairam)
@@ -1260,6 +1313,7 @@ export function Relatorios() {
             custoVariavel,
             custoProdutos,
             custoFixo,
+            custoFixoMensal,
             custoQuebraCaixa: toNumber(custoQuebraCaixa),
             fichas,
             produtosSairam,
@@ -2251,8 +2305,21 @@ export function Relatorios() {
     }))
     .filter((item) => item.nome.length > 0 && item.valor > 0);
 
-  const totalGastosFixosDaLoja = gastosFixosComValor.reduce(
+  const gastosFixosProporcionaisPeriodo = gastosFixosComValor.map((item) => ({
+    ...item,
+    valorProporcionalPeriodo: calcularCustoFixoProporcionalPeriodo(
+      item.valor,
+      dataInicio,
+      dataFim,
+    ),
+  }));
+
+  const totalGastosFixosMensalDaLoja = gastosFixosComValor.reduce(
     (acc, item) => acc + item.valor,
+    0,
+  );
+  const totalGastosFixosDaLoja = gastosFixosProporcionaisPeriodo.reduce(
+    (acc, item) => acc + toNumber(item?.valorProporcionalPeriodo),
     0,
   );
   const custoQuebraCaixaRelatorio = toNumber(
@@ -2983,19 +3050,35 @@ export function Relatorios() {
                     )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
-                    Gastos Fixos da Loja
+                    Gastos Fixos no Período (rateio diário)
+                  </div>
+                  <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                    Mensal da loja: R${" "}
+                    {Number(totalGastosFixosMensalDaLoja || 0).toLocaleString(
+                      "pt-BR",
+                      { minimumFractionDigits: 2 },
+                    )}
                   </div>
                   <div className="text-[10px] sm:text-xs opacity-80 mt-2 space-y-1 max-h-24 overflow-y-auto pr-1">
-                    {gastosFixosComValor.length > 0 ? (
-                      gastosFixosComValor.map((gasto) => (
+                    {gastosFixosProporcionaisPeriodo.length > 0 ? (
+                      gastosFixosProporcionaisPeriodo.map((gasto) => (
                         <div
                           key={`${gasto.id || gasto.nome}`}
                           className="truncate"
                         >
                           {gasto.nome}: R${" "}
-                          {Number(gasto.valor || 0).toLocaleString("pt-BR", {
+                          {Number(
+                            gasto.valorProporcionalPeriodo || 0,
+                          ).toLocaleString("pt-BR", {
                             minimumFractionDigits: 2,
-                          })}
+                          })}{" "}
+                          <span className="opacity-80">
+                            (mensal: R${" "}
+                            {Number(gasto.valor || 0).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                            )
+                          </span>
                         </div>
                       ))
                     ) : (
