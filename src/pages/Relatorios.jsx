@@ -645,13 +645,48 @@ export function Relatorios() {
         "",
     ).trim();
 
-  const calcularQuebraCaixaComoCusto = (fluxos = [], lojaIdAlvo = null) => {
+  const obterDataReferenciaFluxo = (fluxo) => {
+    const dataTexto =
+      fluxo?.movimentacao?.dataColeta ||
+      fluxo?.movimentacao?.dataMovimentacao ||
+      fluxo?.movimentacao?.createdAt ||
+      fluxo?.movimentacao?.updatedAt ||
+      fluxo?.dataConferencia ||
+      fluxo?.createdAt ||
+      fluxo?.updatedAt ||
+      null;
+
+    if (!dataTexto) return null;
+    const dataObj = new Date(dataTexto);
+    if (Number.isNaN(dataObj.getTime())) return null;
+    return dataObj;
+  };
+
+  const calcularQuebraCaixaComoCusto = (
+    fluxos = [],
+    lojaIdAlvo = null,
+    periodoInicio = null,
+    periodoFim = null,
+  ) => {
     const alvo =
       lojaIdAlvo === null || lojaIdAlvo === undefined
         ? ""
         : String(lojaIdAlvo).trim();
 
+    const inicioPeriodo = periodoInicio
+      ? new Date(`${periodoInicio}T00:00:00`)
+      : null;
+    const fimPeriodo = periodoFim ? new Date(`${periodoFim}T23:59:59`) : null;
+
     return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      const dataFluxo = obterDataReferenciaFluxo(fluxo);
+      if (inicioPeriodo && dataFluxo && dataFluxo < inicioPeriodo) {
+        return acc;
+      }
+      if (fimPeriodo && dataFluxo && dataFluxo > fimPeriodo) {
+        return acc;
+      }
+
       if (alvo) {
         const lojaDoFluxo = obterLojaIdDoFluxo(fluxo);
         // Em relatório por loja, só aceita fluxos que comprovem pertencer à loja alvo.
@@ -756,7 +791,7 @@ export function Relatorios() {
     try {
       const fluxos = await carregarFluxosCaixa({ inicio, fim, lojaId });
 
-      return calcularQuebraCaixaComoCusto(fluxos, lojaId);
+      return calcularQuebraCaixaComoCusto(fluxos, lojaId, inicio, fim);
     } catch (erroFluxo) {
       console.warn(
         `Não foi possível calcular quebra de caixa da loja ${lojaId}:`,
@@ -770,7 +805,7 @@ export function Relatorios() {
     try {
       const fluxos = await carregarFluxosCaixa({ inicio, fim, roteiroId });
 
-      return calcularQuebraCaixaComoCusto(fluxos);
+      return calcularQuebraCaixaComoCusto(fluxos, null, inicio, fim);
     } catch (erroFluxoRoteiro) {
       console.warn(
         `Não foi possível calcular quebra de caixa do roteiro ${roteiroId}:`,
@@ -844,24 +879,35 @@ export function Relatorios() {
     const lucroLiquidoConsolidadoOriginal =
       totaisAtuais.valorLiquidoConsolidadoLojaMaquinas;
     const lucroLiquidoTotalOriginal = totaisAtuais.lucroLiquidoTotal;
+    const custoQuebraOriginal = toNumber(
+      totaisAtuais.custoQuebraCaixa ?? totaisAtuais.custoQuebraCaixaTotal,
+    );
+    const gastoSemQuebraOriginal = Math.max(0, gastoTotalOriginal - custoQuebraOriginal);
+    const novoGastoTotal = gastoSemQuebraOriginal + quebra;
 
     return {
       ...dadosRelatorio,
       totais: {
         ...totaisAtuais,
         custoQuebraCaixa: quebra,
-        gastoTotalPeriodo: gastoTotalOriginal + quebra,
+        custoQuebraCaixaTotal: quebra,
+        gastoTotalPeriodo: novoGastoTotal,
         ...(lucroLiquidoConsolidadoOriginal !== null &&
         lucroLiquidoConsolidadoOriginal !== undefined
           ? {
               valorLiquidoConsolidadoLojaMaquinas:
-                toNumber(lucroLiquidoConsolidadoOriginal) - quebra,
+                toNumber(lucroLiquidoConsolidadoOriginal) +
+                custoQuebraOriginal -
+                quebra,
             }
           : {}),
         ...(lucroLiquidoTotalOriginal !== null &&
         lucroLiquidoTotalOriginal !== undefined
           ? {
-              lucroLiquidoTotal: toNumber(lucroLiquidoTotalOriginal) - quebra,
+              lucroLiquidoTotal:
+                toNumber(lucroLiquidoTotalOriginal) +
+                custoQuebraOriginal -
+                quebra,
             }
           : {}),
       },
@@ -1814,7 +1860,12 @@ export function Relatorios() {
             const fluxosLoja = Array.isArray(fluxosPorLoja[idx])
               ? fluxosPorLoja[idx]
               : [];
-            const quebraLoja = calcularQuebraCaixaComoCusto(fluxosLoja, lojaId);
+            const quebraLoja = calcularQuebraCaixaComoCusto(
+              fluxosLoja,
+              lojaId,
+              dataInicio,
+              dataFim,
+            );
 
             return {
               lojaId,
@@ -1831,6 +1882,9 @@ export function Relatorios() {
           );
           custoQuebraCaixaRoteiroPorLojas = calcularQuebraCaixaComoCusto(
             fluxosUnicosRoteiro,
+            null,
+            dataInicio,
+            dataFim,
           );
 
           console.log("[Relatorios][Quebra][Roteiro] Consolidação por lojas:", {
@@ -2226,6 +2280,8 @@ export function Relatorios() {
     custoQuebraCaixaRelatorio;
   const lucroLiquidoRelatorio =
     valorConsolidadoRelatorio - custoTotalConsideradoRelatorio;
+  const lucroSemCustoFixoRelatorio =
+    valorConsolidadoRelatorio - custoProdutosRelatorio;
 
   const isRelatorioRoteiro = relatorio?.tipo === "roteiro";
   const resumoRoteiroConsolidado =
@@ -3001,6 +3057,24 @@ export function Relatorios() {
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
                     Lucro Líquido
+                  </div>
+                </div>
+
+                {/* Lucro sem custo fixo */}
+                <div className="card bg-linear-to-br from-teal-600 to-cyan-800 text-white">
+                  <div className="text-2xl sm:text-3xl mb-2">🟢</div>
+                  <div className="text-xl sm:text-2xl font-bold">
+                    R${" "}
+                    {Number(lucroSemCustoFixoRelatorio || 0).toLocaleString(
+                      "pt-BR",
+                      { minimumFractionDigits: 2 },
+                    )}
+                  </div>
+                  <div className="text-xs sm:text-sm opacity-90">
+                    Lucro sem custo fixo
+                  </div>
+                  <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                    Considera apenas custo dos produtos que saíram
                   </div>
                 </div>
               </div>

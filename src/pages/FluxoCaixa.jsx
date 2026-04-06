@@ -247,23 +247,37 @@ export default function FluxoCaixa() {
       const maquinaId = obterMaquinaId(fluxo);
       const anterior = ultimoContadorPorMaquina.get(maquinaId) || {};
 
-      const contadorInAnteriorCalculado =
+      const contadorInAnteriorInformado =
         fluxo?.movimentacao?.contadorInAnterior ??
         fluxo?.contadorInAnterior ??
         fluxo?.ultimoContadorInRetirada ??
-        anterior.contadorInAtual ??
         null;
 
-      const contadorOutAnteriorCalculado =
+      const contadorOutAnteriorInformado =
         fluxo?.movimentacao?.contadorOutAnterior ??
         fluxo?.contadorOutAnterior ??
         fluxo?.ultimoContadorOutRetirada ??
-        anterior.contadorOutAtual ??
         null;
+
+      // Para manter consistência em cenário de contador digital/mecânico,
+      // o "anterior" principal deve seguir a cadeia cronológica por máquina.
+      const contadorInAnteriorCronologico =
+        anterior.contadorInAtual ?? contadorInAnteriorInformado;
+
+      const contadorOutAnteriorCronologico =
+        anterior.contadorOutAtual ?? contadorOutAnteriorInformado;
+
+      const contadorInAnteriorCalculado =
+        contadorInAnteriorCronologico;
+
+      const contadorOutAnteriorCalculado =
+        contadorOutAnteriorCronologico;
 
       enriquecidoPorId.set(fluxo.id, {
         ultimoContadorInRetirada: contadorInAnteriorCalculado,
         ultimoContadorOutRetirada: contadorOutAnteriorCalculado,
+        contadorInAnteriorCronologico,
+        contadorOutAnteriorCronologico,
       });
 
       const contadorInAtual = obterContadorInAtual(fluxo);
@@ -515,6 +529,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
       movimentacao?.contadorIn ?? movimentacao?.contadorInDigital,
     );
     const contadorInAnterior = parseNumero(
+      fluxo?.contadorInAnteriorCronologico ??
       movimentacao?.contadorInAnterior ??
         fluxo?.contadorInAnterior ??
         fluxo?.ultimoContadorInRetirada,
@@ -524,6 +539,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
       movimentacao?.contadorOut ?? movimentacao?.contadorOutDigital,
     );
     const contadorOutAnterior = parseNumero(
+      fluxo?.contadorOutAnteriorCronologico ??
       movimentacao?.contadorOutAnterior ??
         fluxo?.contadorOutAnterior ??
         fluxo?.ultimoContadorOutRetirada,

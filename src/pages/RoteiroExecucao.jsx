@@ -2074,6 +2074,22 @@ export default function RoteiroExecucao() {
             </button>
           )}
           <button
+            className={`py-2 px-6 rounded-lg font-bold text-white ${
+              roteiroEstaFinalizado(roteiro.status)
+                ? "bg-emerald-600 hover:bg-emerald-700"
+                : "bg-emerald-300 cursor-not-allowed"
+            }`}
+            onClick={executarFinalizacaoRoteiro}
+            disabled={!roteiroEstaFinalizado(roteiro.status)}
+            title={
+              roteiroEstaFinalizado(roteiro.status)
+                ? ""
+                : "Finalize a rota para enviar o resumo no WhatsApp"
+            }
+          >
+            Enviar resumo Whats
+          </button>
+          <button
             className="bg-gray-200 text-gray-700 py-2 px-6 rounded-lg font-bold"
             onClick={() => navigate(-1)}
           >

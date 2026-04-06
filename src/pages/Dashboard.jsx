@@ -372,6 +372,62 @@ export function Dashboard() {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
 
+  const extrairTimestampMovimentacao = (mov) => {
+    const valorData =
+      mov?.dataColeta ||
+      mov?.dataMovimentacao ||
+      mov?.data ||
+      mov?.createdAt ||
+      mov?.updatedAt ||
+      "";
+
+    if (!valorData) return 0;
+
+    const dataDireta = new Date(valorData);
+    if (!Number.isNaN(dataDireta.getTime())) {
+      return dataDireta.getTime();
+    }
+
+    const texto = String(valorData).trim();
+    const matchBr = texto.match(
+      /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+|\s+às\s+)(\d{2}):(\d{2})(?::(\d{2}))?$/i,
+    );
+    if (matchBr) {
+      const [, dd, mm, yyyy, hh, min, ss = "00"] = matchBr;
+      const dataBr = new Date(
+        Number(yyyy),
+        Number(mm) - 1,
+        Number(dd),
+        Number(hh),
+        Number(min),
+        Number(ss),
+      );
+      if (!Number.isNaN(dataBr.getTime())) {
+        return dataBr.getTime();
+      }
+    }
+
+    return 0;
+  };
+
+  const compararMovimentacoesMaisRecentes = (a, b) => {
+    const tsA = extrairTimestampMovimentacao(a);
+    const tsB = extrairTimestampMovimentacao(b);
+
+    if (tsA !== tsB) return tsB - tsA;
+
+    const idA = Number(a?.id || 0);
+    const idB = Number(b?.id || 0);
+    if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) {
+      return idB - idA;
+    }
+
+    return String(b?.id || "").localeCompare(String(a?.id || ""), "pt-BR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+  };
+
   // Função para verificar se usuário pode editar uma movimentação
   const podeEditar = (movimentacao) => {
     if (!usuario) return false;
@@ -965,7 +1021,8 @@ export function Dashboard() {
     try {
       setLoadingMaquina(true);
       const movRes = await api.get(`/movimentacoes?maquinaId=${maquinaId}`);
-      setMovimentacoes(movRes.data || []);
+      const lista = Array.isArray(movRes.data) ? movRes.data : [];
+      setMovimentacoes([...lista].sort(compararMovimentacoesMaisRecentes));
     } catch (error) {
       console.error("Erro ao carregar movimentações:", error);
       setMovimentacoes([]);
@@ -1716,10 +1773,8 @@ export function Dashboard() {
 
       let ultimoProduto = null;
       if (movimentacoes.length > 0) {
-        const movimentacoesOrdenadas = movimentacoes.sort(
-          (a, b) =>
-            new Date(b.dataColeta || b.createdAt) -
-            new Date(a.dataColeta || a.createdAt),
+        const movimentacoesOrdenadas = [...movimentacoes].sort(
+          compararMovimentacoesMaisRecentes,
         );
         const ultimaMov = movimentacoesOrdenadas[0];
         const produtoId = ultimaMov.detalhesProdutos?.[0]?.produtoId;
@@ -3652,9 +3707,12 @@ export function Dashboard() {
                       </div>
                     ) : movimentacoes.length > 0 ? (
                       <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {movimentacoes
+                        {[...movimentacoes]
+                          .sort(compararMovimentacoesMaisRecentes)
                           .filter((mov) => {
-                            const movData = new Date(mov.createdAt);
+                            const movData = new Date(
+                              extrairTimestampMovimentacao(mov),
+                            );
                             const inicio = dataInicio
                               ? new Date(dataInicio)
                               : null;
@@ -3685,11 +3743,15 @@ export function Dashboard() {
                                 </Badge>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-gray-600">
-                                    {new Date(mov.createdAt).toLocaleDateString(
+                                    {new Date(
+                                      extrairTimestampMovimentacao(mov),
+                                    ).toLocaleDateString(
                                       "pt-BR",
                                     )}{" "}
                                     às{" "}
-                                    {new Date(mov.createdAt).toLocaleTimeString(
+                                    {new Date(
+                                      extrairTimestampMovimentacao(mov),
+                                    ).toLocaleTimeString(
                                       "pt-BR",
                                     )}
                                   </span>

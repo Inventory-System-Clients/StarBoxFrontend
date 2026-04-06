@@ -49,6 +49,95 @@ export default function MovimentacaoMaquina() {
   const [isPrimeiraMovimentacao, setIsPrimeiraMovimentacao] = useState(false);
   const [ultimaMovimentacaoData, setUltimaMovimentacaoData] = useState(null);
 
+  const CONTADOR_TIPO_STORAGE_PREFIX = "starbox:maquina:contador-tipo:";
+
+  const obterChaveTipoContadorMaquina = (idMaquina) =>
+    `${CONTADOR_TIPO_STORAGE_PREFIX}${String(idMaquina || "").trim()}`;
+
+  const obterTipoContadorSalvo = (idMaquina) => {
+    const chave = obterChaveTipoContadorMaquina(idMaquina);
+    if (!chave || chave.endsWith(":")) return null;
+
+    try {
+      const valor = String(window.localStorage.getItem(chave) || "")
+        .trim()
+        .toLowerCase();
+      if (valor === "digital" || valor === "mecanico") return valor;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const salvarTipoContadorMaquina = (idMaquina, tipo) => {
+    const chave = obterChaveTipoContadorMaquina(idMaquina);
+    const tipoNormalizado = String(tipo || "").trim().toLowerCase();
+
+    if (
+      !chave ||
+      chave.endsWith(":") ||
+      !["digital", "mecanico"].includes(tipoNormalizado)
+    ) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(chave, tipoNormalizado);
+    } catch {
+      // Sem bloqueio de fluxo caso o storage falhe.
+    }
+  };
+
+  const inferirTipoContadorMovimentacao = (movimentacao) => {
+    if (!movimentacao || typeof movimentacao !== "object") return null;
+
+    const tipoTexto = String(
+      movimentacao?.tipoContador ||
+        movimentacao?.contadorTipo ||
+        movimentacao?.modoContador ||
+        "",
+    )
+      .trim()
+      .toLowerCase();
+
+    if (tipoTexto.includes("digital")) return "digital";
+    if (tipoTexto.includes("mecan") || tipoTexto.includes("manual")) {
+      return "mecanico";
+    }
+
+    if (
+      movimentacao?.usarContadorDigital === true ||
+      movimentacao?.contadorDigital === true
+    ) {
+      return "digital";
+    }
+
+    if (
+      movimentacao?.usarContadorMecanico === true ||
+      movimentacao?.contadorMecanico === true
+    ) {
+      return "mecanico";
+    }
+
+    return null;
+  };
+
+  const obterCamposContadorAtivo = (dadosForm) => {
+    if (dadosForm?.usarContadorManual) {
+      return {
+        contadorInAtual: dadosForm?.contadorInManual,
+        contadorOutAtual: dadosForm?.contadorOutManual,
+        tipo: "digital",
+      };
+    }
+
+    return {
+      contadorInAtual: dadosForm?.contadorInDigital,
+      contadorOutAtual: dadosForm?.contadorOutDigital,
+      tipo: "mecanico",
+    };
+  };
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -123,6 +212,13 @@ export default function MovimentacaoMaquina() {
         const capacidadePadrao = Number(
           maqRes.data?.capacidadePadrao ?? maqRes.data?.capacidade ?? 0,
         );
+        const tipoContadorSalvo = obterTipoContadorSalvo(maquinaId);
+        const tipoContadorInferido = inferirTipoContadorMovimentacao(
+          ultimaMovimentacao,
+        );
+        const tipoContadorInicial =
+          tipoContadorSalvo || tipoContadorInferido || "mecanico";
+        const usarContadorDigitalInicial = tipoContadorInicial === "digital";
 
         setFormData((prev) => ({
           ...prev,
@@ -145,6 +241,7 @@ export default function MovimentacaoMaquina() {
               String(produtosDisponiveisIniciais[0]?.id || "")
             );
           })(),
+          usarContadorManual: usarContadorDigitalInicial,
           quantidadeAtualMaquina: prev.quantidadeAtualMaquina,
         }));
       } catch {
@@ -216,12 +313,9 @@ export default function MovimentacaoMaquina() {
         return;
       }
 
-      const contadorInReferencia = formData.usarContadorManual
-        ? formData.contadorInManual
-        : formData.contadorInDigital;
-      const contadorOutReferencia = formData.usarContadorManual
-        ? formData.contadorOutManual
-        : formData.contadorOutDigital;
+      const camposContadorAtivo = obterCamposContadorAtivo(formData);
+      const contadorInReferencia = camposContadorAtivo.contadorInAtual;
+      const contadorOutReferencia = camposContadorAtivo.contadorOutAtual;
 
       const params = { maquinaId };
       if (!isFuncionarioAbastecedor && !formData.ignoreInOut) {
@@ -322,12 +416,14 @@ export default function MovimentacaoMaquina() {
       return Number.isNaN(numero) ? null : numero;
     };
 
-    const contadorInAtualInformado =
-      parseContadorOpcional(formData.contadorInManual) ??
-      parseContadorOpcional(formData.contadorInDigital);
-    const contadorOutAtualInformado =
-      parseContadorOpcional(formData.contadorOutManual) ??
-      parseContadorOpcional(formData.contadorOutDigital);
+    const camposContadorAtivo = obterCamposContadorAtivo(formData);
+
+    const contadorInAtualInformado = parseContadorOpcional(
+      camposContadorAtivo.contadorInAtual,
+    );
+    const contadorOutAtualInformado = parseContadorOpcional(
+      camposContadorAtivo.contadorOutAtual,
+    );
 
     const deveMarcarRetiradaDinheiro =
       !formData.ignoreInOut &&
@@ -361,7 +457,8 @@ export default function MovimentacaoMaquina() {
       return;
     }
 
-    const contadorOutDigitado = parseInt(formData.contadorOutDigital, 10);
+    const camposContadorAtivo = obterCamposContadorAtivo(formData);
+    const contadorOutDigitado = parseInt(camposContadorAtivo.contadorOutAtual, 10);
     const totalPreInformado = parseInt(formData.quantidadeAtualMaquina, 10);
 
     if (!resumoCalculo) {
@@ -371,7 +468,7 @@ export default function MovimentacaoMaquina() {
 
     if (
       !formData.ignoreInOut &&
-      formData.contadorOutDigital !== "" &&
+      camposContadorAtivo.contadorOutAtual !== "" &&
       !Number.isNaN(contadorOutDigitado) &&
       contadorOutDigitado < (resumoCalculo.contadorOutSugerido || 0)
     ) {
@@ -385,7 +482,7 @@ export default function MovimentacaoMaquina() {
 
     if (
       !formData.ignoreInOut &&
-      formData.contadorOutDigital !== "" &&
+      camposContadorAtivo.contadorOutAtual !== "" &&
       formData.quantidadeAtualMaquina !== "" &&
       !Number.isNaN(totalPreInformado)
     ) {
@@ -411,6 +508,8 @@ export default function MovimentacaoMaquina() {
     isFuncionarioAbastecedor,
     resumoCalculo,
     formData.contadorOutDigital,
+    formData.contadorOutManual,
+    formData.usarContadorManual,
     formData.quantidadeAtualMaquina,
     formData.ignoreInOut,
   ]);
@@ -612,6 +711,21 @@ export default function MovimentacaoMaquina() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === "usarContadorManual") {
+      const vaiUsarDigital = Boolean(checked);
+      const tipoContador = vaiUsarDigital ? "digital" : "mecanico";
+
+      setFormData((prev) => ({
+        ...prev,
+        usarContadorManual: vaiUsarDigital,
+      }));
+      salvarTipoContadorMaquina(maquinaId, tipoContador);
+
+      if (error) setError("");
+      if (success) setSuccess("");
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -654,14 +768,20 @@ export default function MovimentacaoMaquina() {
         formData.contadorOutDigital,
       );
 
-      const contadorInAtualInformado =
-        contadorInManualInformado ?? contadorInDigitalInformado;
-      const contadorOutAtualInformado =
-        contadorOutManualInformado ?? contadorOutDigitalInformado;
+      const camposContadorAtivo = obterCamposContadorAtivo(formData);
+      const contadorInAtivoInformado = parseContadorOpcional(
+        camposContadorAtivo.contadorInAtual,
+      );
+      const contadorOutAtivoInformado = parseContadorOpcional(
+        camposContadorAtivo.contadorOutAtual,
+      );
+
+      const tipoContadorAtivo = camposContadorAtivo.tipo;
+
       const deveGerarFluxoCaixaAutomatico =
         !deveIgnorarContadores &&
-        contadorInAtualInformado !== null &&
-        contadorOutAtualInformado !== null;
+        contadorInAtivoInformado !== null &&
+        contadorOutAtivoInformado !== null;
 
       if (isPrimeiraMovimentacao) {
         if (deveIgnorarContadores) {
@@ -682,11 +802,11 @@ export default function MovimentacaoMaquina() {
         }
 
         if (
-          contadorInAtualInformado === null ||
-          contadorOutAtualInformado === null
+          contadorInAtivoInformado === null ||
+          contadorOutAtivoInformado === null
         ) {
           setError(
-            "Informe os contadores atuais (IN e OUT) para a primeira movimentação.",
+            `Informe os contadores atuais (${tipoContadorAtivo === "digital" ? "digitais" : "mecânicos"}) de IN e OUT para a primeira movimentação.`,
           );
           return;
         }
@@ -715,8 +835,8 @@ export default function MovimentacaoMaquina() {
         contadorOutAnterior: isPrimeiraMovimentacao
           ? contadorOutAnteriorInformado
           : null,
-        contadorIn: deveIgnorarContadores ? null : contadorInAtualInformado,
-        contadorOut: deveIgnorarContadores ? null : contadorOutAtualInformado,
+        contadorIn: deveIgnorarContadores ? null : contadorInAtivoInformado,
+        contadorOut: deveIgnorarContadores ? null : contadorOutAtivoInformado,
         contadorInDigital: deveIgnorarContadores
           ? null
           : contadorInDigitalInformado,
@@ -797,6 +917,8 @@ export default function MovimentacaoMaquina() {
           "Movimentação registrada com sucesso e mensagem preparada no WhatsApp!",
         );
       }
+
+      salvarTipoContadorMaquina(maquinaId, tipoContadorAtivo);
       setTimeout(() => {
         navigate(`/roteiros/${roteiroId}/executar`, {
           replace: true,
@@ -913,52 +1035,54 @@ export default function MovimentacaoMaquina() {
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📥 Contador Entrada Mecânico (Entrada)
-                    </label>
-                    <input
-                      type="number"
-                      name="contadorInDigital"
-                      value={formData.contadorInDigital}
-                      onChange={handleChange}
-                      className="input-field"
-                      placeholder="0"
-                      min="0"
-                      required={
-                        isPrimeiraMovimentacao &&
-                        !formData.usarContadorManual &&
-                        !formData.ignoreInOut
-                      }
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Número do contador Entrada Mecânico da máquina
-                    </p>
+                {!formData.usarContadorManual && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📥 Contador Entrada Mecânico (Entrada)
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorInDigital"
+                        value={formData.contadorInDigital}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                        required={
+                          isPrimeiraMovimentacao &&
+                          !formData.usarContadorManual &&
+                          !formData.ignoreInOut
+                        }
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número do contador Entrada Mecânico da máquina
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📤 Contador Saída Mecânico (Saída)
+                      </label>
+                      <input
+                        type="number"
+                        name="contadorOutDigital"
+                        value={formData.contadorOutDigital}
+                        onChange={handleChange}
+                        className="input-field"
+                        placeholder="0"
+                        min="0"
+                        required={
+                          isPrimeiraMovimentacao &&
+                          !formData.usarContadorManual &&
+                          !formData.ignoreInOut
+                        }
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Número do contador Saída Mecânico da máquina
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      📤 Contador Saída Mecânico (Saída)
-                    </label>
-                    <input
-                      type="number"
-                      name="contadorOutDigital"
-                      value={formData.contadorOutDigital}
-                      onChange={handleChange}
-                      className="input-field"
-                      placeholder="0"
-                      min="0"
-                      required={
-                        isPrimeiraMovimentacao &&
-                        !formData.usarContadorManual &&
-                        !formData.ignoreInOut
-                      }
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Número do contador Saída Mecânico da máquina
-                    </p>
-                  </div>
-                </div>
+                )}
                 <div className="flex items-center mt-2">
                   <input
                     type="checkbox"
@@ -973,7 +1097,9 @@ export default function MovimentacaoMaquina() {
                     htmlFor="usarContadorManual"
                     className="text-sm text-gray-700"
                   >
-                    Usar contador Entrada/Saída digital
+                    {formData.usarContadorManual
+                      ? "Usando contador digital. Clique para usar contador mecânico"
+                      : "Usando contador mecânico. Clique para usar contador digital"}
                   </label>
                 </div>
                 {formData.usarContadorManual && !formData.ignoreInOut && (
