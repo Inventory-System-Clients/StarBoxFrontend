@@ -158,6 +158,8 @@ export function RelatorioTodasLojas({ relatorio }) {
   const faturamentoBrutoTicketTotal = Number(
     totais.faturamentoBrutoTicketTotal ?? brutoConsolidado,
   );
+  const lucroSemCustosFixosTotal =
+    Number(brutoConsolidado || 0) - Number(totais.custoProdutosTotal || 0);
   const saidasPremioTotal = Number(
     totais.saidasPremioTotal ?? (totais.produtosSairamTotal || 0),
   );
@@ -312,6 +314,9 @@ export function RelatorioTodasLojas({ relatorio }) {
             {formatarMoeda(totais.custoTotal)}
           </div>
           <div className="text-sm opacity-90">Custo Total</div>
+          <div className="text-xs opacity-80 mt-1">
+            Produtos: {formatarMoeda(totais.custoProdutosTotal)}
+          </div>
         </div>
         <div className="card bg-linear-to-br from-fuchsia-500 to-purple-700 text-white">
           <div className="text-2xl mb-1">📌</div>
@@ -327,13 +332,6 @@ export function RelatorioTodasLojas({ relatorio }) {
           </div>
           <div className="text-sm opacity-90">Custo Fixo Total</div>
         </div>
-        <div className="card bg-linear-to-br from-amber-500 to-yellow-700 text-white">
-          <div className="text-2xl mb-1">💸</div>
-          <div className="text-2xl font-bold">
-            {formatarMoeda(totais.custoProdutosTotal)}
-          </div>
-          <div className="text-sm opacity-90">Custo Total de Produtos</div>
-        </div>
         <div className="card bg-linear-to-br from-red-500 to-rose-700 text-white">
           <div className="text-2xl mb-1">📤</div>
           <div className="text-2xl font-bold">
@@ -341,32 +339,15 @@ export function RelatorioTodasLojas({ relatorio }) {
           </div>
           <div className="text-sm opacity-90">Produtos Saíram (Total)</div>
         </div>
-        <div className="card bg-linear-to-br from-pink-500 to-fuchsia-700 text-white">
-          <div className="text-2xl mb-1">💳</div>
+        <div className="card bg-linear-to-br from-teal-600 to-cyan-800 text-white">
+          <div className="text-2xl mb-1">🟢</div>
           <div className="text-2xl font-bold">
-            {formatarPercentual(totais.percentualTaxaCartaoMediaTotal)}
+            {formatarMoeda(lucroSemCustosFixosTotal)}
           </div>
-          <div className="text-sm opacity-90">Taxa Média de Cartão</div>
+          <div className="text-sm opacity-90">Lucro sem custos fixos</div>
           <div className="text-xs opacity-80 mt-1">
-            {formatarMoeda(totais.taxaDeCartaoTotal)}
+            Considera apenas custo dos produtos que saíram
           </div>
-        </div>
-        <div className="card bg-linear-to-br from-cyan-500 to-blue-700 text-white">
-          <div className="text-2xl mb-1">✅</div>
-          <div className="text-2xl font-bold">
-            {formatarMoeda(cartaoPixLiquidoTotal)}
-          </div>
-          <div className="text-sm opacity-90">Cartão / Pix Líquido</div>
-          <div className="text-xs opacity-80 mt-1">
-            Valor bruto: {formatarMoeda(totais.cartaoPixTotal)}
-          </div>
-        </div>
-        <div className="card bg-linear-to-br from-cyan-500 to-blue-700 text-white">
-          <div className="text-2xl mb-1">✅</div>
-          <div className="text-2xl font-bold">
-            {formatarMoeda(totais.dinheiroTotal)}
-          </div>
-          <div className="text-sm opacity-90">Dinheiro</div>
         </div>
         <div className="card bg-linear-to-br from-green-500 to-emerald-700 text-white">
           <div className="text-2xl mb-1">📥</div>
@@ -374,13 +355,6 @@ export function RelatorioTodasLojas({ relatorio }) {
             {Number(totais.produtosEntraramTotal || 0).toLocaleString("pt-BR")}
           </div>
           <div className="text-sm opacity-90">Produtos Entraram (Total)</div>
-        </div>
-        <div className="card bg-linear-to-br from-blue-500 to-indigo-700 text-white">
-          <div className="text-2xl mb-1">🎟️</div>
-          <div className="text-2xl font-bold">
-            {Number(totais.fichasTotal || 0).toLocaleString("pt-BR")}
-          </div>
-          <div className="text-sm opacity-90">Quantidade de Fichas</div>
         </div>
       </div>
 
