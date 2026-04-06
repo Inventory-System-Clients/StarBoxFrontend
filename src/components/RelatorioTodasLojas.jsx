@@ -354,7 +354,7 @@ export function RelatorioTodasLojas({ relatorio }) {
           <div className="text-2xl font-bold">
             {Number(totais.produtosEntraramTotal || 0).toLocaleString("pt-BR")}
           </div>
-          <div className="text-sm opacity-90">Produtos Entraram (Total)</div>
+          <div className="text-sm opacity-90">Contador entrada (Total)</div>
         </div>
       </div>
 

@@ -2976,7 +2976,7 @@ export function Relatorios() {
                     )}
                   </div>
                   <div className="text-xs sm:text-sm opacity-90">
-                    Produtos Entraram
+                    Contador entrada
                   </div>
                 </div>
 
