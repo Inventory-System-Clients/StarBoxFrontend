@@ -840,16 +840,18 @@ export default function MovimentacaoMaquina() {
         }
       }
 
-      const produtosParaEnviar = [
-        {
-          produtoId: formData.produto_id,
-          quantidadeSaiu: 0,
-          quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
-          retiradaProduto: parseInt(formData.retiradaProduto) || 0,
-          retiradaProdutoDevolverEstoque:
-            formData.retiradaProdutoDevolverEstoque || false,
-        },
-      ];
+      const produtosParaEnviar = formData.produto_id
+        ? [
+            {
+              produtoId: formData.produto_id,
+              quantidadeSaiu: 0,
+              quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
+              retiradaProduto: parseInt(formData.retiradaProduto) || 0,
+              retiradaProdutoDevolverEstoque:
+                formData.retiradaProdutoDevolverEstoque || false,
+            },
+          ]
+        : [];
 
       const payload = {
         maquinaId: maquinaId,
@@ -1377,16 +1379,15 @@ export default function MovimentacaoMaquina() {
             )}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Produto *
+                Produto
               </label>
               <select
                 name="produto_id"
                 value={formData.produto_id}
                 onChange={handleChange}
                 className="select-field"
-                required
               >
-                <option value="">Selecione um produto</option>
+                <option value="">Não usar nenhum produto</option>
                 {produtosDisponiveis.map((prod) => (
                   <option key={prod.id} value={prod.id}>
                     {prod.nome}
