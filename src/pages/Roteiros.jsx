@@ -10,6 +10,8 @@ import {
   extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
+  obterManutencaoResumoSnapshotRoteiro,
+  salvarManutencaoResumoSnapshotRoteiro,
   obterKmInicialPilotagemAtiva,
   obterEstoqueInicialSnapshotRoteiro,
   obterKmInicialPilotagemSnapshotRoteiro,
@@ -626,6 +628,41 @@ export function Roteiros() {
       }
     }
 
+    if (usuarioReferenciaId) {
+      const statusRoteiro = String(roteiroAtual?.status || "")
+        .trim()
+        .toLowerCase();
+      const statusNaoIniciado = new Set([
+        "",
+        "pendente",
+        "aberto",
+        "nao_iniciado",
+        "não_iniciado",
+      ]);
+      const deveReiniciarContador = statusNaoIniciado.has(statusRoteiro);
+      const lojasRoteiro = Array.isArray(roteiroAtual?.lojas)
+        ? roteiroAtual.lojas
+        : [];
+      const lojasSemManutencao = Array.from(
+        new Set(
+          lojasRoteiro
+            .map((loja) => String(loja?.nome || "").trim())
+            .filter(Boolean),
+        ),
+      );
+
+      salvarManutencaoResumoSnapshotRoteiro({
+        roteiroId,
+        usuarioId: usuarioReferenciaId,
+        resumo: {
+          totalRealizadas: 0,
+          lojasComManutencao: [],
+          lojasSemManutencao,
+        },
+        sobrescrever: deveReiniciarContador,
+      });
+    }
+
     navigate(`/roteiros/${roteiroId}/executar`);
   };
 
@@ -968,6 +1005,32 @@ export function Roteiros() {
           [],
       );
 
+      const lojasRoteiroNomes = Array.from(
+        new Set(
+          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
+            .map((loja) => String(loja?.nome || "").trim())
+            .filter(Boolean),
+        ),
+      );
+      let lojasComManutencao = [];
+      let lojasSemManutencao = [...lojasRoteiroNomes];
+      let totalManutencoesRealizadas = 0;
+
+      const snapshotManutencao = obterManutencaoResumoSnapshotRoteiro({
+        roteiroId: roteiro?.id,
+        usuarioId: usuarioReferenciaId,
+      });
+
+      if (snapshotManutencao) {
+        lojasComManutencao = Array.isArray(snapshotManutencao.lojasComManutencao)
+          ? snapshotManutencao.lojasComManutencao
+          : [];
+        lojasSemManutencao = Array.isArray(snapshotManutencao.lojasSemManutencao)
+          ? snapshotManutencao.lojasSemManutencao
+          : lojasSemManutencao;
+        totalManutencoesRealizadas = Number(snapshotManutencao.totalRealizadas || 0);
+      }
+
       try {
         const manutRes = await api.get("/manutencoes", {
           params: {
@@ -1036,6 +1099,19 @@ export function Roteiros() {
         // exclusivamente o estado real das manutencoes do roteiro/pontos.
         manutencoesRealizadas = normalizarListaResumo(feitas);
         manutencoesNaoRealizadas = normalizarListaResumo(pendentes);
+        totalManutencoesRealizadas = feitas.length;
+        lojasComManutencao = Array.from(
+          new Set(
+            feitas
+              .map((item) =>
+                String(item?.loja?.nome || item?.lojaNome || "").trim(),
+              )
+              .filter(Boolean),
+          ),
+        );
+        lojasSemManutencao = lojasRoteiroNomes.filter(
+          (nomeLoja) => !lojasComManutencao.includes(nomeLoja),
+        );
       } catch (err) {
         if ([401, 403].includes(err?.response?.status)) {
           throw err;
@@ -1142,6 +1218,9 @@ export function Roteiros() {
         sobraValorDespesa,
         manutencoesRealizadas,
         manutencoesNaoRealizadas,
+        totalManutencoesRealizadas,
+        lojasComManutencao,
+        lojasSemManutencao,
         resumoConsumoProdutos:
           saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null
             ? {

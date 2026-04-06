@@ -12,6 +12,8 @@ const KM_INICIAL_PILOTAGEM_ROTEIRO_STORAGE_PREFIX =
   "starbox:roteiro:km-inicial-pilotagem:";
 const KM_INICIAL_PILOTAGEM_ATIVA_STORAGE_PREFIX =
   "starbox:pilotagem:km-inicial:";
+const MANUTENCAO_RESUMO_ROTEIRO_STORAGE_PREFIX =
+  "starbox:roteiro:manutencao-resumo:";
 
 const normalizarTexto = (valor) => String(valor || "").trim();
 
@@ -216,6 +218,98 @@ export const salvarKmInicialPilotagemAtiva = ({
 
 export const removerKmInicialPilotagemAtiva = ({ usuarioId, veiculoId }) => {
   const chave = montarChaveKmInicialPilotagemAtiva({ usuarioId, veiculoId });
+  if (!chave) return false;
+
+  try {
+    window.localStorage.removeItem(chave);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const montarChaveManutencaoResumoRoteiro = ({ roteiroId, usuarioId }) => {
+  const roteiroNormalizado = normalizarTexto(roteiroId);
+  const usuarioNormalizado = normalizarTexto(usuarioId);
+
+  if (!roteiroNormalizado || !usuarioNormalizado) return "";
+  return `${MANUTENCAO_RESUMO_ROTEIRO_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}`;
+};
+
+export const obterManutencaoResumoSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+  const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
+  if (!chave) return null;
+
+  try {
+    const bruto = window.localStorage.getItem(chave);
+    if (!bruto) return null;
+
+    const payload = JSON.parse(bruto);
+    const totalRealizadas = Number(payload?.totalRealizadas);
+    const lojasComManutencao = Array.isArray(payload?.lojasComManutencao)
+      ? payload.lojasComManutencao.filter(Boolean)
+      : [];
+    const lojasSemManutencao = Array.isArray(payload?.lojasSemManutencao)
+      ? payload.lojasSemManutencao.filter(Boolean)
+      : [];
+
+    return {
+      totalRealizadas: Number.isFinite(totalRealizadas)
+        ? Math.max(0, totalRealizadas)
+        : 0,
+      lojasComManutencao: Array.from(new Set(lojasComManutencao)),
+      lojasSemManutencao: Array.from(new Set(lojasSemManutencao)),
+      updatedAt: payload?.updatedAt || null,
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const salvarManutencaoResumoSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+  resumo,
+  sobrescrever = true,
+}) => {
+  const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
+  if (!chave || !resumo || typeof resumo !== "object") return false;
+
+  try {
+    if (!sobrescrever && window.localStorage.getItem(chave)) {
+      return true;
+    }
+
+    const totalRealizadas = Number(resumo?.totalRealizadas);
+    const lojasComManutencao = Array.isArray(resumo?.lojasComManutencao)
+      ? resumo.lojasComManutencao.filter(Boolean)
+      : [];
+    const lojasSemManutencao = Array.isArray(resumo?.lojasSemManutencao)
+      ? resumo.lojasSemManutencao.filter(Boolean)
+      : [];
+
+    window.localStorage.setItem(
+      chave,
+      JSON.stringify({
+        roteiroId: String(roteiroId),
+        usuarioId: String(usuarioId),
+        totalRealizadas: Number.isFinite(totalRealizadas)
+          ? Math.max(0, totalRealizadas)
+          : 0,
+        lojasComManutencao: Array.from(new Set(lojasComManutencao)),
+        lojasSemManutencao: Array.from(new Set(lojasSemManutencao)),
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const removerManutencaoResumoSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+  const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
   if (!chave) return false;
 
   try {
@@ -541,6 +635,9 @@ export const montarMensagemFinalizacaoRoteiro = ({
   sobraValorDespesa,
   manutencoesRealizadas,
   manutencoesNaoRealizadas,
+  totalManutencoesRealizadas,
+  lojasComManutencao,
+  lojasSemManutencao,
   resumoConsumoProdutos,
 }) => {
   const totalUsadas = Number.isFinite(Number(totalPeluciasUsadas))
@@ -572,6 +669,17 @@ export const montarMensagemFinalizacaoRoteiro = ({
   const manutencoesNaoFeitasLista = normalizarListaNomes(
     manutencoesNaoFeitasBrutas,
     "descricao",
+  );
+  const totalManutencoesFeitas = Number.isFinite(Number(totalManutencoesRealizadas))
+    ? Number(totalManutencoesRealizadas)
+    : manutencoesFeitasLista.length;
+  const lojasComManutencaoLista = normalizarListaNomes(
+    toArray(lojasComManutencao),
+    "nome",
+  );
+  const lojasSemManutencaoLista = normalizarListaNomes(
+    toArray(lojasSemManutencao),
+    "nome",
   );
   const manutencoesFeitasPorPonto = montarResumoManutencoesPorPonto(
     manutencoesFeitasBrutas,
@@ -623,6 +731,9 @@ export const montarMensagemFinalizacaoRoteiro = ({
       : ["Resumo de consumo indisponivel para esta finalizacao."]),
     `Despesa total: ${formatarMoedaBRL(despesaTotal)}`,
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
+    `Total de manutencoes realizadas: ${totalManutencoesFeitas}`,
+    `Lojas com manutencao realizada: ${formatarLista(lojasComManutencaoLista)}`,
+    `Lojas sem manutencao realizada: ${formatarLista(lojasSemManutencaoLista)}`,
     `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,
     `Manutencoes realizadas por ponto: ${formatarLista(manutencoesFeitasPorPonto)}`,
     `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,

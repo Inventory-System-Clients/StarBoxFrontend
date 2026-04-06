@@ -11,9 +11,11 @@ import {
   extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
+  obterManutencaoResumoSnapshotRoteiro,
   obterKmInicialPilotagemAtiva,
   obterEstoqueInicialSnapshotRoteiro,
   obterKmInicialPilotagemSnapshotRoteiro,
+  salvarManutencaoResumoSnapshotRoteiro,
   removerEstoqueInicialSnapshotRoteiro,
   removerKmInicialPilotagemSnapshotRoteiro,
   salvarEstoqueInicialSnapshotRoteiro,
@@ -77,6 +79,11 @@ export default function RoteiroExecucao() {
     observacao: "",
   });
   const [lancandoGasto, setLancandoGasto] = useState(false);
+  const [resumoManutencaoRota, setResumoManutencaoRota] = useState({
+    totalRealizadas: 0,
+    lojasComManutencao: [],
+    lojasSemManutencao: [],
+  });
 
   const lojaEstaConcluida = (status) =>
     ["concluido", "concluida", "finalizado", "finalizada"].includes(
@@ -108,6 +115,84 @@ export default function RoteiroExecucao() {
     Boolean(
       String(roteiroAtual?.veiculoId || roteiroAtual?.veiculo?.id || "").trim(),
     );
+
+  const STATUS_MANUTENCAO_REALIZADA = new Set([
+    "feito",
+    "concluida",
+    "concluido",
+    "finalizada",
+    "finalizado",
+  ]);
+
+  const extrairResumoManutencoesDaLista = (listaManutencoes, roteiroAtual) => {
+    const itens = Array.isArray(listaManutencoes) ? listaManutencoes : [];
+    const lojasRoteiro = Array.isArray(roteiroAtual?.lojas)
+      ? roteiroAtual.lojas
+      : [];
+    const lojasRoteiroNomes = Array.from(
+      new Set(
+        lojasRoteiro
+          .map((loja) => String(loja?.nome || "").trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const manutencoesFeitas = itens.filter((item) => {
+      const status = String(item?.status || "")
+        .trim()
+        .toLowerCase();
+      return STATUS_MANUTENCAO_REALIZADA.has(status);
+    });
+
+    const lojasComManutencao = Array.from(
+      new Set(
+        manutencoesFeitas
+          .map((item) =>
+            String(item?.loja?.nome || item?.lojaNome || "").trim(),
+          )
+          .filter(Boolean),
+      ),
+    );
+
+    const lojasSemManutencao = lojasRoteiroNomes.filter(
+      (nomeLoja) => !lojasComManutencao.includes(nomeLoja),
+    );
+
+    return {
+      totalRealizadas: manutencoesFeitas.length,
+      lojasComManutencao,
+      lojasSemManutencao,
+    };
+  };
+
+  const sincronizarResumoManutencaoRota = ({
+    roteiroAtual,
+    resumoBase,
+    sobrescrever = true,
+  }) => {
+    const usuarioReferenciaId = String(
+      roteiroAtual?.funcionarioId || usuario?.id || "",
+    ).trim();
+
+    if (!usuarioReferenciaId || !roteiroAtual?.id) return;
+
+    salvarManutencaoResumoSnapshotRoteiro({
+      roteiroId: roteiroAtual.id,
+      usuarioId: usuarioReferenciaId,
+      resumo: resumoBase,
+      sobrescrever,
+    });
+
+    setResumoManutencaoRota({
+      totalRealizadas: Number(resumoBase?.totalRealizadas || 0),
+      lojasComManutencao: Array.isArray(resumoBase?.lojasComManutencao)
+        ? resumoBase.lojasComManutencao
+        : [],
+      lojasSemManutencao: Array.isArray(resumoBase?.lojasSemManutencao)
+        ? resumoBase.lojasSemManutencao
+        : [],
+    });
+  };
 
   const formatarMoedaBRL = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
@@ -144,6 +229,50 @@ export default function RoteiroExecucao() {
     carregarRoteiro();
   }, [id]);
 
+  useEffect(() => {
+    if (!roteiro?.id) return;
+
+    const usuarioReferenciaId = String(
+      roteiro?.funcionarioId || usuario?.id || "",
+    ).trim();
+    if (!usuarioReferenciaId) return;
+
+    const snapshot = obterManutencaoResumoSnapshotRoteiro({
+      roteiroId: roteiro.id,
+      usuarioId: usuarioReferenciaId,
+    });
+
+    if (snapshot) {
+      setResumoManutencaoRota({
+        totalRealizadas: Number(snapshot?.totalRealizadas || 0),
+        lojasComManutencao: Array.isArray(snapshot?.lojasComManutencao)
+          ? snapshot.lojasComManutencao
+          : [],
+        lojasSemManutencao: Array.isArray(snapshot?.lojasSemManutencao)
+          ? snapshot.lojasSemManutencao
+          : [],
+      });
+    } else {
+      const lojasRoteiroNomes = Array.from(
+        new Set(
+          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
+            .map((loja) => String(loja?.nome || "").trim())
+            .filter(Boolean),
+        ),
+      );
+
+      sincronizarResumoManutencaoRota({
+        roteiroAtual: roteiro,
+        resumoBase: {
+          totalRealizadas: 0,
+          lojasComManutencao: [],
+          lojasSemManutencao: lojasRoteiroNomes,
+        },
+        sobrescrever: false,
+      });
+    }
+  }, [roteiro, usuario?.id]);
+
   // Efeito para selecionar automaticamente a loja quando volta da movimentação
   useEffect(() => {
     if (roteiro && location.state?.lojaId) {
@@ -163,7 +292,6 @@ export default function RoteiroExecucao() {
 
   useEffect(() => {
     if (!roteiro || !roteiroEstaFinalizado(roteiro.status)) return;
-    if (roteiroTemPendencias(roteiro)) return;
     if (!roteiroTemVeiculoAssociado(roteiro)) return;
     if (!location.state?.origemMovimentacao) return;
     if (location.state?.pilotagemFinalizada) return;
@@ -449,9 +577,37 @@ export default function RoteiroExecucao() {
     }
   };
 
-  const handleManutencaoConcluida = async () => {
+  const handleManutencaoConcluida = async (evento = {}) => {
     setSuccess("Manutenção processada com sucesso!");
     setModalManutencao(false);
+
+    if (evento?.acao === "feito" && roteiro?.id) {
+      const lojaNomeEvento = String(
+        evento?.lojaNome || manutencaoPendente?.loja?.nome || "",
+      ).trim();
+      const lojasComAtualizadas = Array.from(
+        new Set([
+          ...(Array.isArray(resumoManutencaoRota.lojasComManutencao)
+            ? resumoManutencaoRota.lojasComManutencao
+            : []),
+          ...(lojaNomeEvento ? [lojaNomeEvento] : []),
+        ]),
+      );
+      const lojasSemAtualizadas = (
+        Array.isArray(resumoManutencaoRota.lojasSemManutencao)
+          ? resumoManutencaoRota.lojasSemManutencao
+          : []
+      ).filter((nomeLoja) => nomeLoja !== lojaNomeEvento);
+
+      sincronizarResumoManutencaoRota({
+        roteiroAtual: roteiro,
+        resumoBase: {
+          totalRealizadas: Number(resumoManutencaoRota.totalRealizadas || 0) + 1,
+          lojasComManutencao: lojasComAtualizadas,
+          lojasSemManutencao: lojasSemAtualizadas,
+        },
+      });
+    }
 
     if (
       manutencaoRecemCriada?.id &&
@@ -463,6 +619,26 @@ export default function RoteiroExecucao() {
     setManutencaoPendente(null);
     // Recarregar roteiro para atualizar status
     await carregarRoteiro();
+
+    try {
+      if (!roteiro?.id) return;
+      const manutRes = await api.get("/manutencoes", {
+        params: {
+          roteiroId: id,
+        },
+      });
+      const listaManut = Array.isArray(manutRes.data)
+        ? manutRes.data
+        : manutRes.data?.rows || [];
+      const resumoAtualizado = extrairResumoManutencoesDaLista(listaManut, roteiro);
+
+      sincronizarResumoManutencaoRota({
+        roteiroAtual: roteiro,
+        resumoBase: resumoAtualizado,
+      });
+    } catch {
+      // Sem bloqueio de fluxo se a sincronizacao por API falhar.
+    }
   };
 
   const abrirModalNovaManutencao = () => {
@@ -981,6 +1157,32 @@ export default function RoteiroExecucao() {
           [],
       );
 
+      const lojasRoteiroNomes = Array.from(
+        new Set(
+          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
+            .map((loja) => String(loja?.nome || "").trim())
+            .filter(Boolean),
+        ),
+      );
+      let lojasComManutencao = [];
+      let lojasSemManutencao = [...lojasRoteiroNomes];
+      let totalManutencoesRealizadas = 0;
+
+      const snapshotManutencao = obterManutencaoResumoSnapshotRoteiro({
+        roteiroId: id,
+        usuarioId: funcionarioDoRoteiro,
+      });
+
+      if (snapshotManutencao) {
+        lojasComManutencao = Array.isArray(snapshotManutencao.lojasComManutencao)
+          ? snapshotManutencao.lojasComManutencao
+          : [];
+        lojasSemManutencao = Array.isArray(snapshotManutencao.lojasSemManutencao)
+          ? snapshotManutencao.lojasSemManutencao
+          : lojasSemManutencao;
+        totalManutencoesRealizadas = Number(snapshotManutencao.totalRealizadas || 0);
+      }
+
       try {
         const manutRes = await api.get("/manutencoes", {
           params: {
@@ -1049,6 +1251,31 @@ export default function RoteiroExecucao() {
         // exclusivamente o estado real das manutencoes do roteiro/pontos.
         manutencoesRealizadas = normalizarListaResumo(feitas);
         manutencoesNaoRealizadas = normalizarListaResumo(pendentes);
+        totalManutencoesRealizadas = feitas.length;
+        lojasComManutencao = Array.from(
+          new Set(
+            feitas
+              .map((item) =>
+                String(item?.loja?.nome || item?.lojaNome || "").trim(),
+              )
+              .filter(Boolean),
+          ),
+        );
+        lojasSemManutencao = lojasRoteiroNomes.filter(
+          (nomeLoja) => !lojasComManutencao.includes(nomeLoja),
+        );
+
+        if (funcionarioDoRoteiro) {
+          salvarManutencaoResumoSnapshotRoteiro({
+            roteiroId: id,
+            usuarioId: funcionarioDoRoteiro,
+            resumo: {
+              totalRealizadas: totalManutencoesRealizadas,
+              lojasComManutencao,
+              lojasSemManutencao,
+            },
+          });
+        }
       } catch (err) {
         if ([401, 403].includes(err?.response?.status)) {
           throw err;
@@ -1155,6 +1382,9 @@ export default function RoteiroExecucao() {
         sobraValorDespesa,
         manutencoesRealizadas,
         manutencoesNaoRealizadas,
+        totalManutencoesRealizadas,
+        lojasComManutencao,
+        lojasSemManutencao,
         resumoConsumoProdutos:
           saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null
             ? {
@@ -1404,6 +1634,24 @@ export default function RoteiroExecucao() {
         <p className="text-sm text-gray-600 mb-4">
           🚗 Veículo: {veiculoResumo}
         </p>
+        <section className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <h3 className="text-sm font-bold text-violet-900 mb-2">
+            🔧 Contador de manutenções da rota
+          </h3>
+          <p className="text-sm font-semibold text-violet-800">
+            Total realizadas nesta rota: {resumoManutencaoRota.totalRealizadas}
+          </p>
+          <p className="mt-2 text-xs text-violet-900">
+            Lojas com manutenção: {resumoManutencaoRota.lojasComManutencao.length > 0
+              ? resumoManutencaoRota.lojasComManutencao.join(", ")
+              : "Nenhuma"}
+          </p>
+          <p className="mt-1 text-xs text-violet-900">
+            Lojas sem manutenção: {resumoManutencaoRota.lojasSemManutencao.length > 0
+              ? resumoManutencaoRota.lojasSemManutencao.join(", ")
+              : "Nenhuma"}
+          </p>
+        </section>
         {error && (
           <AlertBox type="error" message={error} onClose={() => setError("")} />
         )}

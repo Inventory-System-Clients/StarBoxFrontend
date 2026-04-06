@@ -236,7 +236,11 @@ export default function ManutencaoModal({
 
       abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
 
-      onManutencaoConcluida?.();
+      onManutencaoConcluida?.({
+        acao: "feito",
+        manutencao,
+        lojaNome: manutencao?.loja?.nome || null,
+      });
       resetarModal();
       onClose();
     } catch (err) {
@@ -285,7 +289,11 @@ export default function ManutencaoModal({
 
       abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
 
-      onManutencaoConcluida?.();
+      onManutencaoConcluida?.({
+        acao: "nao-fazer",
+        manutencao,
+        lojaNome: manutencao?.loja?.nome || null,
+      });
       resetarModal();
       onClose();
     } catch (err) {
