@@ -2381,6 +2381,11 @@ export function Relatorios() {
     valorConsolidadoRelatorio - custoTotalConsideradoRelatorio;
   const lucroSemCustoFixoRelatorio =
     valorConsolidadoRelatorio - custoProdutosRelatorio;
+  const valorEsperadoRelatorio = toNumber(
+    relatorio?.totais?.valorEsperadoContadores ?? 0,
+  );
+  const lucroEsperadoRelatorio =
+    valorEsperadoRelatorio - custoTotalConsideradoRelatorio;
 
   const isRelatorioRoteiro = relatorio?.tipo === "roteiro";
   const resumoRoteiroConsolidado =
@@ -2443,6 +2448,14 @@ export function Relatorios() {
   );
 
   const lucroLiquidoRoteiro = rendimentoBrutoRoteiro - custoTotalRoteiro;
+
+  const valorEsperadoRoteiro = toNumber(
+    pickNumber(
+      totaisRoteiroConsolidado?.valorEsperadoTotal,
+      totaisRoteiroConsolidado?.valorEsperadoContadores,
+    ) || 0,
+  );
+  const lucroEsperadoRoteiro = valorEsperadoRoteiro - custoTotalRoteiro;
 
   const outrosCustosRoteiro = Math.max(
     0,
@@ -2954,6 +2967,49 @@ export function Relatorios() {
                         Lucro Líquido Geral da Rota
                       </div>
                     </div>
+
+                    {valorEsperadoRoteiro > 0 && (
+                      <div className="card bg-linear-to-br from-amber-500 to-yellow-600 text-white border-2 border-amber-300">
+                        <div className="text-2xl mb-2">🔮</div>
+                        <div className="text-xl sm:text-2xl font-bold">
+                          R${" "}
+                          {valorEsperadoRoteiro.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </div>
+                        <div className="text-xs sm:text-sm opacity-90">
+                          Valor Esperado (Contadores)
+                        </div>
+                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                          Baseado nas diferenças do contador IN — sem passar
+                          pelo fluxo de caixa
+                        </div>
+                      </div>
+                    )}
+
+                    {valorEsperadoRoteiro > 0 && (
+                      <div
+                        className={`card border-2 text-white ${
+                          lucroEsperadoRoteiro >= 0
+                            ? "bg-linear-to-br from-lime-500 to-green-700 border-lime-300"
+                            : "bg-linear-to-br from-red-600 to-rose-800 border-red-300"
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">🎯</div>
+                        <div className="text-xl sm:text-2xl font-bold">
+                          R${" "}
+                          {lucroEsperadoRoteiro.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </div>
+                        <div className="text-xs sm:text-sm opacity-90">
+                          Lucro Esperado
+                        </div>
+                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                          Valor Esperado − Custos Totais
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -3221,6 +3277,57 @@ export function Relatorios() {
                       Considera apenas custo dos produtos que saíram
                     </div>
                   </div>
+
+                  {/* Valor Esperado (Contadores) */}
+                  {valorEsperadoRelatorio > 0 && (
+                    <div className="card bg-linear-to-br from-amber-500 to-yellow-600 text-white border-2 border-amber-300">
+                      <div className="text-2xl sm:text-3xl mb-2">🔮</div>
+                      <div className="text-xl sm:text-2xl font-bold">
+                        R${" "}
+                        {Number(valorEsperadoRelatorio).toLocaleString(
+                          "pt-BR",
+                          {
+                            minimumFractionDigits: 2,
+                          },
+                        )}
+                      </div>
+                      <div className="text-xs sm:text-sm opacity-90">
+                        Valor Esperado (Contadores)
+                      </div>
+                      <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                        Baseado nas diferenças do contador IN — sem passar pelo
+                        fluxo de caixa
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lucro Esperado */}
+                  {valorEsperadoRelatorio > 0 && (
+                    <div
+                      className={`card border-2 text-white ${
+                        lucroEsperadoRelatorio >= 0
+                          ? "bg-linear-to-br from-lime-500 to-green-700 border-lime-300"
+                          : "bg-linear-to-br from-red-600 to-rose-800 border-red-300"
+                      }`}
+                    >
+                      <div className="text-2xl sm:text-3xl mb-2">🎯</div>
+                      <div className="text-xl sm:text-2xl font-bold">
+                        R${" "}
+                        {Number(lucroEsperadoRelatorio).toLocaleString(
+                          "pt-BR",
+                          {
+                            minimumFractionDigits: 2,
+                          },
+                        )}
+                      </div>
+                      <div className="text-xs sm:text-sm opacity-90">
+                        Lucro Esperado
+                      </div>
+                      <div className="text-[10px] sm:text-xs opacity-80 mt-1">
+                        Valor Esperado − Custos Totais
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

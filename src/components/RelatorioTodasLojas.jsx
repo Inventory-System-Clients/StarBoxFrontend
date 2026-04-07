@@ -174,6 +174,11 @@ export function RelatorioTodasLojas({ relatorio }) {
         custoVariavelTotal +
         custoQuebraCaixaTotal),
   );
+  const valorEsperadoTotal = Number(totais.valorEsperadoTotal || 0);
+  const lucroEsperadoTotal = Number(
+    totais.lucroEsperadoTotal ??
+      valorEsperadoTotal - Number(totais.custoTotal || 0),
+  );
   const saidasPremioTotal = Number(
     totais.saidasPremioTotal ?? (totais.produtosSairamTotal || 0),
   );
@@ -374,6 +379,38 @@ export function RelatorioTodasLojas({ relatorio }) {
           </div>
           <div className="text-sm opacity-90">Contador entrada (Total)</div>
         </div>
+        {valorEsperadoTotal > 0 && (
+          <div className="card bg-linear-to-br from-amber-500 to-yellow-600 text-white border-2 border-amber-300">
+            <div className="text-2xl mb-1">🔮</div>
+            <div className="text-2xl font-bold">
+              {formatarMoeda(valorEsperadoTotal)}
+            </div>
+            <div className="text-sm opacity-90">
+              Valor Esperado (Contadores)
+            </div>
+            <div className="text-xs opacity-80 mt-1">
+              Diferença contador IN — sem fluxo de caixa
+            </div>
+          </div>
+        )}
+        {valorEsperadoTotal > 0 && (
+          <div
+            className={`card border-2 text-white ${
+              lucroEsperadoTotal >= 0
+                ? "bg-linear-to-br from-lime-500 to-green-700 border-lime-300"
+                : "bg-linear-to-br from-red-600 to-rose-800 border-red-300"
+            }`}
+          >
+            <div className="text-2xl mb-1">🎯</div>
+            <div className="text-2xl font-bold">
+              {formatarMoeda(lucroEsperadoTotal)}
+            </div>
+            <div className="text-sm opacity-90">Lucro Esperado</div>
+            <div className="text-xs opacity-80 mt-1">
+              Valor Esperado − Custo Total
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card bg-linear-to-r from-violet-50 to-indigo-100 border-2 border-indigo-300">
