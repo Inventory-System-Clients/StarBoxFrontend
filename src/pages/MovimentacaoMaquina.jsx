@@ -726,7 +726,7 @@ export default function MovimentacaoMaquina() {
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
       `${codigoMaquina} | ${tipoMaquina}${modeloMaquina ? ` | Modelo: ${modeloMaquina}` : ""}`,
-      `Produto abastecido: ${nomeProdutoAbastecido}$${
+      `Produto abastecido: ${nomeProdutoAbastecido}${
         quantidadeAbastecidaInformada > 0
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
           : ""
