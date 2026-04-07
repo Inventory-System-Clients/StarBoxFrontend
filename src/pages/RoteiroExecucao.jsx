@@ -476,11 +476,17 @@ export default function RoteiroExecucao() {
   const handleSelecionarLoja = async (loja) => {
     // Verificar ordem das lojas
     if (roteiro?.lojas) {
+      const lojasPendentesJustificadas = new Set(
+        Array.isArray(roteiro?.lojasPendentesJustificadasIds)
+          ? roteiro.lojasPendentesJustificadasIds
+          : [],
+      );
       const lojasOrdenadas = [...roteiro.lojas].sort(
         (a, b) => (a.ordem || 0) - (b.ordem || 0),
       );
       const proximaLoja = lojasOrdenadas.find(
-        (l) => !lojaEstaConcluida(l.status),
+        (l) =>
+          !lojaEstaConcluida(l.status) && !lojasPendentesJustificadas.has(l.id),
       );
 
       // Se não é a próxima loja na ordem e ainda tem lojas pendentes antes
@@ -554,6 +560,27 @@ export default function RoteiroExecucao() {
       const loja = roteiro.lojas.find(
         (l) => l.id === modalJustificativa.lojaId,
       );
+
+      setRoteiro((prev) => {
+        if (!prev) return prev;
+
+        const idsAtuais = Array.isArray(prev.lojasPendentesJustificadasIds)
+          ? prev.lojasPendentesJustificadasIds
+          : [];
+
+        return {
+          ...prev,
+          lojasPendentesJustificadasIds: Array.from(
+            new Set(
+              [
+                ...idsAtuais,
+                String(modalJustificativa.lojaIdEsperada || "").trim(),
+              ].filter(Boolean),
+            ),
+          ),
+        };
+      });
+
       setLojaSelecionada(loja);
 
       // Verificar manutenções
@@ -602,7 +629,8 @@ export default function RoteiroExecucao() {
       sincronizarResumoManutencaoRota({
         roteiroAtual: roteiro,
         resumoBase: {
-          totalRealizadas: Number(resumoManutencaoRota.totalRealizadas || 0) + 1,
+          totalRealizadas:
+            Number(resumoManutencaoRota.totalRealizadas || 0) + 1,
           lojasComManutencao: lojasComAtualizadas,
           lojasSemManutencao: lojasSemAtualizadas,
         },
@@ -630,7 +658,10 @@ export default function RoteiroExecucao() {
       const listaManut = Array.isArray(manutRes.data)
         ? manutRes.data
         : manutRes.data?.rows || [];
-      const resumoAtualizado = extrairResumoManutencoesDaLista(listaManut, roteiro);
+      const resumoAtualizado = extrairResumoManutencoesDaLista(
+        listaManut,
+        roteiro,
+      );
 
       sincronizarResumoManutencaoRota({
         roteiroAtual: roteiro,
@@ -1174,13 +1205,19 @@ export default function RoteiroExecucao() {
       });
 
       if (snapshotManutencao) {
-        lojasComManutencao = Array.isArray(snapshotManutencao.lojasComManutencao)
+        lojasComManutencao = Array.isArray(
+          snapshotManutencao.lojasComManutencao,
+        )
           ? snapshotManutencao.lojasComManutencao
           : [];
-        lojasSemManutencao = Array.isArray(snapshotManutencao.lojasSemManutencao)
+        lojasSemManutencao = Array.isArray(
+          snapshotManutencao.lojasSemManutencao,
+        )
           ? snapshotManutencao.lojasSemManutencao
           : lojasSemManutencao;
-        totalManutencoesRealizadas = Number(snapshotManutencao.totalRealizadas || 0);
+        totalManutencoesRealizadas = Number(
+          snapshotManutencao.totalRealizadas || 0,
+        );
       }
 
       try {
@@ -1642,12 +1679,14 @@ export default function RoteiroExecucao() {
             Total realizadas nesta rota: {resumoManutencaoRota.totalRealizadas}
           </p>
           <p className="mt-2 text-xs text-violet-900">
-            Lojas com manutenção: {resumoManutencaoRota.lojasComManutencao.length > 0
+            Lojas com manutenção:{" "}
+            {resumoManutencaoRota.lojasComManutencao.length > 0
               ? resumoManutencaoRota.lojasComManutencao.join(", ")
               : "Nenhuma"}
           </p>
           <p className="mt-1 text-xs text-violet-900">
-            Lojas sem manutenção: {resumoManutencaoRota.lojasSemManutencao.length > 0
+            Lojas sem manutenção:{" "}
+            {resumoManutencaoRota.lojasSemManutencao.length > 0
               ? resumoManutencaoRota.lojasSemManutencao.join(", ")
               : "Nenhuma"}
           </p>
