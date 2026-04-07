@@ -160,6 +160,20 @@ export function RelatorioTodasLojas({ relatorio }) {
   );
   const lucroSemCustosFixosTotal =
     Number(brutoConsolidado || 0) - Number(totais.custoProdutosTotal || 0);
+  const custoProdutosTotal = Number(totais.custoProdutosTotal || 0);
+  const custoFixoTotal = Number(totais.custoFixoTotal || 0);
+  const custoVariavelTotal = Number(totais.custoVariavelTotal || 0);
+  const custoQuebraCaixaTotal = Number(
+    totais.custoQuebraCaixaTotal ?? totais.custoQuebraCaixa ?? 0,
+  );
+  const custoOutrosTotal = Math.max(
+    0,
+    Number(totais.custoTotal || 0) -
+      (custoProdutosTotal +
+        custoFixoTotal +
+        custoVariavelTotal +
+        custoQuebraCaixaTotal),
+  );
   const saidasPremioTotal = Number(
     totais.saidasPremioTotal ?? (totais.produtosSairamTotal || 0),
   );
@@ -314,8 +328,12 @@ export function RelatorioTodasLojas({ relatorio }) {
             {formatarMoeda(totais.custoTotal)}
           </div>
           <div className="text-sm opacity-90">Custo Total</div>
-          <div className="text-xs opacity-80 mt-1">
-            Produtos: {formatarMoeda(totais.custoProdutosTotal)}
+          <div className="text-xs opacity-85 mt-2 space-y-1">
+            <div>Produtos: {formatarMoeda(custoProdutosTotal)}</div>
+            <div>Fixos: {formatarMoeda(custoFixoTotal)}</div>
+            <div>Quebra de caixa: {formatarMoeda(custoQuebraCaixaTotal)}</div>
+            <div>Variáveis: {formatarMoeda(custoVariavelTotal)}</div>
+            <div>Outros: {formatarMoeda(custoOutrosTotal)}</div>
           </div>
         </div>
         <div className="card bg-linear-to-br from-fuchsia-500 to-purple-700 text-white">
