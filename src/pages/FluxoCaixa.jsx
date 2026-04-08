@@ -947,12 +947,9 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
               📝 Conferir
             </button>
           ) : (
-            <button
-              onClick={() => setEditando(true)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-xs font-semibold"
-            >
-              ✏️ Editar
-            </button>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+              🔒 Bloqueado
+            </span>
           )
         ) : (
           <span className="text-gray-400 text-xs italic">Somente admin</span>
