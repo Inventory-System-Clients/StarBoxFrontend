@@ -1,38 +1,6 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { useLocation, useNavigate } from "react-router-dom";
-// Excluir veículo
-const excluirVeiculo = async (veiculo) => {
-  const confirm = await Swal.fire({
-    title: `Excluir veículo?`,
-    text: `Tem certeza que deseja excluir "${veiculo.nome}"? Esta ação não pode ser desfeita.`,
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#62A1D9",
-    confirmButtonText: "Sim, excluir",
-    cancelButtonText: "Cancelar",
-  });
-  if (!confirm.isConfirmed) return;
-  try {
-    await api.delete(`/veiculos/${veiculo.id}`);
-    setVeiculosLista((prev) => prev.filter((v) => v.id !== veiculo.id));
-    Swal.fire({
-      icon: "success",
-      title: "Veículo excluído",
-      text: `Veículo removido com sucesso!`,
-      confirmButtonColor: "#62A1D9",
-    });
-  } catch (error) {
-    Swal.fire({
-      icon: "error",
-      title: "Erro ao excluir",
-      text:
-        error?.response?.data?.error || "Não foi possível excluir o veículo.",
-      confirmButtonColor: "#62A1D9",
-    });
-  }
-};
 import { AuthContext } from "../contexts/AuthContext";
 import { reconhecerAlertaRevisao } from "../services/revisoesVeiculos";
 import {
@@ -136,6 +104,10 @@ export default function ControleVeiculos({
   const [veiculoSelecionado, setVeiculoSelecionado] = useState(null);
   const [veiculoEditandoIntervalo, setVeiculoEditandoIntervalo] =
     useState(null);
+  const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
+  const [veiculoExclusao, setVeiculoExclusao] = useState(null);
+  const [deletandoVeiculoId, setDeletandoVeiculoId] = useState(null);
+  const botaoCancelarExcluirRef = useRef(null);
   const [salvando, setSalvando] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [salvandoIntervalo, setSalvandoIntervalo] = useState(false);
@@ -248,6 +220,97 @@ export default function ControleVeiculos({
     setIntervaloInput("");
     setErroIntervalo("");
   };
+
+  const abrirModalExcluir = (veiculo) => {
+    if (!veiculo?.id || deletandoVeiculoId) return;
+    setVeiculoExclusao(veiculo);
+    setModalExcluirAberto(true);
+  };
+
+  const fecharModalExcluir = () => {
+    if (deletandoVeiculoId) return;
+    setModalExcluirAberto(false);
+    setVeiculoExclusao(null);
+  };
+
+  const sincronizarListaVeiculos = async () => {
+    try {
+      if (onRefresh) {
+        await Promise.resolve(onRefresh());
+      }
+    } catch (error) {
+      console.error("Erro ao sincronizar lista de veículos:", error);
+    }
+  };
+
+  const confirmarExcluirVeiculo = async () => {
+    if (!veiculoExclusao?.id || deletandoVeiculoId) return;
+
+    const veiculoId = veiculoExclusao.id;
+    setDeletandoVeiculoId(veiculoId);
+
+    try {
+      await api.delete(`/veiculos/${veiculoId}`);
+      setVeiculosLista((prev) => prev.filter((v) => v.id !== veiculoId));
+      setModalExcluirAberto(false);
+      setVeiculoExclusao(null);
+
+      Swal.fire({
+        icon: "success",
+        title: "Sucesso",
+        text: "Veículo removido com sucesso.",
+        confirmButtonColor: "#62A1D9",
+      });
+      return;
+    } catch (error) {
+      const status = error?.response?.status;
+
+      if (status === 404) {
+        Swal.fire({
+          icon: "warning",
+          title: "Veículo não encontrado",
+          text: "Veículo não encontrado.",
+          confirmButtonColor: "#62A1D9",
+        });
+        await sincronizarListaVeiculos();
+      } else if (status === 409) {
+        console.error(
+          "Erro 409 ao excluir veículo:",
+          error?.response?.data || error,
+        );
+        Swal.fire({
+          icon: "warning",
+          title: "Não foi possível remover",
+          text: "Não foi possível remover este veículo porque ele ainda possui vínculos ativos.",
+          confirmButtonColor: "#62A1D9",
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Erro",
+          text: "Erro ao remover veículo. Tente novamente.",
+          confirmButtonColor: "#62A1D9",
+        });
+      }
+    } finally {
+      setDeletandoVeiculoId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!modalExcluirAberto) return;
+
+    botaoCancelarExcluirRef.current?.focus();
+
+    const handleEsc = (event) => {
+      if (event.key === "Escape") {
+        fecharModalExcluir();
+      }
+    };
+
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [modalExcluirAberto, deletandoVeiculoId]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -586,13 +649,24 @@ export default function ControleVeiculos({
           const precisaLimpar = mov?.nivel_limpeza
             ?.toLowerCase()
             .includes("precisa");
+          const kmAtual = Number(veiculo?.km || 0);
+          const kmProximaRevisao = Number(obterProximaRevisao(veiculo) || 0);
+          const kmParaRevisao = kmProximaRevisao - kmAtual;
+          const pertoDaRevisao =
+            kmParaRevisao >= 0 &&
+            kmParaRevisao <= 2000 &&
+            !veiculo?.alertaRevisaoPendente;
+
           let cardClass = veiculo.emUso
             ? "filter grayscale opacity-70"
             : "bg-white";
+
           if (isRuim && precisaLimpar) {
             cardClass += " bg-red-100 border-2 border-red-400";
           } else if (isRuim) {
             cardClass += " bg-red-100 border-2 border-red-400";
+          } else if (pertoDaRevisao) {
+            cardClass += " bg-yellow-100 border-2 border-yellow-400";
           } else if (precisaLimpar) {
             cardClass += " bg-yellow-100 border-2 border-yellow-400";
           }
@@ -707,9 +781,10 @@ export default function ControleVeiculos({
                   </button>
                   <button
                     className="flex-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                    onClick={() => excluirVeiculo(veiculo)}
+                    onClick={() => abrirModalExcluir(veiculo)}
+                    disabled={deletandoVeiculoId === veiculo.id}
                   >
-                    Excluir
+                    {deletandoVeiculoId === veiculo.id ? "Excluindo..." : "Excluir"}
                   </button>
                 </div>
               )}
@@ -866,6 +941,54 @@ export default function ControleVeiculos({
           );
         })}
       </div>
+
+      {modalExcluirAberto && veiculoExclusao && (
+        <div
+          className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4"
+          onClick={fecharModalExcluir}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-gray-200 p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-excluir-veiculo-titulo"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3
+              id="modal-excluir-veiculo-titulo"
+              className="text-lg font-bold text-gray-900"
+            >
+              Excluir veículo
+            </h3>
+            <p className="mt-3 text-sm text-gray-700">
+              Tem certeza que deseja excluir o veículo <strong>{veiculoExclusao.nome}</strong>?
+            </p>
+            <p className="mt-1 text-sm text-gray-700">
+              Essa ação não pode ser desfeita.
+            </p>
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                ref={botaoCancelarExcluirRef}
+                type="button"
+                onClick={fecharModalExcluir}
+                disabled={Boolean(deletandoVeiculoId)}
+                className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarExcluirVeiculo}
+                disabled={Boolean(deletandoVeiculoId)}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {deletandoVeiculoId ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Editar Intervalo de Revisão */}
       {modalIntervaloAberto && (
