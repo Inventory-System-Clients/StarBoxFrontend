@@ -178,6 +178,16 @@ export default function MovimentacaoMaquina() {
     );
   };
 
+  const obterContadorOutAtualDigitado = (dadosForm) => {
+    const camposContadorAtivo = obterCamposContadorAtivo(dadosForm);
+
+    return toNumero(
+      camposContadorAtivo?.contadorOutAtual ??
+        dadosForm?.contadorOutManual ??
+        dadosForm?.contadorOutDigital,
+    );
+  };
+
   const calcularQuantidadeAtualPelaSaida = ({
     dadosForm,
     resumo,
@@ -185,8 +195,7 @@ export default function MovimentacaoMaquina() {
     ultimaMov,
     maquinaAtual,
   }) => {
-    const camposContadorAtivo = obterCamposContadorAtivo(dadosForm);
-    const contadorOutAtual = toNumero(camposContadorAtivo.contadorOutAtual);
+    const contadorOutAtual = obterContadorOutAtualDigitado(dadosForm);
 
     if (contadorOutAtual === null) return null;
 
@@ -396,7 +405,6 @@ export default function MovimentacaoMaquina() {
     async function atualizarCalculos() {
       if (!maquina || !maquinaId) {
         setResumoCalculo(null);
-        setSugestaoAbastecimento(null);
         return;
       }
 
@@ -455,7 +463,6 @@ export default function MovimentacaoMaquina() {
               : 0;
 
         setResumoCalculo(res.data);
-        setSugestaoAbastecimento(res.data.sugestaoAbastecimento ?? null);
 
         const temContadoresDigitados =
           !isFuncionarioAbastecedor &&
@@ -471,7 +478,6 @@ export default function MovimentacaoMaquina() {
         }
       } catch {
         setResumoCalculo(null);
-        setSugestaoAbastecimento(null);
       }
     }
 
@@ -580,8 +586,6 @@ export default function MovimentacaoMaquina() {
     formData.ignoreInOut,
   ]);
 
-  // Sugestão de abastecimento usando backend
-  const [sugestaoAbastecimento, setSugestaoAbastecimento] = useState(null);
   useEffect(() => {
     if (isFuncionarioAbastecedor) {
       setAlertaDivergencia(null);
@@ -646,23 +650,33 @@ export default function MovimentacaoMaquina() {
     formData.ignoreInOut,
   ]);
 
-  useEffect(() => {
-    async function calcularSugestao() {
-      if (isFuncionarioAbastecedor) {
-        setSugestaoAbastecimento(null);
-        return;
-      }
+  const sugestaoAbastecimento = useMemo(() => {
+    if (isFuncionarioAbastecedor) return null;
 
-      if (!resumoCalculo) {
-        setSugestaoAbastecimento(null);
-        return;
-      }
+    const capacidadePadrao = Number(
+      maquina?.capacidadePadrao ?? maquina?.capacidade ?? 0,
+    );
 
-      setSugestaoAbastecimento(resumoCalculo.sugestaoAbastecimento ?? null);
+    if (!Number.isFinite(capacidadePadrao) || capacidadePadrao <= 0) {
+      return null;
     }
 
-    calcularSugestao();
-  }, [isFuncionarioAbastecedor, resumoCalculo]);
+    const quantidadeAtualBase = Number(
+      quantidadeAtualSugerida ?? resumoCalculo?.quantidadeAtual,
+    );
+
+    if (!Number.isFinite(quantidadeAtualBase)) {
+      return null;
+    }
+
+    return Math.max(0, Math.round(capacidadePadrao - quantidadeAtualBase));
+  }, [
+    isFuncionarioAbastecedor,
+    maquina?.capacidadePadrao,
+    maquina?.capacidade,
+    quantidadeAtualSugerida,
+    resumoCalculo?.quantidadeAtual,
+  ]);
 
   const parseNumeroOpcional = (valor) => {
     if (valor === "" || valor === null || valor === undefined) return null;
