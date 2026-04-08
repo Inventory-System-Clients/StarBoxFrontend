@@ -109,6 +109,81 @@ const montarMensagemConclusaoManutencao = ({
   ].join("\n");
 };
 
+const formatarMaquinaParaAviso = (maquina) => {
+  if (!maquina) return "";
+
+  const codigo = String(maquina?.codigo || "").trim();
+  const nome = String(maquina?.nome || "").trim();
+
+  if (codigo && nome) return `${codigo} - ${nome}`;
+  return codigo || nome;
+};
+
+const anexarMaquinaNoAviso = (aviso, maquina) => {
+  const textoAviso = String(aviso || "").trim();
+  const identificacaoMaquina = formatarMaquinaParaAviso(maquina);
+
+  if (!textoAviso || !identificacaoMaquina) {
+    return textoAviso;
+  }
+
+  const avisoNormalizado = normalizarTextoBusca(textoAviso);
+  const maquinaNormalizada = normalizarTextoBusca(identificacaoMaquina);
+
+  if (avisoNormalizado.includes(maquinaNormalizada)) {
+    return textoAviso;
+  }
+
+  return `${textoAviso} Máquina: ${identificacaoMaquina}.`;
+};
+
+const garantirMaquinaNoTextoWhatsApp = (texto, maquina) => {
+  const textoOriginal = String(texto || "");
+  const identificacaoMaquina = formatarMaquinaParaAviso(maquina);
+
+  if (!textoOriginal || !identificacaoMaquina) {
+    return textoOriginal;
+  }
+
+  const textoNormalizado = normalizarTextoBusca(textoOriginal);
+  const maquinaNormalizada = normalizarTextoBusca(identificacaoMaquina);
+
+  if (textoNormalizado.includes(maquinaNormalizada)) {
+    return textoOriginal;
+  }
+
+  if (/maquina\s*:/i.test(textoOriginal)) {
+    return textoOriginal.replace(
+      /(maquina\s*:\s*)([^\n\r]*)/i,
+      `$1${identificacaoMaquina}`,
+    );
+  }
+
+  return `${textoOriginal} Maquina: ${identificacaoMaquina}`;
+};
+
+const garantirMaquinaNoWhatsappUrl = (whatsappUrl, maquina) => {
+  const urlOriginal = String(whatsappUrl || "").trim();
+  if (!urlOriginal) return "";
+
+  try {
+    const url = new URL(urlOriginal);
+    const textoAtual = url.searchParams.get("text");
+
+    if (!textoAtual) return urlOriginal;
+
+    const textoComMaquina = garantirMaquinaNoTextoWhatsApp(textoAtual, maquina);
+    if (!textoComMaquina || textoComMaquina === textoAtual) {
+      return urlOriginal;
+    }
+
+    url.searchParams.set("text", textoComMaquina);
+    return url.toString();
+  } catch {
+    return urlOriginal;
+  }
+};
+
 const normalizarTextoBusca = (valor) =>
   String(valor || "")
     .trim()
@@ -206,6 +281,108 @@ function CampoSelectDigitavel({
           <option key={opcao.value} value={opcao.label} />
         ))}
       </datalist>
+    </div>
+  );
+}
+
+function CampoSelectComBusca({
+  id,
+  label,
+  value,
+  options,
+  onValueChange,
+  placeholder = "Selecione",
+  placeholderBusca = "Buscar...",
+  required = false,
+  disabled = false,
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [textoBusca, setTextoBusca] = useState("");
+
+  const opcaoSelecionada = options.find(
+    (opcao) => opcao.value === String(value || ""),
+  );
+
+  const opcoesFiltradas = useMemo(() => {
+    const termo = normalizarTextoBusca(textoBusca);
+    if (!termo) return options;
+
+    return options.filter((opcao) =>
+      normalizarTextoBusca(opcao.label).includes(termo),
+    );
+  }, [options, textoBusca]);
+
+  useEffect(() => {
+    if (!aberto) {
+      setTextoBusca("");
+    }
+  }, [aberto]);
+
+  return (
+    <div className="relative">
+      <label className="block text-sm font-medium" htmlFor={`${id}-toggle`}>
+        {label}
+      </label>
+
+      <input
+        type="text"
+        className="sr-only"
+        tabIndex={-1}
+        value={value}
+        onChange={() => {}}
+        required={required}
+        aria-hidden="true"
+      />
+
+      <button
+        id={`${id}-toggle`}
+        type="button"
+        className="input-field w-full text-left flex items-center justify-between"
+        disabled={disabled}
+        onClick={() => setAberto((estadoAtual) => !estadoAtual)}
+      >
+        <span className={opcaoSelecionada ? "text-gray-900" : "text-gray-500"}>
+          {opcaoSelecionada?.label || placeholder}
+        </span>
+        <span className="ml-2 text-gray-500">▾</span>
+      </button>
+
+      {aberto && !disabled && (
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg p-2">
+          <input
+            id={id}
+            type="text"
+            className="input-field w-full"
+            value={textoBusca}
+            onChange={(event) => setTextoBusca(event.target.value)}
+            placeholder={placeholderBusca}
+            autoComplete="off"
+            autoFocus
+          />
+
+          <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-gray-100">
+            {opcoesFiltradas.length > 0 ? (
+              opcoesFiltradas.map((opcao) => (
+                <button
+                  key={opcao.value}
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                  onClick={() => {
+                    onValueChange(opcao.value);
+                    setAberto(false);
+                  }}
+                >
+                  {opcao.label}
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                Nenhum ponto encontrado.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -593,6 +770,9 @@ function Manutencoes() {
 
     // Reserva a aba durante o clique para evitar bloqueio e nao trocar a aba atual.
     const popupReservado = window.open("about:blank", "_blank");
+    const maquinaSelecionada = maquinas.find(
+      (maquina) => String(maquina?.id || "") === String(novaManutencao.maquinaId || ""),
+    );
 
     try {
       setLoading(true);
@@ -619,7 +799,10 @@ function Manutencoes() {
           funcionarioId: novaManutencao.destinatarioWhatsAppId || null,
         });
 
-        const whatsappUrl = promptRes?.data?.whatsappUrl;
+        const whatsappUrl = garantirMaquinaNoWhatsappUrl(
+          promptRes?.data?.whatsappUrl,
+          maquinaSelecionada,
+        );
         const abriuWhatsApp = abrirWhatsAppEmNovaAba({
           whatsappUrl,
           popupReservado,
@@ -631,9 +814,14 @@ function Manutencoes() {
         }
 
         if (promptRes?.data?.aviso) {
+          const avisoComMaquina = anexarMaquinaNoAviso(
+            promptRes.data.aviso,
+            maquinaSelecionada,
+          );
+
           mensagemPosCadastro = !abriuWhatsApp
-            ? `${mensagemPosCadastro} ${promptRes.data.aviso}`
-            : `Manutenção criada com sucesso. ${promptRes.data.aviso}`;
+            ? `${mensagemPosCadastro} ${avisoComMaquina}`
+            : `Manutenção criada com sucesso. ${avisoComMaquina}`;
         }
       } catch (promptErr) {
         console.error(
@@ -1025,7 +1213,7 @@ function Manutencoes() {
               <h3 className="text-xl font-bold mb-4">Nova Manutenção</h3>
 
               <div className="space-y-4">
-                <CampoSelectDigitavel
+                <CampoSelectComBusca
                   id="nova-manutencao-loja"
                   label="Ponto"
                   value={novaManutencao.lojaId}
@@ -1038,7 +1226,8 @@ function Manutencoes() {
                     }));
                     carregarDestinatariosWhatsApp(lojaId);
                   }}
-                  placeholder="Digite o nome do ponto"
+                  placeholder="Toque para selecionar um ponto"
+                  placeholderBusca="Digite para buscar pontos"
                   required
                 />
 

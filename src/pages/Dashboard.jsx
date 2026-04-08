@@ -17,8 +17,6 @@ async function buscarSaldosDepositoPrincipal(produtoIds, api) {
     return {};
   }
 }
-// Adiciona CSS para animação de piscar vermelho
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -39,70 +37,6 @@ import Swal from "sweetalert2";
 export function Dashboard() {
   // Saldos do depósito principal para os produtos selecionados no modal de loja
   const [saldosDeposito, setSaldosDeposito] = useState({});
-  const blinkRedStyle = `
-                /* Define a animação brusca */
-@keyframes blinkBruscoRed {
-  /* No estado inicial, força o fundo para o roxo original */
-  0%, 49.9% { 
-    background-color: #D92E30 !important; /* Seu Roxo Original */
-    /* Mantém o gradiente original, se houver */
-    background-image: var(--seu-gradiente-original-das-ondas) !important; 
-    color: #D92E30 !important; /* Texto Branco */
-    filter: brightness(100%) !important;
-  }
-  /* No meio da animação, pula direto para o vermelho vivo */
-  50%, 100% { 
-    background-color: #D92E30 !important; /* Vermelho Alerta */
-    background-image: none !important; /* Remove o gradiente para o vermelho ficar sólido e claro */
-    color: #D92E30 !important; /* Mantém texto branco */
-    filter: brightness(120%) !important; /* Dá um leve brilho no vermelho */
-    box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.7) !important;
-  }
-}
-
-/* Aplique esta classe ao card de Manutenções */
-.blink-red {
-  /* Animação com steps(1, start) para pulos bruscos */
-  animation: blinkBruscoRed 0.7s steps(1, start) infinite !important;
-  border: 2px solid #b91c1c !important; /* Borda vermelha escura sempre visível */
-  
-  /* Mantém o arredondamento */
-  border-radius: 12px;
-}
-
-/* Garante que o conteúdo interno não seja afetado negativamente pela troca de cor */
-.blink-red * {
-  transition: color 5s; /* Garante que o texto também mude abruptamente */
-  color: #D92E30 !important;
-}
-
-/* Variante para cards de alerta, sem sobrescrever a cor do texto */
-.blink-red-alert {
-  animation: blinkBruscoRed 0.9s steps(1, start) infinite !important;
-  border: 2px solid #b91c1c !important;
-  border-radius: 12px;
-}
-
-/* Pulso suave com fade vermelho para botão de alerta */
-@keyframes alertFadeRed {
-  0% {
-    background-color: rgba(220, 38, 38, 1);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  }
-  50% {
-    background-color: rgba(239, 68, 68, 0.82);
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.18);
-  }
-  100% {
-    background-color: rgba(220, 38, 38, 1);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
-
-.alert-fade-red {
-  animation: alertFadeRed 1.2s ease-in-out infinite;
-}
-`;
   const { usuario } = useAuth();
   // Estado para saber se há manutenção pendente atribuída ao usuário
   const [temManutencaoPendente, setTemManutencaoPendente] = useState(false);
@@ -2109,7 +2043,6 @@ export function Dashboard() {
           <div className="flex items-center gap-3">
             {alertaInatividadeLojas.lojas.length > 0 && (
               <>
-                <style>{blinkRedStyle}</style>
                 <button
                   type="button"
                   onClick={
@@ -2493,11 +2426,9 @@ export function Dashboard() {
             </div>
             {/* Manutenções */}
             <div
-              className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
+              className={`stat-card bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " maintenance-blink" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
-              {/* Injeta o CSS da animação blink-red para o card inteiro */}
-              <style>{blinkRedStyle}</style>
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
@@ -2653,11 +2584,9 @@ export function Dashboard() {
             )}
             {/* Manutenções */}
             <div
-              className={`stat-card order-2 md:order-0 bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " blink-red" : ""}`}
+              className={`stat-card order-2 md:order-0 bg-linear-to-br from-indigo-500 to-indigo-700 p-4 sm:p-6 rounded-xl shadow-md flex flex-col justify-between min-h-30 cursor-pointer${temManutencaoPendente ? " maintenance-blink" : ""}`}
               onClick={() => navigate("/manutencoes")}
             >
-              {/* Injeta o CSS da animação blink-red para o card inteiro */}
-              <style>{blinkRedStyle}</style>
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium opacity-90">
