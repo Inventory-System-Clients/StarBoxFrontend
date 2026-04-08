@@ -1665,7 +1665,7 @@ export default function MovimentacaoMaquina() {
                     Jogou: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}</strong>
                   </p>
                   <p>
-                    Quantidade de premios que saiu: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}</strong>
+                    Saiu: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}</strong>
                   </p>
                 </div>
                 <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
