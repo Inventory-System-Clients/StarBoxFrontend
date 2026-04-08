@@ -48,6 +48,7 @@ export default function MovimentacaoMaquina() {
   const [alertaDivergencia, setAlertaDivergencia] = useState(null);
   const [isPrimeiraMovimentacao, setIsPrimeiraMovimentacao] = useState(false);
   const [ultimaMovimentacaoData, setUltimaMovimentacaoData] = useState(null);
+  const [ultimaMovimentacao, setUltimaMovimentacao] = useState(null);
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [dadosConfirmacao, setDadosConfirmacao] = useState(null);
 
@@ -140,6 +141,89 @@ export default function MovimentacaoMaquina() {
     };
   };
 
+  const toNumero = (valor) => {
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : null;
+  };
+
+  const obterTotalPosUltimaMovimentacao = (movimentacao) => {
+    if (!movimentacao) return null;
+
+    const totalPosDireto = toNumero(
+      movimentacao?.totalPos ??
+        movimentacao?.totalAtual ??
+        movimentacao?.quantidadeAtualMaquina ??
+        movimentacao?.quantidadeAtual,
+    );
+
+    if (totalPosDireto !== null) return totalPosDireto;
+
+    const totalPre = toNumero(movimentacao?.totalPre);
+    const abastecidas = toNumero(movimentacao?.abastecidas) ?? 0;
+
+    if (totalPre !== null) {
+      return totalPre + abastecidas;
+    }
+
+    return null;
+  };
+
+  const obterContadorOutUltimoMovimento = (movimentacao) => {
+    if (!movimentacao) return null;
+
+    return toNumero(
+      movimentacao?.contadorOut ??
+        movimentacao?.contadorOutDigital ??
+        movimentacao?.contadorSaida,
+    );
+  };
+
+  const calcularQuantidadeAtualPelaSaida = ({
+    dadosForm,
+    resumo,
+    primeiraMovimentacao,
+    ultimaMov,
+    maquinaAtual,
+  }) => {
+    const camposContadorAtivo = obterCamposContadorAtivo(dadosForm);
+    const contadorOutAtual = toNumero(camposContadorAtivo.contadorOutAtual);
+
+    if (contadorOutAtual === null) return null;
+
+    const contadorOutBase = primeiraMovimentacao
+      ? toNumero(dadosForm?.contadorOutAnterior)
+      : toNumero(
+          resumo?.contadorOutUltimaMovimentacao ??
+            obterContadorOutUltimoMovimento(ultimaMov) ??
+            resumo?.contadorOutSugerido,
+        );
+
+    const capacidadePadraoMaquina = toNumero(
+      maquinaAtual?.capacidadePadrao ?? maquinaAtual?.capacidade,
+    );
+
+    const totalPosUltimoMovimento = obterTotalPosUltimaMovimentacao(ultimaMov);
+    const totalPosResumo = toNumero(resumo?.totalPosUltimaMovimentacao);
+
+    // Prioridade: ultima movimentacao real > capacidade padrao > resumo da API.
+    // Isso evita sugestao zerada quando a API retorna totalPosUltimaMovimentacao=0 de forma inconsistente.
+    const totalPosUltima =
+      totalPosUltimoMovimento !== null && totalPosUltimoMovimento > 0
+        ? totalPosUltimoMovimento
+        : capacidadePadraoMaquina !== null && capacidadePadraoMaquina > 0
+          ? capacidadePadraoMaquina
+          : totalPosResumo;
+
+    if (contadorOutBase === null || totalPosUltima === null) return null;
+
+    const quantidadeSaiuDesdeUltima = Math.max(
+      0,
+      contadorOutAtual - contadorOutBase,
+    );
+
+    return Math.max(0, totalPosUltima - quantidadeSaiuDesdeUltima);
+  };
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -203,6 +287,7 @@ export default function MovimentacaoMaquina() {
           ? movRes.data
           : [];
         const ultimaMovimentacao = movimentacoesMaquina[0] || null;
+        setUltimaMovimentacao(ultimaMovimentacao);
         const dataUltimaMovimentacao =
           ultimaMovimentacao?.dataColeta ||
           ultimaMovimentacao?.createdAt ||
@@ -345,12 +430,29 @@ export default function MovimentacaoMaquina() {
           },
         );
 
+        const primeiraMovimentacaoAtual =
+          typeof res.data?.primeiraMovimentacao === "boolean"
+            ? res.data.primeiraMovimentacao
+            : isPrimeiraMovimentacao;
+
         if (typeof res.data?.primeiraMovimentacao === "boolean") {
           setIsPrimeiraMovimentacao(res.data.primeiraMovimentacao);
         }
 
+        const quantidadeCalculadaPorSaida = calcularQuantidadeAtualPelaSaida({
+          dadosForm: formData,
+          resumo: res.data,
+          primeiraMovimentacao: primeiraMovimentacaoAtual,
+          ultimaMov: ultimaMovimentacao,
+          maquinaAtual: maquina,
+        });
+
         const quantidadeCalculada =
-          res.data.quantidadeAtual >= 0 ? res.data.quantidadeAtual : 0;
+          quantidadeCalculadaPorSaida !== null
+            ? quantidadeCalculadaPorSaida
+            : res.data.quantidadeAtual >= 0
+              ? res.data.quantidadeAtual
+              : 0;
 
         setResumoCalculo(res.data);
         setSugestaoAbastecimento(res.data.sugestaoAbastecimento ?? null);
@@ -387,6 +489,33 @@ export default function MovimentacaoMaquina() {
     formData.contadorOutDigital,
     formData.contadorInDigital,
     formData.ignoreInOut,
+    formData.contadorOutAnterior,
+    ultimaMovimentacao,
+  ]);
+
+  const quantidadeAtualSugerida = useMemo(() => {
+    const calculadaPorSaida = calcularQuantidadeAtualPelaSaida({
+      dadosForm: formData,
+      resumo: resumoCalculo,
+      primeiraMovimentacao: isPrimeiraMovimentacao,
+      ultimaMov: ultimaMovimentacao,
+      maquinaAtual: maquina,
+    });
+
+    if (calculadaPorSaida !== null) {
+      return Math.max(0, Math.round(calculadaPorSaida));
+    }
+
+    const fallback = Number(
+      resumoCalculo?.totalPreEsperado ?? resumoCalculo?.quantidadeAtual,
+    );
+
+    return Number.isFinite(fallback) ? Math.max(0, Math.round(fallback)) : null;
+  }, [
+    formData,
+    resumoCalculo,
+    isPrimeiraMovimentacao,
+    ultimaMovimentacao,
   ]);
 
   useEffect(() => {
@@ -489,7 +618,7 @@ export default function MovimentacaoMaquina() {
       !Number.isNaN(totalPreInformado)
     ) {
       const totalPreEsperado = parseInt(
-        resumoCalculo.totalPreEsperado ?? resumoCalculo.quantidadeAtual ?? 0,
+        quantidadeAtualSugerida ?? resumoCalculo.quantidadeAtual ?? 0,
         10,
       );
       const diferenca = Math.abs(totalPreInformado - totalPreEsperado);
@@ -509,6 +638,7 @@ export default function MovimentacaoMaquina() {
   }, [
     isFuncionarioAbastecedor,
     resumoCalculo,
+    quantidadeAtualSugerida,
     formData.contadorOutDigital,
     formData.contadorOutManual,
     formData.usarContadorManual,
@@ -1250,7 +1380,7 @@ export default function MovimentacaoMaquina() {
                     </p>
                     <p className="text-xs text-indigo-700">
                       Era para ter na máquina:{" "}
-                      {resumoCalculo.totalPreEsperado ?? 0}
+                      {quantidadeAtualSugerida ?? 0}
                     </p>
                     <p className="text-xs text-indigo-700">
                       Sugestão de abastecimento: {sugestaoAbastecimento ?? 0}
@@ -1304,6 +1434,12 @@ export default function MovimentacaoMaquina() {
                 <p className="text-xs text-gray-500 mt-1">
                   Quantos produtos tem agora
                 </p>
+                {quantidadeAtualSugerida !== null && (
+                  <p className="text-xs text-indigo-700 mt-1 font-semibold">
+                    Sugestão automática: {quantidadeAtualSugerida} (pela saída do
+                    contador OUT desde a última movimentação)
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
