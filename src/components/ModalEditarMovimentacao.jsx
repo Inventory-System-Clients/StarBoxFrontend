@@ -3,15 +3,32 @@ import { Modal } from "./UIComponents";
 import api from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 
+const formatDatetimeLocal = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 /**
  * Modal para editar movimentações de máquinas
  * Permite editar campos como fichas, contadores, valores monetários, etc.
- * 
+ *
  * @param {Object} movimentacao - Dados da movimentação a ser editada
  * @param {Function} onClose - Callback para fechar o modal
  * @param {Function} onSucesso - Callback chamado após edição bem-sucedida
  */
-export default function ModalEditarMovimentacao({ movimentacao, onClose, onSucesso }) {
+export default function ModalEditarMovimentacao({
+  movimentacao,
+  onClose,
+  onSucesso,
+}) {
   const { usuario } = useAuth();
   const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
   const [loading, setLoading] = useState(false);
@@ -33,7 +50,7 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
     if (movimentacao) {
       // Formatar data para input datetime-local
       const dataFormatada = movimentacao.dataColeta
-        ? new Date(movimentacao.dataColeta).toISOString().slice(0, 16)
+        ? formatDatetimeLocal(movimentacao.dataColeta)
         : "";
 
       setFormData({
@@ -74,26 +91,35 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
       const dadosParaEnviar = {
         totalPre: formData.totalPre ? parseInt(formData.totalPre) : null,
         sairam: formData.sairam ? parseInt(formData.sairam) : null,
-        abastecidas: formData.abastecidas ? parseInt(formData.abastecidas) : null,
+        abastecidas: formData.abastecidas
+          ? parseInt(formData.abastecidas)
+          : null,
         fichas: formData.fichas ? parseInt(formData.fichas) : null,
         contadorIn: formData.contadorIn ? parseInt(formData.contadorIn) : null,
-        contadorOut: formData.contadorOut ? parseInt(formData.contadorOut) : null,
-        contadorMaquina: formData.contadorMaquina ? parseInt(formData.contadorMaquina) : null,
+        contadorOut: formData.contadorOut
+          ? parseInt(formData.contadorOut)
+          : null,
+        contadorMaquina: formData.contadorMaquina
+          ? parseInt(formData.contadorMaquina)
+          : null,
         quantidade_notas_entrada: null,
         valor_entrada_maquininha_pix: null,
         observacoes: !ocultarCamposFinanceirosEObservacoes
           ? formData.observacoes || null
           : null,
         tipoOcorrencia: formData.tipoOcorrencia || "Normal",
-        dataColeta: formData.dataColeta ? new Date(formData.dataColeta).toISOString() : null,
+        dataColeta: formData.dataColeta || null,
       };
 
       // Enviar requisição PUT
-      const response = await api.put(`/movimentacoes/${movimentacao.id}`, dadosParaEnviar);
+      const response = await api.put(
+        `/movimentacoes/${movimentacao.id}`,
+        dadosParaEnviar,
+      );
 
       // Sucesso
       alert("Movimentação atualizada com sucesso!");
-      
+
       // Chamar callback de sucesso com dados atualizados
       if (onSucesso) {
         onSucesso(response.data);
@@ -103,7 +129,7 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
       onClose();
     } catch (error) {
       console.error("Erro ao atualizar movimentação:", error);
-      
+
       // Tratar erros específicos
       if (error.response?.status === 403) {
         alert("Você não tem permissão para editar esta movimentação.");
@@ -111,8 +137,8 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
         alert("Movimentação não encontrada.");
       } else {
         alert(
-          error.response?.data?.error || 
-          "Erro ao atualizar movimentação. Tente novamente."
+          error.response?.data?.error ||
+            "Erro ao atualizar movimentação. Tente novamente.",
         );
       }
     } finally {
@@ -121,9 +147,12 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
   };
 
   // Calcular valores automáticos (apenas para exibição)
-  const totalPosCalculado = formData.totalPre && formData.abastecidas
-    ? parseInt(formData.totalPre) + parseInt(formData.abastecidas) - (parseInt(formData.sairam) || 0)
-    : null;
+  const totalPosCalculado =
+    formData.totalPre && formData.abastecidas
+      ? parseInt(formData.totalPre) +
+        parseInt(formData.abastecidas) -
+        (parseInt(formData.sairam) || 0)
+      : null;
 
   const valorFaturadoCalculado =
     (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
@@ -273,7 +302,8 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
           {!ocultarCamposFinanceirosEObservacoes && (
             <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
               <span className="text-sm text-gray-600">
-                Valor Faturado (calculado): <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
+                Valor Faturado (calculado):{" "}
+                <strong>R$ {valorFaturadoCalculado.toFixed(2)}</strong>
               </span>
             </div>
           )}
@@ -321,9 +351,20 @@ export default function ModalEditarMovimentacao({ movimentacao, onClose, onSuces
           <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
             <p className="font-medium mb-1">ℹ️ Informações:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Registrado por: {movimentacao?.usuario?.nome || "Usuário desconhecido"}</li>
-              <li>Data original: {movimentacao?.dataColeta ? new Date(movimentacao.dataColeta).toLocaleString("pt-BR") : "-"}</li>
-              <li>Os campos Total Pós e Valor Faturado são calculados automaticamente</li>
+              <li>
+                Registrado por:{" "}
+                {movimentacao?.usuario?.nome || "Usuário desconhecido"}
+              </li>
+              <li>
+                Data original:{" "}
+                {movimentacao?.dataColeta
+                  ? new Date(movimentacao.dataColeta).toLocaleString("pt-BR")
+                  : "-"}
+              </li>
+              <li>
+                Os campos Total Pós e Valor Faturado são calculados
+                automaticamente
+              </li>
             </ul>
           </div>
 

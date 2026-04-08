@@ -677,13 +677,6 @@ export const montarMensagemFinalizacaoRoteiro = ({
     toArray(lojasComManutencao),
     "nome",
   );
-  const lojasSemManutencaoLista = normalizarListaNomes(
-    toArray(lojasSemManutencao),
-    "nome",
-  );
-  const manutencoesFeitasPorPonto = montarResumoManutencoesPorPonto(
-    manutencoesFeitasBrutas,
-  );
   const manutencoesNaoFeitasPorPonto = montarResumoManutencoesPorPonto(
     manutencoesNaoFeitasBrutas,
   );
@@ -733,9 +726,9 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
     `Total de manutencoes realizadas: ${totalManutencoesFeitas}`,
     `Lojas com manutencao realizada: ${formatarLista(lojasComManutencaoLista)}`,
-    `Lojas sem manutencao realizada: ${formatarLista(lojasSemManutencaoLista)}`,
+    
     `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,
-    `Manutencoes realizadas por ponto: ${formatarLista(manutencoesFeitasPorPonto)}`,
+
     `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,
     `Manutencoes nao realizadas por ponto: ${formatarLista(manutencoesNaoFeitasPorPonto)}`,
   ].join("\n");

@@ -726,7 +726,7 @@ export default function MovimentacaoMaquina() {
       `Lançado por: ${nomeUsuario}`,
       "___________________________________",
       `${codigoMaquina} | ${tipoMaquina}${modeloMaquina ? ` | Modelo: ${modeloMaquina}` : ""}`,
-      `Produto abastecido: ${nomeProdutoAbastecido}$${
+      `Produto abastecido: ${nomeProdutoAbastecido}${
         quantidadeAbastecidaInformada > 0
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
           : ""
@@ -1098,7 +1098,7 @@ export default function MovimentacaoMaquina() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs font-semibold text-indigo-700 mb-1">
-                        IN anterior: {formatarValorConfirmacao(resumoContadoresPreview.inAnterior)}
+                        Contador entrada anterior: {formatarValorConfirmacao(resumoContadoresPreview.inAnterior)}
                       </p>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         📥 Contador Entrada Mecânico (Entrada)
@@ -1171,7 +1171,7 @@ export default function MovimentacaoMaquina() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div>
                       <p className="text-xs font-semibold text-indigo-700 mb-1">
-                        IN anterior: {formatarValorConfirmacao(resumoContadoresPreview.inAnterior)}
+                        Contador entrada: {formatarValorConfirmacao(resumoContadoresPreview.inAnterior)}
                       </p>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         📥 Contador Entrada Digital
@@ -1468,7 +1468,7 @@ export default function MovimentacaoMaquina() {
                   Pré-cálculo antes de salvar
                 </p>
                 <p className="text-xs text-emerald-800 mt-1">
-                  IN anterior: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | IN atual: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença IN: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
+                  Contador entrada anterior: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | Contador entrada atual: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença contador entrada: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
                 </p>
               </div>
             )}
@@ -1501,16 +1501,16 @@ export default function MovimentacaoMaquina() {
                 </h4>
                 <div className="space-y-1 text-sm text-gray-700">
                   <p>
-                    IN preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.inAtual)}</strong>
+                    Contador entrada preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.inAtual)}</strong>
                   </p>
                   <p>
-                    OUT preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.outAtual)}</strong>
+                    Contador saida preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.outAtual)}</strong>
                   </p>
                   <p>
-                    Diferença IN para o anterior: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}</strong>
+                    Jogou(Diferença do Contador Entrada): <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}</strong>
                   </p>
                   <p>
-                    Diferença OUT para o anterior: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}</strong>
+                    Quantidade de premios que saiu: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}</strong>
                   </p>
                 </div>
                 <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">

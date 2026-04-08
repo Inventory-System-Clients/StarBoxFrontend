@@ -11,10 +11,12 @@ export default function FluxoCaixa() {
   const [fluxos, setFluxos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
-    dataInicio: formatDate(new Date(new Date().setDate(new Date().getDate() - 7))),
+    dataInicio: formatDate(
+      new Date(new Date().setDate(new Date().getDate() - 7)),
+    ),
     dataFim: formatDate(new Date()),
     lojaId: "",
-    status: "todos"
+    status: "todos",
   });
   const [resumo, setResumo] = useState(null);
   const [error, setError] = useState("");
@@ -105,7 +107,7 @@ export default function FluxoCaixa() {
         valorRetiradoFisico: fisico,
         valorRetiradoDigital: digital,
         conferencia,
-        observacoes: observacoes || null
+        observacoes: observacoes || null,
       };
 
       // Se valorEsperado foi fornecido, incluir no payload
@@ -123,7 +125,10 @@ export default function FluxoCaixa() {
       }
     } catch (error) {
       console.error("Erro ao conferir:", error);
-      setError("❌ Erro ao conferir fluxo de caixa: " + (error.response?.data?.error || error.message));
+      setError(
+        "❌ Erro ao conferir fluxo de caixa: " +
+          (error.response?.data?.error || error.message),
+      );
     }
   };
 
@@ -150,7 +155,7 @@ export default function FluxoCaixa() {
     if (Number.isNaN(dataObj.getTime())) {
       return false;
     }
-    const dataSomenteDia = dataObj.toISOString().slice(0, 10);
+    const dataSomenteDia = formatLocalDateKey(dataObj);
 
     if (filtros.dataInicio && dataSomenteDia < filtros.dataInicio) {
       return false;
@@ -171,7 +176,8 @@ export default function FluxoCaixa() {
 
     const obterContadorInAtual = (fluxo) =>
       parseNumero(
-        fluxo?.movimentacao?.contadorIn ?? fluxo?.movimentacao?.contadorInDigital,
+        fluxo?.movimentacao?.contadorIn ??
+          fluxo?.movimentacao?.contadorInDigital,
       );
 
     const obterContadorOutAtual = (fluxo) =>
@@ -190,7 +196,9 @@ export default function FluxoCaixa() {
 
     const obterMaquinaId = (fluxo) =>
       String(
-        fluxo?.movimentacao?.maquinaId || fluxo?.movimentacao?.maquina?.id || "",
+        fluxo?.movimentacao?.maquinaId ||
+          fluxo?.movimentacao?.maquina?.id ||
+          "",
       );
 
     const obterDataFluxo = (fluxo) => {
@@ -267,11 +275,9 @@ export default function FluxoCaixa() {
       const contadorOutAnteriorCronologico =
         anterior.contadorOutAtual ?? contadorOutAnteriorInformado;
 
-      const contadorInAnteriorCalculado =
-        contadorInAnteriorCronologico;
+      const contadorInAnteriorCalculado = contadorInAnteriorCronologico;
 
-      const contadorOutAnteriorCalculado =
-        contadorOutAnteriorCronologico;
+      const contadorOutAnteriorCalculado = contadorOutAnteriorCronologico;
 
       enriquecidoPorId.set(fluxo.id, {
         ultimoContadorInRetirada: contadorInAnteriorCalculado,
@@ -286,7 +292,9 @@ export default function FluxoCaixa() {
       if (maquinaId) {
         ultimoContadorPorMaquina.set(maquinaId, {
           contadorInAtual:
-            contadorInAtual !== null ? contadorInAtual : anterior.contadorInAtual,
+            contadorInAtual !== null
+              ? contadorInAtual
+              : anterior.contadorInAtual,
           contadorOutAtual:
             contadorOutAtual !== null
               ? contadorOutAtual
@@ -316,7 +324,11 @@ export default function FluxoCaixa() {
           <AlertBox type="error" message={error} onClose={() => setError("")} />
         )}
         {success && (
-          <AlertBox type="success" message={success} onClose={() => setSuccess("")} />
+          <AlertBox
+            type="success"
+            message={success}
+            onClose={() => setSuccess("")}
+          />
         )}
 
         {/* Resumo/Cards */}
@@ -325,7 +337,10 @@ export default function FluxoCaixa() {
             <div className="stat-card bg-linear-to-br from-blue-500/10 to-blue-500/5">
               <div className="text-3xl mb-2">💵</div>
               <div className="text-xl font-bold text-gray-900">
-                R$ {(resumo.valorTotalRetirado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R${" "}
+                {(resumo.valorTotalRetirado || 0).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
               </div>
               <div className="text-sm text-gray-600">Lucro Geral</div>
             </div>
@@ -333,7 +348,11 @@ export default function FluxoCaixa() {
             <div className="stat-card bg-linear-to-br from-green-500/10 to-green-500/5">
               <div className="text-3xl mb-2">💵</div>
               <div className="text-xl font-bold text-gray-900">
-                R$ {(resumo.valorTotalRetiradoFisico || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R${" "}
+                {(resumo.valorTotalRetiradoFisico || 0).toLocaleString(
+                  "pt-BR",
+                  { minimumFractionDigits: 2 },
+                )}
               </div>
               <div className="text-sm text-gray-600">Total Físico</div>
             </div>
@@ -341,7 +360,11 @@ export default function FluxoCaixa() {
             <div className="stat-card bg-linear-to-br from-cyan-500/10 to-cyan-500/5">
               <div className="text-3xl mb-2">📱</div>
               <div className="text-xl font-bold text-gray-900">
-                R$ {(resumo.valorTotalRetiradoDigital || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R${" "}
+                {(resumo.valorTotalRetiradoDigital || 0).toLocaleString(
+                  "pt-BR",
+                  { minimumFractionDigits: 2 },
+                )}
               </div>
               <div className="text-sm text-gray-600">Total Digital</div>
             </div>
@@ -349,15 +372,23 @@ export default function FluxoCaixa() {
             <div className="stat-card bg-linear-to-br from-yellow-500/10 to-yellow-500/5">
               <div className="text-3xl mb-2">🎯</div>
               <div className="text-xl font-bold text-gray-900">
-                R$ {(resumo.valorTotalEsperado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R${" "}
+                {(resumo.valorTotalEsperado || 0).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
               </div>
               <div className="text-sm text-gray-600">Valor Esperado Total</div>
             </div>
 
             <div className="stat-card bg-linear-to-br from-purple-500/10 to-purple-500/5">
               <div className="text-3xl mb-2">📊</div>
-              <div className={`text-xl font-bold ${(resumo.diferencaTotal || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {(resumo.diferencaTotal || 0) >= 0 ? '+' : ''}R$ {Math.abs(resumo.diferencaTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              <div
+                className={`text-xl font-bold ${(resumo.diferencaTotal || 0) >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
+                {(resumo.diferencaTotal || 0) >= 0 ? "+" : ""}R${" "}
+                {Math.abs(resumo.diferencaTotal || 0).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
               </div>
               <div className="text-sm text-gray-600">Diferença Total</div>
             </div>
@@ -374,7 +405,12 @@ export default function FluxoCaixa() {
               <input
                 type="date"
                 value={filtros.dataInicio}
-                onChange={(e) => setFiltros(prev => ({ ...prev, dataInicio: e.target.value }))}
+                onChange={(e) =>
+                  setFiltros((prev) => ({
+                    ...prev,
+                    dataInicio: e.target.value,
+                  }))
+                }
                 className="input-field"
               />
             </div>
@@ -386,7 +422,9 @@ export default function FluxoCaixa() {
               <input
                 type="date"
                 value={filtros.dataFim}
-                onChange={(e) => setFiltros(prev => ({ ...prev, dataFim: e.target.value }))}
+                onChange={(e) =>
+                  setFiltros((prev) => ({ ...prev, dataFim: e.target.value }))
+                }
                 className="input-field"
               />
             </div>
@@ -397,12 +435,16 @@ export default function FluxoCaixa() {
               </label>
               <select
                 value={filtros.lojaId}
-                onChange={(e) => setFiltros(prev => ({ ...prev, lojaId: e.target.value }))}
+                onChange={(e) =>
+                  setFiltros((prev) => ({ ...prev, lojaId: e.target.value }))
+                }
                 className="select-field"
               >
                 <option value="">Todos os pontos</option>
-                {lojas.map(loja => (
-                  <option key={loja.id} value={loja.id}>{loja.nome}</option>
+                {lojas.map((loja) => (
+                  <option key={loja.id} value={loja.id}>
+                    {loja.nome}
+                  </option>
                 ))}
               </select>
             </div>
@@ -413,7 +455,9 @@ export default function FluxoCaixa() {
               </label>
               <select
                 value={filtros.status}
-                onChange={(e) => setFiltros(prev => ({ ...prev, status: e.target.value }))}
+                onChange={(e) =>
+                  setFiltros((prev) => ({ ...prev, status: e.target.value }))
+                }
                 className="select-field"
               >
                 <option value="todos">Todos</option>
@@ -429,18 +473,26 @@ export default function FluxoCaixa() {
         <div className="card-gradient">
           <div className="mb-4">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+              <svg
+                className="w-5 h-5 text-primary"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"
+                  clipRule="evenodd"
+                />
               </svg>
               Retiradas de Dinheiro ({fluxosComBaseContadores.length})
             </h3>
             <p className="text-xs text-gray-600 mt-2 flex items-start gap-2">
               <span className="text-blue-600">💡</span>
               <span>
-                  Na conferência, informe separadamente o valor retirado em
-                  <strong className="text-blue-700"> dinheiro físico</strong> e
-                  <strong className="text-cyan-700"> digital</strong>.
+                Na conferência, informe separadamente o valor retirado em
+                <strong className="text-blue-700"> dinheiro físico</strong> e
+                <strong className="text-cyan-700"> digital</strong>.
               </span>
             </p>
           </div>
@@ -454,7 +506,8 @@ export default function FluxoCaixa() {
                 Nenhuma retirada de dinheiro encontrada no período selecionado.
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                As movimentações marcadas como "Retirada de Dinheiro" aparecerão aqui.
+                As movimentações marcadas como "Retirada de Dinheiro" aparecerão
+                aqui.
               </p>
             </div>
           ) : (
@@ -489,7 +542,7 @@ export default function FluxoCaixa() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {fluxosComBaseContadores.map(fluxo => (
+                  {fluxosComBaseContadores.map((fluxo) => (
                     <ItemFluxoCaixa
                       key={fluxo.id}
                       fluxo={fluxo}
@@ -530,7 +583,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     );
     const contadorInAnterior = parseNumero(
       fluxo?.contadorInAnteriorCronologico ??
-      movimentacao?.contadorInAnterior ??
+        movimentacao?.contadorInAnterior ??
         fluxo?.contadorInAnterior ??
         fluxo?.ultimoContadorInRetirada,
     );
@@ -540,7 +593,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     );
     const contadorOutAnterior = parseNumero(
       fluxo?.contadorOutAnteriorCronologico ??
-      movimentacao?.contadorOutAnterior ??
+        movimentacao?.contadorOutAnterior ??
         fluxo?.contadorOutAnterior ??
         fluxo?.ultimoContadorOutRetirada,
     );
@@ -582,8 +635,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     parseNumero(fluxo?.valorRetirado) ??
     0;
   const valorRetiradoDigitalInicial =
-    parseNumero(fluxo?.valorRetiradoDigital) ??
-    0;
+    parseNumero(fluxo?.valorRetiradoDigital) ?? 0;
   const valorRetiradoTotalInicial =
     parseNumero(fluxo?.valorRetiradoTotal) ??
     roundTo2(valorRetiradoFisicoInicial + valorRetiradoDigitalInicial);
@@ -594,7 +646,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     valorRetiradoDigital: valorRetiradoDigitalInicial,
     valorEsperado: valorEsperadoInicial,
     conferencia: fluxo.conferencia || "pendente",
-    observacoes: fluxo.observacoes || ""
+    observacoes: fluxo.observacoes || "",
   });
 
   useEffect(() => {
@@ -647,21 +699,21 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
       digital,
       formConferencia.conferencia,
       formConferencia.observacoes,
-      formConferencia.valorEsperado
+      formConferencia.valorEsperado,
     );
     setEditando(false);
   };
 
   const valorEsperado = roundTo2(
-    editando
-      ? formConferencia.valorEsperado
-      : valorEsperadoInicial,
+    editando ? formConferencia.valorEsperado : valorEsperadoInicial,
   );
   const valorRetiradoFisico = roundTo2(
     editando ? formConferencia.valorRetiradoFisico : valorRetiradoFisicoInicial,
   );
   const valorRetiradoDigital = roundTo2(
-    editando ? formConferencia.valorRetiradoDigital : valorRetiradoDigitalInicial,
+    editando
+      ? formConferencia.valorRetiradoDigital
+      : valorRetiradoDigitalInicial,
   );
   const valorRetiradoTotal = editando
     ? roundTo2(valorRetiradoFisico + valorRetiradoDigital)
@@ -708,47 +760,72 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
   };
 
   return (
-    <tr className={`${fluxo.conferencia === "bateu" ? "bg-green-50" : fluxo.conferencia === "nao_bateu" ? "bg-red-50" : ""} hover:bg-gray-50 transition-colors`}>
+    <tr
+      className={`${fluxo.conferencia === "bateu" ? "bg-green-50" : fluxo.conferencia === "nao_bateu" ? "bg-red-50" : ""} hover:bg-gray-50 transition-colors`}
+    >
       <td className="px-4 py-4 text-sm text-gray-900">
-        <div className="font-semibold">{fluxo.movimentacao.maquina.loja.nome}</div>
+        <div className="font-semibold">
+          {fluxo.movimentacao.maquina.loja.nome}
+        </div>
         <div className="text-xs text-gray-600">
           {[
             fluxo.movimentacao.maquina.loja.endereco,
-            fluxo.movimentacao.maquina.loja.numero && `nº ${fluxo.movimentacao.maquina.loja.numero}`,
-            fluxo.movimentacao.maquina.loja.bairro
-          ].filter(Boolean).join(", ")}
+            fluxo.movimentacao.maquina.loja.numero &&
+              `nº ${fluxo.movimentacao.maquina.loja.numero}`,
+            fluxo.movimentacao.maquina.loja.bairro,
+          ]
+            .filter(Boolean)
+            .join(", ")}
         </div>
         <div className="text-xs text-gray-500 mt-1">
-          <strong>{fluxo.movimentacao.maquina.nome}</strong> ({fluxo.movimentacao.maquina.codigo})
+          <strong>{fluxo.movimentacao.maquina.nome}</strong> (
+          {fluxo.movimentacao.maquina.codigo})
         </div>
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
         <div>{fluxo.movimentacao.usuario.nome}</div>
-        <div className="text-xs text-gray-500">{fluxo.movimentacao.usuario.email}</div>
+        <div className="text-xs text-gray-500">
+          {fluxo.movimentacao.usuario.email}
+        </div>
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
         <div className="flex flex-col items-end gap-1">
-          <span>R$ {valorEsperado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-          {fluxo.valorEsperado && Math.abs(fluxo.valorEsperado - (fluxo.movimentacao?.valorFaturado || 0)) > 0.01 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800" title="Valor ajustado manualmente">
-              ✏️ Editado
-            </span>
-          )}
+          <span>
+            R${" "}
+            {valorEsperado.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            })}
+          </span>
+          {fluxo.valorEsperado &&
+            Math.abs(
+              fluxo.valorEsperado - (fluxo.movimentacao?.valorFaturado || 0),
+            ) > 0.01 && (
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800"
+                title="Valor ajustado manualmente"
+              >
+                ✏️ Editado
+              </span>
+            )}
         </div>
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
         {editando ? (
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-600 font-semibold">Físico:</label>
+            <label className="text-xs text-gray-600 font-semibold">
+              Físico:
+            </label>
             <input
               type="number"
               step="0.01"
               min="0"
               value={formConferencia.valorRetiradoFisico}
-              onChange={(e) => setFormConferencia(prev => ({
-                ...prev,
-                valorRetiradoFisico: e.target.value
-              }))}
+              onChange={(e) =>
+                setFormConferencia((prev) => ({
+                  ...prev,
+                  valorRetiradoFisico: e.target.value,
+                }))
+              }
               placeholder="0.00"
               className="w-32 px-2 py-1 border-2 border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
@@ -756,40 +833,58 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
           </div>
         ) : (
           <span className="font-bold text-gray-900">
-            R$ {valorRetiradoFisico.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R${" "}
+            {valorRetiradoFisico.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            })}
           </span>
         )}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
         {editando ? (
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-600 font-semibold">Digital:</label>
+            <label className="text-xs text-gray-600 font-semibold">
+              Digital:
+            </label>
             <input
               type="number"
               step="0.01"
               min="0"
               value={formConferencia.valorRetiradoDigital}
-              onChange={(e) => setFormConferencia(prev => ({
-                ...prev,
-                valorRetiradoDigital: e.target.value
-              }))}
+              onChange={(e) =>
+                setFormConferencia((prev) => ({
+                  ...prev,
+                  valorRetiradoDigital: e.target.value,
+                }))
+              }
               placeholder="0.00"
               className="w-28 px-2 py-1 border-2 border-cyan-500 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
           </div>
         ) : (
           <span className="font-bold text-gray-900">
-            R$ {valorRetiradoDigital.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R${" "}
+            {valorRetiradoDigital.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            })}
           </span>
         )}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
         <div>
           <div className="font-bold text-gray-900">
-            R$ {valorRetiradoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R${" "}
+            {valorRetiradoTotal.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            })}
           </div>
-          <div className={`text-xs font-semibold ${diferenca > 0 ? "text-green-600" : diferenca < 0 ? "text-red-600" : "text-gray-500"}`}>
-            {diferenca > 0 ? "+" : ""}R$ {Math.abs(diferenca).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          <div
+            className={`text-xs font-semibold ${diferenca > 0 ? "text-green-600" : diferenca < 0 ? "text-red-600" : "text-gray-500"}`}
+          >
+            {diferenca > 0 ? "+" : ""}R${" "}
+            {Math.abs(diferenca).toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            })}
           </div>
         </div>
       </td>
@@ -797,10 +892,12 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
         {editando ? (
           <select
             value={formConferencia.conferencia}
-            onChange={(e) => setFormConferencia(prev => ({
-              ...prev,
-              conferencia: e.target.value
-            }))}
+            onChange={(e) =>
+              setFormConferencia((prev) => ({
+                ...prev,
+                conferencia: e.target.value,
+              }))
+            }
             className="px-3 py-1 border-2 border-primary rounded focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="pendente">⏳ Pendente</option>
@@ -808,8 +905,11 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
             <option value="nao_bateu">❌ Não Bateu</option>
           </select>
         ) : (
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(fluxo.conferencia)}`}>
-            {getStatusIcon(fluxo.conferencia)} {getStatusText(fluxo.conferencia)}
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(fluxo.conferencia)}`}
+          >
+            {getStatusIcon(fluxo.conferencia)}{" "}
+            {getStatusText(fluxo.conferencia)}
           </span>
         )}
       </td>
@@ -831,7 +931,7 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
                     valorRetiradoDigital: valorRetiradoDigitalInicial,
                     valorEsperado: valorEsperadoInicial,
                     conferencia: fluxo.conferencia || "pendente",
-                    observacoes: fluxo.observacoes || ""
+                    observacoes: fluxo.observacoes || "",
                   });
                 }}
                 className="px-3 py-1 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors text-xs font-semibold"
@@ -847,12 +947,9 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
               📝 Conferir
             </button>
           ) : (
-            <button
-              onClick={() => setEditando(true)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-xs font-semibold"
-            >
-              ✏️ Editar
-            </button>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+              🔒 Bloqueado
+            </span>
           )
         ) : (
           <span className="text-gray-400 text-xs italic">Somente admin</span>
@@ -868,4 +965,11 @@ function formatDate(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatLocalDateKey(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatDate(date);
 }

@@ -1,10 +1,27 @@
-                  import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { PageHeader, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
+
+const normalizarNomeGasto = (nome) =>
+  String(nome || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
+const obterValorAluguelDaLista = (lista) => {
+  const gastoAluguel = (Array.isArray(lista) ? lista : []).find(
+    (item) => normalizarNomeGasto(item?.nome) === "aluguel",
+  );
+
+  const valor = Number(gastoAluguel?.valor || 0);
+  return Number.isFinite(valor) ? valor : 0;
+};
 
 export function MaquinaForm() {
   const { id } = useParams();
@@ -39,6 +56,8 @@ export function MaquinaForm() {
   const [loadingTiposMaquina, setLoadingTiposMaquina] = useState(false);
   const [tiposMaquinaExistentes, setTiposMaquinaExistentes] = useState([]);
   const [mostrarSugestoesTipo, setMostrarSugestoesTipo] = useState(false);
+  const [valorAluguelPonto, setValorAluguelPonto] = useState(0);
+  const [loadingRegraComissao, setLoadingRegraComissao] = useState(false);
 
   useEffect(() => {
     carregarLojas();
@@ -52,18 +71,29 @@ export function MaquinaForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    const lojaIdSelecionada = formData.loja_id;
+
+    if (!lojaIdSelecionada) {
+      setValorAluguelPonto(0);
+      return;
+    }
+
+    carregarRegraComissaoPorLoja(lojaIdSelecionada);
+  }, [formData.loja_id]);
+
   const carregarProximoCodigo = async () => {
     try {
       const response = await api.get("/maquinas");
       const maquinas = response.data;
-      
+
       if (!maquinas || maquinas.length === 0) {
-        setFormData(prev => ({ ...prev, codigo: "1" }));
+        setFormData((prev) => ({ ...prev, codigo: "1" }));
         return;
       }
 
       // Extrai números dos códigos existentes
-      const codigos = maquinas.map(m => {
+      const codigos = maquinas.map((m) => {
         const codigo = String(m.codigo || "");
         // Extrai apenas números do código (ex: "MAQ-001" -> 1, "123" -> 123)
         const numero = parseInt(codigo.replace(/\D/g, ""), 10);
@@ -73,12 +103,12 @@ export function MaquinaForm() {
       // Encontra o maior código e incrementa
       const maiorCodigo = Math.max(...codigos, 0);
       const proximoCodigo = maiorCodigo + 1;
-      
-      setFormData(prev => ({ ...prev, codigo: String(proximoCodigo) }));
+
+      setFormData((prev) => ({ ...prev, codigo: String(proximoCodigo) }));
     } catch (error) {
       console.error("Erro ao carregar próximo código:", error);
       // Em caso de erro, deixa vazio para o usuário preencher
-      setFormData(prev => ({ ...prev, codigo: "" }));
+      setFormData((prev) => ({ ...prev, codigo: "" }));
     }
   };
 
@@ -128,7 +158,11 @@ export function MaquinaForm() {
         tipo: response.data.tipo || "",
         capacidadePadrao: response.data.capacidadePadrao || "",
         valorFicha: response.data.valorFicha || "",
-        comissaoLojaPercentual: response.data.comissaoLojaPercentual || "",
+        comissaoLojaPercentual:
+          response.data.comissaoLojaPercentual !== null &&
+          response.data.comissaoLojaPercentual !== undefined
+            ? String(response.data.comissaoLojaPercentual)
+            : "",
         fichasNecessarias: response.data.fichasNecessarias || "",
         forcaForte: response.data.forcaForte || "",
         forcaFraca: response.data.forcaFraca || "",
@@ -150,8 +184,36 @@ export function MaquinaForm() {
     }
   };
 
+  const carregarRegraComissaoPorLoja = async (lojaId) => {
+    try {
+      setLoadingRegraComissao(true);
+      const response = await api.get(`/gastos-fixos-loja/${lojaId}`);
+      const aluguel = obterValorAluguelDaLista(response.data);
+
+      setValorAluguelPonto(aluguel);
+      setFormData((prev) => ({
+        ...prev,
+        comissaoLojaPercentual: aluguel > 0 ? "0" : prev.comissaoLojaPercentual,
+      }));
+    } catch (error) {
+      console.error("Erro ao carregar gastos fixos do ponto:", error);
+      setValorAluguelPonto(0);
+    } finally {
+      setLoadingRegraComissao(false);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === "comissaoLojaPercentual" && valorAluguelPonto > 0) {
+      setFormData({
+        ...formData,
+        comissaoLojaPercentual: "0",
+      });
+      return;
+    }
+
     setFormData({
       ...formData,
       [name]: type === "checkbox" ? checked : value,
@@ -200,12 +262,39 @@ export function MaquinaForm() {
         return;
       }
 
-      const contadorInInicialInformado =
-        formData.contadorInInicial !== "" && formData.contadorInInicial !== null;
-      const contadorOutInicialInformado =
-        formData.contadorOutInicial !== "" && formData.contadorOutInicial !== null;
+      if (
+        valorAluguelPonto > 0 &&
+        Number(formData.comissaoLojaPercentual || 0) !== 0
+      ) {
+        setError(
+          "Este ponto possui aluguel maior que zero. A comissão da máquina deve ser 0%.",
+        );
+        setLoading(false);
+        return;
+      }
 
-      if (!isEdit && contadorInInicialInformado !== contadorOutInicialInformado) {
+      if (
+        valorAluguelPonto <= 0 &&
+        String(formData.comissaoLojaPercentual || "").trim() === ""
+      ) {
+        setError(
+          "Este ponto não possui aluguel. Informe a comissão da máquina.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      const contadorInInicialInformado =
+        formData.contadorInInicial !== "" &&
+        formData.contadorInInicial !== null;
+      const contadorOutInicialInformado =
+        formData.contadorOutInicial !== "" &&
+        formData.contadorOutInicial !== null;
+
+      if (
+        !isEdit &&
+        contadorInInicialInformado !== contadorOutInicialInformado
+      ) {
         setError(
           "Para lançar movimentação inicial, preencha IN e OUT inicial juntos.",
         );
@@ -222,7 +311,7 @@ export function MaquinaForm() {
         valorFicha: parseFloat(formData.valorFicha) || 0,
         comissaoLojaPercentual:
           formData.comissaoLojaPercentual === ""
-            ? 0
+            ? null
             : parseFloat(formData.comissaoLojaPercentual),
         fichasNecessarias: parseInt(formData.fichasNecessarias, 10) || null,
         forcaForte: parseInt(formData.forcaForte, 10) || null,
@@ -245,7 +334,8 @@ export function MaquinaForm() {
 
         if (contadorInInicialInformado && contadorOutInicialInformado) {
           const novaMaquinaId =
-            responseNovaMaquina?.data?.id || responseNovaMaquina?.data?.maquina?.id;
+            responseNovaMaquina?.data?.id ||
+            responseNovaMaquina?.data?.maquina?.id;
 
           if (!novaMaquinaId) {
             throw new Error(
@@ -275,7 +365,8 @@ export function MaquinaForm() {
             retiradaEstoque: false,
             origemEstoque: "usuario",
             contadorMaquina: null,
-            observacoes: "Movimentação inicial automática no cadastro da máquina",
+            observacoes:
+              "Movimentação inicial automática no cadastro da máquina",
             produtos: [],
             retiradaProduto: 0,
           };
@@ -291,9 +382,7 @@ export function MaquinaForm() {
 
           const existeMovimentacaoInicial = (lista) =>
             lista.some((mov) => {
-              const inAtual = Number(
-                mov?.contadorIn ?? mov?.contadorInDigital,
-              );
+              const inAtual = Number(mov?.contadorIn ?? mov?.contadorInDigital);
               const outAtual = Number(
                 mov?.contadorOut ?? mov?.contadorOutDigital,
               );
@@ -305,8 +394,10 @@ export function MaquinaForm() {
                   String(novaMaquinaId) &&
                 inAtual === contadorInInicial &&
                 outAtual === contadorOutInicial &&
-                (inAnterior === contadorInInicial || Number.isNaN(inAnterior)) &&
-                (outAnterior === contadorOutInicial || Number.isNaN(outAnterior))
+                (inAnterior === contadorInInicial ||
+                  Number.isNaN(inAnterior)) &&
+                (outAnterior === contadorOutInicial ||
+                  Number.isNaN(outAnterior))
               );
             });
 
@@ -338,9 +429,8 @@ export function MaquinaForm() {
               })
               .catch(() => ({ data: [] }));
 
-            const listaMovimentacoes = normalizarListaMovimentacoes(
-              respostaConsulta,
-            );
+            const listaMovimentacoes =
+              normalizarListaMovimentacoes(respostaConsulta);
 
             const movimentacaoInicialEncontrada =
               existeMovimentacaoInicial(listaMovimentacoes);
@@ -572,7 +662,8 @@ export function MaquinaForm() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Comissão do Ponto (%)
+                    Comissão do Ponto{" "}
+                    {valorAluguelPonto > 0 ? "(fixa em 0%)" : "(%) *"}
                   </label>
                   <input
                     type="number"
@@ -580,13 +671,19 @@ export function MaquinaForm() {
                     value={formData.comissaoLojaPercentual}
                     onChange={handleChange}
                     className="input-field"
-                    placeholder="Ex: 15"
+                    placeholder={valorAluguelPonto > 0 ? "0" : "Ex: 15"}
                     min="0"
                     max="100"
                     step="0.01"
+                    required={valorAluguelPonto <= 0}
+                    disabled={valorAluguelPonto > 0 || loadingRegraComissao}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Percentual de comissão do ponto para esta máquina
+                    {loadingRegraComissao
+                      ? "Carregando regra do ponto..."
+                      : valorAluguelPonto > 0
+                        ? `Este ponto possui aluguel de R$ ${valorAluguelPonto.toFixed(2)}. A comissão deve permanecer em 0%.`
+                        : "Sem aluguel cadastrado para o ponto. O preenchimento da comissão é obrigatório."}
                   </p>
                 </div>
 
@@ -718,7 +815,8 @@ export function MaquinaForm() {
                         min="0"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Opcional. Preencha junto com OUT para lançar movimentação inicial automática.
+                        Opcional. Preencha junto com OUT para lançar
+                        movimentação inicial automática.
                       </p>
                     </div>
 

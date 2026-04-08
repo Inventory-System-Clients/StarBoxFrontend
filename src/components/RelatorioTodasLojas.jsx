@@ -160,6 +160,25 @@ export function RelatorioTodasLojas({ relatorio }) {
   );
   const lucroSemCustosFixosTotal =
     Number(brutoConsolidado || 0) - Number(totais.custoProdutosTotal || 0);
+  const custoProdutosTotal = Number(totais.custoProdutosTotal || 0);
+  const custoFixoTotal = Number(totais.custoFixoTotal || 0);
+  const custoVariavelTotal = Number(totais.custoVariavelTotal || 0);
+  const custoQuebraCaixaTotal = Number(
+    totais.custoQuebraCaixaTotal ?? totais.custoQuebraCaixa ?? 0,
+  );
+  const custoOutrosTotal = Math.max(
+    0,
+    Number(totais.custoTotal || 0) -
+      (custoProdutosTotal +
+        custoFixoTotal +
+        custoVariavelTotal +
+        custoQuebraCaixaTotal),
+  );
+  const valorEsperadoTotal = Number(totais.valorEsperadoTotal || 0);
+  const lucroEsperadoTotal = Number(
+    totais.lucroEsperadoTotal ??
+      valorEsperadoTotal - Number(totais.custoTotal || 0),
+  );
   const saidasPremioTotal = Number(
     totais.saidasPremioTotal ?? (totais.produtosSairamTotal || 0),
   );
@@ -296,7 +315,7 @@ export function RelatorioTodasLojas({ relatorio }) {
           <div className="text-2xl font-bold">
             {formatarMoeda(totais.lucroBrutoTotal)}
           </div>
-          <div className="text-sm opacity-90">Total de Vendas</div>
+          <div className="text-sm opacity-90">Valor Recebido Total</div>
         </div>
         <div className="card bg-linear-to-br from-blue-600 to-cyan-700 text-white">
           <div className="text-2xl mb-1">📉</div>
@@ -314,8 +333,12 @@ export function RelatorioTodasLojas({ relatorio }) {
             {formatarMoeda(totais.custoTotal)}
           </div>
           <div className="text-sm opacity-90">Custo Total</div>
-          <div className="text-xs opacity-80 mt-1">
-            Produtos: {formatarMoeda(totais.custoProdutosTotal)}
+          <div className="text-xs opacity-85 mt-2 space-y-1">
+            <div>Produtos: {formatarMoeda(custoProdutosTotal)}</div>
+            <div>Fixos: {formatarMoeda(custoFixoTotal)}</div>
+            <div>Quebra de caixa: {formatarMoeda(custoQuebraCaixaTotal)}</div>
+            <div>Variáveis: {formatarMoeda(custoVariavelTotal)}</div>
+            <div>Outros: {formatarMoeda(custoOutrosTotal)}</div>
           </div>
         </div>
         <div className="card bg-linear-to-br from-fuchsia-500 to-purple-700 text-white">
@@ -355,6 +378,34 @@ export function RelatorioTodasLojas({ relatorio }) {
             {Number(totais.produtosEntraramTotal || 0).toLocaleString("pt-BR")}
           </div>
           <div className="text-sm opacity-90">Contador entrada (Total)</div>
+        </div>
+        <div className="card bg-linear-to-br from-amber-500 to-yellow-600 text-white border-2 border-amber-300">
+          <div className="text-2xl mb-1">🔮</div>
+          <div className="text-2xl font-bold">
+            {formatarMoeda(valorEsperadoTotal)}
+          </div>
+          <div className="text-sm opacity-90">
+            Valor Esperado (Fluxo de Caixa)
+          </div>
+          <div className="text-xs opacity-80 mt-1">
+            Soma da coluna valor esperado com os filtros do relatório
+          </div>
+        </div>
+        <div
+          className={`card border-2 text-white ${
+            lucroEsperadoTotal >= 0
+              ? "bg-linear-to-br from-lime-500 to-green-700 border-lime-300"
+              : "bg-linear-to-br from-red-600 to-rose-800 border-red-300"
+          }`}
+        >
+          <div className="text-2xl mb-1">🎯</div>
+          <div className="text-2xl font-bold">
+            {formatarMoeda(lucroEsperadoTotal)}
+          </div>
+          <div className="text-sm opacity-90">Lucro Esperado</div>
+          <div className="text-xs opacity-80 mt-1">
+            Valor Esperado − Custo Total
+          </div>
         </div>
       </div>
 
