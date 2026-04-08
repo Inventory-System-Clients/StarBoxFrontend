@@ -700,6 +700,16 @@ export function Relatorios() {
         "",
     ).trim();
 
+  const filtrarFluxosPorLoja = (fluxos = [], lojaId) => {
+    const lojaAlvo = String(lojaId || "").trim();
+    if (!lojaAlvo) return Array.isArray(fluxos) ? fluxos : [];
+
+    return (Array.isArray(fluxos) ? fluxos : []).filter((fluxo) => {
+      const lojaDoFluxo = obterLojaIdDoFluxo(fluxo);
+      return lojaDoFluxo === lojaAlvo;
+    });
+  };
+
   const obterDataReferenciaFluxo = (fluxo) => {
     const dataTexto =
       fluxo?.movimentacao?.dataColeta ||
@@ -831,6 +841,59 @@ export function Relatorios() {
     }
 
     return Array.from(mapa.values());
+  };
+
+  const obterTotaisRecebimentoPorFluxos = (fluxos = []) => {
+    return (Array.isArray(fluxos) ? fluxos : []).reduce(
+      (acc, fluxo) => {
+        const valorFisico = pickNumber(
+          fluxo?.valorRetiradoFisico,
+          fluxo?.valorRetiradoDinheiro,
+          fluxo?.valorFisico,
+        );
+        const valorDigital = pickNumber(
+          fluxo?.valorRetiradoDigital,
+          fluxo?.valorRetiradoCartaoPix,
+          fluxo?.valorDigital,
+        );
+
+        // Compatibilidade com registros antigos sem separacao fisico/digital.
+        const valorTotalLegado =
+          valorFisico === null && valorDigital === null
+            ? pickNumber(fluxo?.valorRetirado, fluxo?.valorRetiradoTotal)
+            : null;
+
+        if (
+          valorFisico !== null ||
+          valorDigital !== null ||
+          valorTotalLegado !== null
+        ) {
+          acc.temDadosFluxo = true;
+        }
+
+        acc.dinheiroFluxo += toNumber(valorFisico ?? valorTotalLegado);
+        acc.cartaoPixFluxoLiquido += toNumber(valorDigital);
+
+        return acc;
+      },
+      {
+        dinheiroFluxo: 0,
+        cartaoPixFluxoLiquido: 0,
+        temDadosFluxo: false,
+      },
+    );
+  };
+
+  const obterValorEsperadoTotalPorFluxos = (fluxos = []) => {
+    return (Array.isArray(fluxos) ? fluxos : []).reduce((acc, fluxo) => {
+      const valorEsperado = pickNumber(
+        fluxo?.valorEsperado,
+        fluxo?.valorEsperadoCalculado,
+        fluxo?.movimentacao?.valorFaturado,
+      );
+
+      return acc + toNumber(valorEsperado);
+    }, 0);
   };
 
   const carregarFluxosCaixa = async (filtros = {}) => {
@@ -1204,6 +1267,7 @@ export function Relatorios() {
       totais: {
         lucroBrutoTotal: 0,
         lucroLiquidoTotal: 0,
+        valorEsperadoTotal: 0,
         custoTotal: 0,
         custoVariavelTotal: 0,
         custoFixoTotal: 0,
@@ -1246,7 +1310,7 @@ export function Relatorios() {
         const nomeFallback = lojaNomePorId.get(lojaId) || `Loja ${lojaId}`;
 
         try {
-          const [relatorioResponse, gastosFixosResponse, custoQuebraCaixa] =
+          const [relatorioResponse, gastosFixosResponse, fluxosLoja] =
             await Promise.all([
               api
                 .get("/relatorios/impressao", {
@@ -1260,7 +1324,11 @@ export function Relatorios() {
               api
                 .get(`/gastos-fixos-loja/${lojaId}`)
                 .catch(() => ({ data: [] })),
-              carregarQuebraCaixaPorLoja(lojaId, periodoInicio, periodoFim),
+              carregarFluxosCaixa({
+                inicio: periodoInicio,
+                fim: periodoFim,
+                lojaId,
+              }).catch(() => []),
             ]);
 
           const dadosLoja = relatorioResponse?.data;
@@ -1273,7 +1341,34 @@ export function Relatorios() {
           }
 
           const lojaNome = dadosLoja?.loja?.nome || nomeFallback;
-          const fluxo = obterTotaisFluxoCaixaRelatorio(dadosLoja);
+          const fluxosDaLoja = filtrarFluxosPorLoja(fluxosLoja, lojaId);
+          const custoQuebraCaixa = calcularQuebraCaixaComoCusto(
+            fluxosDaLoja,
+            lojaId,
+            periodoInicio,
+            periodoFim,
+          );
+
+          const recebimentoFluxo = obterTotaisRecebimentoPorFluxos(fluxosDaLoja);
+          const valorEsperadoFluxo =
+            obterValorEsperadoTotalPorFluxos(fluxosDaLoja);
+          const fluxoFallback = obterTotaisFluxoCaixaRelatorio(dadosLoja);
+          const fluxo = {
+            ...fluxoFallback,
+            dinheiroFluxo:
+              recebimentoFluxo.temDadosFluxo
+                ? recebimentoFluxo.dinheiroFluxo
+                : fluxoFallback.dinheiroFluxo,
+            cartaoPixFluxoLiquido:
+              recebimentoFluxo.temDadosFluxo
+                ? recebimentoFluxo.cartaoPixFluxoLiquido
+                : fluxoFallback.cartaoPixFluxoLiquido,
+            // No consolidado manual o cartao/pix exibido deve refletir o valor digital conferido no fluxo.
+            cartaoPixFluxoBruto:
+              recebimentoFluxo.temDadosFluxo
+                ? recebimentoFluxo.cartaoPixFluxoLiquido
+                : fluxoFallback.cartaoPixFluxoBruto,
+          };
           const lucroBruto = calcularValorConsolidadoRelatorio(dadosLoja);
 
           const gastosFixosLista = extrairListaGastosFixos(
@@ -1353,6 +1448,7 @@ export function Relatorios() {
             custoFixo,
             custoFixoMensal,
             custoQuebraCaixa: toNumber(custoQuebraCaixa),
+            valorEsperadoFluxo,
             fichas,
             produtosSairam,
             produtosEntraram,
@@ -1496,6 +1592,10 @@ export function Relatorios() {
       (acc, item) => acc + toNumber(item?.lucroLiquido),
       0,
     );
+    const valorEsperadoTotal = lojasComDadosDetalhado.reduce(
+      (acc, item) => acc + toNumber(item?.valorEsperadoFluxo),
+      0,
+    );
     const custoTotal = rankingGastoLojas.reduce(
       (acc, item) => acc + toNumber(item?.custoTotal),
       0,
@@ -1571,6 +1671,7 @@ export function Relatorios() {
         lojaNome: item?.lojaNome,
         lucroBruto: toNumber(item?.lucroBruto),
         lucroLiquido: toNumber(item?.lucroLiquido),
+        valorEsperado: toNumber(item?.valorEsperadoFluxo),
         custoTotal: toNumber(item?.custoTotal),
         produtosSairam: toNumber(item?.produtosSairam),
       })),
@@ -1578,6 +1679,7 @@ export function Relatorios() {
       totais: {
         lucroBrutoTotal,
         lucroLiquidoTotal,
+        valorEsperadoTotal,
         custoTotal,
         custoVariavelTotal,
         custoFixoTotal,
