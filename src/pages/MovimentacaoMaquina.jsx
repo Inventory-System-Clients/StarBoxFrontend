@@ -1662,7 +1662,7 @@ export default function MovimentacaoMaquina() {
                     Contador saida preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.outAtual)}</strong>
                   </p>
                   <p>
-                    Jogou(Diferença do Contador Entrada): <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}</strong>
+                    Jogou: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}</strong>
                   </p>
                   <p>
                     Quantidade de premios que saiu: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}</strong>
