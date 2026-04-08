@@ -869,9 +869,6 @@ export default function MovimentacaoMaquina() {
     const jogadasMediasPorPelucia =
       quantidadeSaiu > 0 ? diferencaIn / valorJogadaMedia / quantidadeSaiu : 0;
 
-    const lojaCodigo = String(maquina?.loja?.id || lojaId || "")
-      .slice(0, 8)
-      .toUpperCase();
     const lojaNome = maquina?.loja?.nome || "Ponto sem nome";
     const dataMovimentacao = new Date().toLocaleString("pt-BR");
     const dataUltimaMovimentacao = ultimaMovimentacaoData
@@ -922,7 +919,7 @@ export default function MovimentacaoMaquina() {
 
     return [
       "STAR BOX",
-      `*${lojaCodigo} | ${lojaNome}*`,
+      `*${lojaNome}*`,
       `Data: ${dataMovimentacao}`,
       `Última movimentação da máquina: ${dataUltimaMovimentacao}`,
       ...(diasDesdeUltimaMovimentacao !== null
