@@ -709,6 +709,62 @@ export default function MovimentacaoMaquina() {
     return formatarInteiro(valor);
   };
 
+  const capacidadePadraoMaquina = useMemo(() => {
+    const numero = Number(maquina?.capacidadePadrao ?? maquina?.capacidade ?? 0);
+    return Number.isFinite(numero) && numero > 0 ? Math.round(numero) : 0;
+  }, [maquina?.capacidadePadrao, maquina?.capacidade]);
+
+  const quantidadeAtualUltimaMovimentacao = useMemo(() => {
+    const valorUltimaMovimentacao = toNumero(
+      obterTotalPosUltimaMovimentacao(ultimaMovimentacao),
+    );
+
+    if (valorUltimaMovimentacao !== null) {
+      return Math.max(0, Math.round(valorUltimaMovimentacao));
+    }
+
+    const valorResumo = toNumero(resumoCalculo?.totalPosUltimaMovimentacao);
+    if (valorResumo !== null) {
+      return Math.max(0, Math.round(valorResumo));
+    }
+
+    return null;
+  }, [ultimaMovimentacao, resumoCalculo?.totalPosUltimaMovimentacao]);
+
+  const quantidadeBaseAbastecedor = useMemo(() => {
+    if (!isFuncionarioAbastecedor) return null;
+
+    if (quantidadeAtualUltimaMovimentacao !== null) {
+      if (capacidadePadraoMaquina > 0) {
+        return Math.max(capacidadePadraoMaquina, quantidadeAtualUltimaMovimentacao);
+      }
+
+      return quantidadeAtualUltimaMovimentacao;
+    }
+
+    return capacidadePadraoMaquina > 0 ? capacidadePadraoMaquina : null;
+  }, [
+    isFuncionarioAbastecedor,
+    capacidadePadraoMaquina,
+    quantidadeAtualUltimaMovimentacao,
+  ]);
+
+  useEffect(() => {
+    if (!isFuncionarioAbastecedor || quantidadeBaseAbastecedor === null) return;
+
+    setFormData((prev) => {
+      const valorPadrao = String(quantidadeBaseAbastecedor);
+      if (String(prev.quantidadeAtualMaquina || "") === valorPadrao) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        quantidadeAtualMaquina: valorPadrao,
+      };
+    });
+  }, [isFuncionarioAbastecedor, quantidadeBaseAbastecedor]);
+
   const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
     const textoCodificado = encodeURIComponent(mensagem);
     const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
@@ -889,6 +945,11 @@ export default function MovimentacaoMaquina() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (isFuncionarioAbastecedor && name === "quantidadeAtualMaquina") {
+      return;
+    }
+
     if (name === "usarContadorManual") {
       const vaiUsarDigital = Boolean(checked);
       const tipoContador = vaiUsarDigital ? "digital" : "mecanico";
@@ -1002,11 +1063,36 @@ export default function MovimentacaoMaquina() {
           ]
         : [];
 
+      const quantidadeAdicionadaInformada =
+        parseInt(formData.quantidadeAdicionada, 10) || 0;
+
+      const estoqueAlvoAbastecedor =
+        quantidadeBaseAbastecedor !== null
+          ? quantidadeBaseAbastecedor
+          : capacidadePadraoMaquina > 0
+            ? capacidadePadraoMaquina
+            : parseInt(formData.quantidadeAtualMaquina, 10) || 0;
+
+      const quantidadeAdicionadaAjustada = isFuncionarioAbastecedor
+        ? estoqueAlvoAbastecedor > 0
+          ? Math.max(
+              0,
+              Math.min(quantidadeAdicionadaInformada, estoqueAlvoAbastecedor),
+            )
+          : Math.max(0, quantidadeAdicionadaInformada)
+        : quantidadeAdicionadaInformada;
+
+      const totalPreAjustado = isFuncionarioAbastecedor
+        ? estoqueAlvoAbastecedor > 0
+          ? Math.max(0, estoqueAlvoAbastecedor - quantidadeAdicionadaAjustada)
+          : parseInt(formData.quantidadeAtualMaquina, 10) || 0
+        : parseInt(formData.quantidadeAtualMaquina, 10) || 0;
+
       const payload = {
         maquinaId: maquinaId,
         roteiroId: roteiroId,
-        totalPre: parseInt(formData.quantidadeAtualMaquina) || 0,
-        abastecidas: parseInt(formData.quantidadeAdicionada) || 0,
+        totalPre: totalPreAjustado,
+        abastecidas: quantidadeAdicionadaAjustada,
         fichas: parseInt(formData.fichas) || 0,
         contadorInAnterior: isPrimeiraMovimentacao
           ? contadorInAnteriorInformado
@@ -1449,9 +1535,12 @@ export default function MovimentacaoMaquina() {
                   className="input-field"
                   placeholder="0"
                   min="0"
+                  disabled={isFuncionarioAbastecedor}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Quantos produtos tem agora
+                  {isFuncionarioAbastecedor
+                    ? "Para abastecedor, este campo usa a maior quantidade entre capacidade padrão e estoque atual da última movimentação"
+                    : "Quantos produtos tem agora"}
                 </p>
                 {quantidadeAtualSugerida !== null && (
                   <p className="text-xs text-indigo-700 mt-1 font-semibold">
