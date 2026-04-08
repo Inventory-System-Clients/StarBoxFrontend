@@ -338,7 +338,12 @@ export default function MovimentacaoMaquina() {
             );
           })(),
           usarContadorManual: usarContadorDigitalInicial,
-          quantidadeAtualMaquina: prev.quantidadeAtualMaquina,
+          quantidadeAtualMaquina:
+            prev.quantidadeAtualMaquina !== ""
+              ? prev.quantidadeAtualMaquina
+              : !ultimaMovimentacao && capacidadePadrao > 0
+                ? String(capacidadePadrao)
+                : prev.quantidadeAtualMaquina,
         }));
       } catch {
         setError("Erro ao carregar dados da máquina ou produtos.");
