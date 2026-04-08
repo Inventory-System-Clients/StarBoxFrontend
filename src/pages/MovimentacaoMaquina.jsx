@@ -1074,18 +1074,11 @@ export default function MovimentacaoMaquina() {
             : parseInt(formData.quantidadeAtualMaquina, 10) || 0;
 
       const quantidadeAdicionadaAjustada = isFuncionarioAbastecedor
-        ? estoqueAlvoAbastecedor > 0
-          ? Math.max(
-              0,
-              Math.min(quantidadeAdicionadaInformada, estoqueAlvoAbastecedor),
-            )
-          : Math.max(0, quantidadeAdicionadaInformada)
+        ? Math.max(0, quantidadeAdicionadaInformada)
         : quantidadeAdicionadaInformada;
 
       const totalPreAjustado = isFuncionarioAbastecedor
-        ? estoqueAlvoAbastecedor > 0
-          ? Math.max(0, estoqueAlvoAbastecedor - quantidadeAdicionadaAjustada)
-          : parseInt(formData.quantidadeAtualMaquina, 10) || 0
+        ? Math.max(0, estoqueAlvoAbastecedor)
         : parseInt(formData.quantidadeAtualMaquina, 10) || 0;
 
       const payload = {
