@@ -1486,6 +1486,17 @@ export default function MovimentacaoMaquina() {
                   </div>
                 )}
 
+                {!formData.ignoreInOut && resumoPreConfirmacao && (
+                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Pré-cálculo antes de salvar
+                    </p>
+                    <p className="text-xs text-emerald-800 mt-1">
+                      Contador entrada anterior: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | Contador entrada atual: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença contador entrada: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
+                    </p>
+                  </div>
+                )}
+
                 {alertaDivergencia && (
                   <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
                     <p className="text-xs font-bold text-yellow-800 mb-1">
@@ -1696,17 +1707,6 @@ export default function MovimentacaoMaquina() {
                     </p>
                   </div>
                 </label>
-              </div>
-            )}
-
-            {!formData.ignoreInOut && resumoPreConfirmacao && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <p className="text-sm font-semibold text-emerald-900">
-                  Pré-cálculo antes de salvar
-                </p>
-                <p className="text-xs text-emerald-800 mt-1">
-                  Contador entrada anterior: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | Contador entrada atual: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença contador entrada: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
-                </p>
               </div>
             )}
 
