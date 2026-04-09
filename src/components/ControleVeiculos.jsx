@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import { reconhecerAlertaRevisao } from "../services/revisoesVeiculos";
 import {
+  obterKmInicialPilotagemAtiva,
   removerKmInicialPilotagemAtiva,
   salvarKmInicialPilotagemAtiva,
 } from "../lib/roteiroFinalizacaoWhatsApp";
@@ -385,6 +386,17 @@ export default function ControleVeiculos({
 
   const finalizarVeiculo = async () => {
     if (!veiculoSelecionado || finalizando) return;
+
+    if (!usuarioPodeFinalizarPilotagem(veiculoSelecionado)) {
+      Swal.fire({
+        icon: "warning",
+        title: "Veículo em uso",
+        text: "Somente o usuário que iniciou a pilotagem pode finalizar este veículo.",
+        confirmButtonColor: "#62A1D9",
+      });
+      return;
+    }
+
     const kmValue =
       formFinalizar.km === "" ? 0 : parseInt(formFinalizar.km, 10);
     // Bloqueio: não pode finalizar com KM menor que o da última movimentação
@@ -551,6 +563,44 @@ export default function ControleVeiculos({
 
   const [ultimasMovs, setUltimasMovs] = useState({});
 
+  const normalizarId = (valor) => String(valor ?? "").trim();
+
+  const obterUsuarioDaPilotagemAtiva = (veiculo) => {
+    const ultimaMov = ultimasMovs?.[veiculo?.id];
+    const tipoUltimaMov = String(ultimaMov?.tipo || "").toLowerCase();
+
+    if (tipoUltimaMov === "devolucao") return "";
+
+    const candidatos = [
+      ultimaMov?.usuarioId,
+      ultimaMov?.usuario?.id,
+      veiculo?.usuarioPilotagemId,
+      veiculo?.usuarioIdEmUso,
+      veiculo?.usuarioId,
+      veiculo?.usuario?.id,
+    ];
+
+    return candidatos.map(normalizarId).find(Boolean) || "";
+  };
+
+  const usuarioPodeFinalizarPilotagem = (veiculo) => {
+    if (!veiculo?.emUso) return false;
+
+    const usuarioDaPilotagem = obterUsuarioDaPilotagemAtiva(veiculo);
+    const usuarioLogadoId = normalizarId(usuario?.id);
+
+    if (usuarioDaPilotagem) {
+      return usuarioDaPilotagem === usuarioLogadoId;
+    }
+
+    const kmInicialLocal = obterKmInicialPilotagemAtiva({
+      usuarioId: usuario?.id,
+      veiculoId: veiculo?.id,
+    });
+
+    return Number.isFinite(Number(kmInicialLocal));
+  };
+
   useEffect(() => {
     // Busca a última movimentação de cada veículo
     async function fetchUltimasMovs() {
@@ -645,6 +695,7 @@ export default function ControleVeiculos({
       <div className="flex flex-wrap gap-6">
         {veiculosLista.map((veiculo) => {
           const mov = ultimasMovs[veiculo.id];
+          const podeFinalizarPilotagem = usuarioPodeFinalizarPilotagem(veiculo);
           const isRuim = mov?.estado?.toLowerCase() === "ruim";
           const precisaLimpar = mov?.nivel_limpeza
             ?.toLowerCase()
@@ -756,12 +807,22 @@ export default function ControleVeiculos({
                   <div className="absolute top-2 right-2 bg-black text-white text-xs px-2 py-1 rounded">
                     Em uso
                   </div>
-                  <button
-                    className="mt-2 px-4 py-1 bg-[#733D38] text-white rounded hover:bg-[#A6806A]"
-                    onClick={() => abrirModalFinalizar(veiculo)}
-                  >
-                    Finalizar
-                  </button>
+                  {podeFinalizarPilotagem ? (
+                    <button
+                      className="mt-2 px-4 py-1 bg-[#733D38] text-white rounded hover:bg-[#A6806A]"
+                      onClick={() => abrirModalFinalizar(veiculo)}
+                    >
+                      Finalizar
+                    </button>
+                  ) : (
+                    <button
+                      className="mt-2 px-4 py-1 bg-gray-400 text-white rounded cursor-not-allowed"
+                      disabled
+                      title="Somente quem iniciou a pilotagem pode finalizar"
+                    >
+                      Em uso
+                    </button>
+                  )}
                 </>
               )}
 

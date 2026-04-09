@@ -454,7 +454,10 @@ export function Roteiros() {
     }
   };
 
-  const usuarioTemPilotagemAtiva = async (validarParaTodosPerfis = false) => {
+  const usuarioTemPilotagemAtiva = async (
+    validarParaTodosPerfis = false,
+    roteiroAtual = null,
+  ) => {
     if (
       !validarParaTodosPerfis &&
       usuario?.role !== "FUNCIONARIO_TODAS_LOJAS"
@@ -468,7 +471,24 @@ export function Roteiros() {
         api.get("/veiculos"),
       ]);
 
-      const usuarioId = String(usuario?.id || "");
+      const usuarioId = String(usuario?.id || "").trim();
+      const veiculoRoteiroId = String(
+        roteiroAtual?.veiculoId || roteiroAtual?.veiculo?.id || "",
+      ).trim();
+
+      if (!usuarioId) return false;
+
+      if (veiculoRoteiroId) {
+        const kmInicialLocal = obterKmInicialPilotagemAtiva({
+          usuarioId,
+          veiculoId: veiculoRoteiroId,
+        });
+
+        if (Number.isFinite(kmInicialLocal)) {
+          return true;
+        }
+      }
+
       const veiculosLista = Array.isArray(veiculosRes.data)
         ? veiculosRes.data
         : [];
@@ -481,14 +501,15 @@ export function Roteiros() {
       const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
         const usuarioMovId = String(
           mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
-        );
+        ).trim();
         const tipoMov = String(mov?.tipo || "").toLowerCase();
-        const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
+        const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "").trim();
         const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
 
         return (
           usuarioMovId === usuarioId &&
           tipoMov === "retirada" &&
+          (!veiculoRoteiroId || veiculoId === veiculoRoteiroId) &&
           Boolean(veiculo?.emUso)
         );
       });
@@ -501,9 +522,14 @@ export function Roteiros() {
             veiculo?.funcionarioId ||
             veiculo?.condutorId ||
             "",
-        );
+        ).trim();
+        const veiculoId = String(veiculo?.id || "").trim();
 
-        return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
+        return (
+          Boolean(veiculo?.emUso) &&
+          usuarioVeiculoId === usuarioId &&
+          (!veiculoRoteiroId || veiculoId === veiculoRoteiroId)
+        );
       });
 
       return temRetiradaAtiva || temVinculoDiretoNoVeiculo;
@@ -524,7 +550,7 @@ export function Roteiros() {
     );
 
     if (roteiroTemVeiculoAssociado(roteiroAtual)) {
-      const podeProsseguir = await usuarioTemPilotagemAtiva();
+      const podeProsseguir = await usuarioTemPilotagemAtiva(false, roteiroAtual);
       if (!podeProsseguir) {
         const mensagemBloqueio =
           "Voce precisa iniciar a pilotagem de um veiculo antes de comecar o roteiro. Voce sera redirecionado para a aba de veiculos.";
@@ -672,7 +698,7 @@ export function Roteiros() {
       return true;
     }
 
-    const temPilotagemAtiva = await usuarioTemPilotagemAtiva(true);
+    const temPilotagemAtiva = await usuarioTemPilotagemAtiva(true, roteiroAtual);
     if (!temPilotagemAtiva) return true;
 
     const mensagemBloqueio =
