@@ -133,4 +133,19 @@ export const pecasDefeituosasAPI = {
   },
 };
 
+export const basesSecundariasAPI = {
+  listar: async () => {
+    const response = await api.get(`/dashboard/bases-secundarias`);
+    return response.data;
+  },
+  criar: async (baseData) => {
+    const response = await api.post(`/dashboard/bases-secundarias`, baseData);
+    return response.data;
+  },
+  editar: async (id, baseData) => {
+    const response = await api.put(`/dashboard/bases-secundarias/${id}`, baseData);
+    return response.data;
+  },
+};
+
 export default api;

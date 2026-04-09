@@ -20,7 +20,7 @@ async function buscarSaldosDepositoPrincipal(produtoIds, api) {
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import api from "../services/api";
+import api, { basesSecundariasAPI } from "../services/api";
 import { gerarPdfComissao } from "../lib/pdfComissao";
 import { listarRevisoesPendentes } from "../services/revisoesVeiculos";
 import Navbar from "../components/Navbar";
@@ -290,6 +290,24 @@ export function Dashboard() {
     balanco: null,
     loading: true,
   });
+  const [basesSecundarias, setBasesSecundarias] = useState([]);
+  const [loadingBasesSecundarias, setLoadingBasesSecundarias] = useState(false);
+  const [erroBasesSecundarias, setErroBasesSecundarias] = useState("");
+  const [modalBaseSecundariaAberto, setModalBaseSecundariaAberto] =
+    useState(false);
+  const [salvandoBaseSecundaria, setSalvandoBaseSecundaria] = useState(false);
+  const [baseSecundariaEditando, setBaseSecundariaEditando] = useState(null);
+  const [formBaseSecundaria, setFormBaseSecundaria] = useState({
+    nomeBase: "",
+    ativo: true,
+  });
+  const [produtosSelecionadosBaseSecundaria, setProdutosSelecionadosBaseSecundaria] =
+    useState([]);
+  const [quantidadePorProdutoBaseSecundaria, setQuantidadePorProdutoBaseSecundaria] =
+    useState({});
+  const [buscaProdutoBaseSecundaria, setBuscaProdutoBaseSecundaria] =
+    useState("");
+  const [errosFormBaseSecundaria, setErrosFormBaseSecundaria] = useState({});
 
   // Estados para busca e navegação
 
@@ -305,6 +323,298 @@ export function Dashboard() {
   const [vendasPorProduto, setVendasPorProduto] = useState([]);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+
+  const isAdminEstrito = usuario?.role === "ADMIN";
+
+  const normalizarBaseSecundaria = useCallback((base) => {
+    const quantidadeNumerica = Number(base?.quantidadeProdutos);
+    return {
+      id: base?.id || `base-${Date.now()}`,
+      nomeBase: String(base?.nomeBase || ""),
+      quantidadeProdutos: Number.isNaN(quantidadeNumerica)
+        ? 0
+        : quantidadeNumerica,
+      modelosProdutos: String(base?.modelosProdutos || ""),
+      ativo: Boolean(base?.ativo ?? true),
+      createdAt: base?.createdAt || null,
+      updatedAt: base?.updatedAt || null,
+    };
+  }, []);
+
+  const formatarDataAtualizacaoBaseSecundaria = useCallback((dataTexto) => {
+    if (!dataTexto) return "Não informado";
+    const data = new Date(dataTexto);
+    if (Number.isNaN(data.getTime())) return "Não informado";
+    return data.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, []);
+
+  const carregarBasesSecundarias = useCallback(async () => {
+    if (!isAdminEstrito) {
+      setBasesSecundarias([]);
+      setLoadingBasesSecundarias(false);
+      setErroBasesSecundarias("");
+      return;
+    }
+
+    try {
+      setLoadingBasesSecundarias(true);
+      setErroBasesSecundarias("");
+      const payload = await basesSecundariasAPI.listar();
+      const listaBases = Array.isArray(payload) ? payload : [];
+      setBasesSecundarias(listaBases.map(normalizarBaseSecundaria));
+    } catch (error) {
+      console.error("Erro ao carregar bases secundarias:", error);
+      setErroBasesSecundarias(
+        error?.response?.data?.message ||
+          "Não foi possível carregar as bases secundárias.",
+      );
+      setBasesSecundarias([]);
+    } finally {
+      setLoadingBasesSecundarias(false);
+    }
+  }, [isAdminEstrito, normalizarBaseSecundaria]);
+
+  const abrirModalCriarBaseSecundaria = () => {
+    setBaseSecundariaEditando(null);
+    setErrosFormBaseSecundaria({});
+    setProdutosSelecionadosBaseSecundaria([]);
+    setQuantidadePorProdutoBaseSecundaria({});
+    setBuscaProdutoBaseSecundaria("");
+    setFormBaseSecundaria({
+      nomeBase: "",
+      ativo: true,
+    });
+    setModalBaseSecundariaAberto(true);
+  };
+
+  const abrirModalEditarBaseSecundaria = (base) => {
+    const modelosTexto = String(base?.modelosProdutos || "");
+    const itensModelos = modelosTexto
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const produtosSelecionados = [];
+    const quantidadesMap = {};
+
+    for (const itemModelo of itensModelos) {
+      const matchComParenteses = itemModelo.match(/^(.*)\((\d+)\)$/);
+      const matchComX = itemModelo.match(/^(.*)\s+x\s*(\d+)$/i);
+
+      let nomeProduto = itemModelo;
+      let quantidade = 1;
+
+      if (matchComParenteses) {
+        nomeProduto = matchComParenteses[1].trim();
+        quantidade = Number.parseInt(matchComParenteses[2], 10) || 1;
+      } else if (matchComX) {
+        nomeProduto = matchComX[1].trim();
+        quantidade = Number.parseInt(matchComX[2], 10) || 1;
+      }
+
+      const produtoEncontrado = (produtos || []).find(
+        (produto) =>
+          String(produto?.nome || "").trim().toLowerCase() ===
+          nomeProduto.toLowerCase(),
+      );
+
+      if (!produtoEncontrado) continue;
+
+      const produtoId = String(produtoEncontrado.id);
+      if (!produtosSelecionados.includes(produtoId)) {
+        produtosSelecionados.push(produtoId);
+      }
+
+      quantidadesMap[produtoId] = String(
+        (Number.parseInt(quantidadesMap[produtoId], 10) || 0) + quantidade,
+      );
+    }
+
+    const quantidadeTotalBase = Number.parseInt(base?.quantidadeProdutos, 10) || 0;
+    const somaQuantidades = produtosSelecionados.reduce(
+      (acc, produtoId) => acc + (Number.parseInt(quantidadesMap[produtoId], 10) || 0),
+      0,
+    );
+
+    if (quantidadeTotalBase > somaQuantidades && produtosSelecionados.length > 0) {
+      const primeiroProdutoId = produtosSelecionados[0];
+      quantidadesMap[primeiroProdutoId] = String(
+        (Number.parseInt(quantidadesMap[primeiroProdutoId], 10) || 0) +
+          (quantidadeTotalBase - somaQuantidades),
+      );
+    }
+
+    setBaseSecundariaEditando(base);
+    setErrosFormBaseSecundaria({});
+    setProdutosSelecionadosBaseSecundaria(produtosSelecionados);
+    setQuantidadePorProdutoBaseSecundaria(quantidadesMap);
+    setBuscaProdutoBaseSecundaria("");
+    setFormBaseSecundaria({
+      nomeBase: base?.nomeBase || "",
+      ativo: base?.ativo ?? true,
+    });
+    setModalBaseSecundariaAberto(true);
+  };
+
+  const fecharModalBaseSecundaria = () => {
+    if (salvandoBaseSecundaria) return;
+    setModalBaseSecundariaAberto(false);
+  };
+
+  const validarFormBaseSecundaria = () => {
+    const erros = {};
+    const nomeBase = (formBaseSecundaria.nomeBase || "").trim();
+
+    if (!nomeBase) {
+      erros.nomeBase = "O nome da base é obrigatório.";
+    }
+
+    const possuiQuantidadeInvalida = produtosSelecionadosBaseSecundaria.some(
+      (produtoId) => {
+        const quantidade = Number.parseInt(
+          quantidadePorProdutoBaseSecundaria[produtoId],
+          10,
+        );
+        return !Number.isInteger(quantidade) || quantidade < 0;
+      },
+    );
+
+    if (possuiQuantidadeInvalida) {
+      erros.quantidadeProdutos =
+        "A quantidade por produto deve ser um inteiro maior ou igual a zero.";
+    }
+
+    setErrosFormBaseSecundaria(erros);
+    return Object.keys(erros).length === 0;
+  };
+
+  const salvarBaseSecundaria = async (e) => {
+    e.preventDefault();
+
+    if (!isAdminEstrito || salvandoBaseSecundaria) return;
+    if (!validarFormBaseSecundaria()) return;
+
+    const produtosSelecionadosComQuantidade = (produtos || [])
+      .filter((produto) =>
+        produtosSelecionadosBaseSecundaria.includes(String(produto.id)),
+      )
+      .map((produto) => {
+        const produtoId = String(produto.id);
+        const quantidade =
+          Number.parseInt(quantidadePorProdutoBaseSecundaria[produtoId], 10) || 0;
+
+        return {
+          nome: String(produto.nome || "").trim(),
+          quantidade,
+        };
+      })
+      .filter(Boolean);
+
+    const quantidadeTotalProdutos = produtosSelecionadosComQuantidade.reduce(
+      (acc, item) => acc + item.quantidade,
+      0,
+    );
+
+    const payload = {
+      nomeBase: formBaseSecundaria.nomeBase.trim(),
+      quantidadeProdutos: quantidadeTotalProdutos,
+      modelosProdutos: produtosSelecionadosComQuantidade
+        .map((item) => `${item.nome} (${item.quantidade})`)
+        .join(", "),
+      ativo: Boolean(formBaseSecundaria.ativo),
+    };
+
+    try {
+      setSalvandoBaseSecundaria(true);
+      let baseAtualizada;
+
+      if (baseSecundariaEditando?.id) {
+        const resposta = await basesSecundariasAPI.editar(
+          baseSecundariaEditando.id,
+          payload,
+        );
+        baseAtualizada = normalizarBaseSecundaria({
+          ...baseSecundariaEditando,
+          ...payload,
+          ...(resposta || {}),
+        });
+
+        setBasesSecundarias((prev) =>
+          prev.map((base) =>
+            base.id === baseSecundariaEditando.id ? baseAtualizada : base,
+          ),
+        );
+      } else {
+        const resposta = await basesSecundariasAPI.criar(payload);
+        baseAtualizada = normalizarBaseSecundaria(resposta || payload);
+
+        setBasesSecundarias((prev) => [baseAtualizada, ...prev]);
+      }
+
+      setModalBaseSecundariaAberto(false);
+      Swal.fire({
+        icon: "success",
+        title: "Sucesso",
+        text: baseSecundariaEditando
+          ? "Base secundária atualizada com sucesso."
+          : "Base secundária adicionada com sucesso.",
+        confirmButtonColor: "#fbbf24",
+      });
+    } catch (error) {
+      console.error("Erro ao salvar base secundaria:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Erro ao salvar",
+        text:
+          error?.response?.data?.message ||
+          "Não foi possível salvar a base secundária.",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setSalvandoBaseSecundaria(false);
+    }
+  };
+
+  const toggleProdutoBaseSecundaria = (produtoId) => {
+    setProdutosSelecionadosBaseSecundaria((prev) => {
+      const idTexto = String(produtoId);
+      if (prev.includes(idTexto)) {
+        setQuantidadePorProdutoBaseSecundaria((quantidadesPrev) => {
+          const proximo = { ...quantidadesPrev };
+          delete proximo[idTexto];
+          return proximo;
+        });
+        return prev.filter((item) => item !== idTexto);
+      }
+
+      setQuantidadePorProdutoBaseSecundaria((quantidadesPrev) => ({
+        ...quantidadesPrev,
+        [idTexto]: quantidadesPrev[idTexto] || "1",
+      }));
+
+      return [...prev, idTexto];
+    });
+  };
+
+  const atualizarQuantidadeProdutoBaseSecundaria = (produtoId, valorDigitado) => {
+    const somenteNumeros = String(valorDigitado || "").replace(/\D/g, "");
+    setQuantidadePorProdutoBaseSecundaria((prev) => ({
+      ...prev,
+      [String(produtoId)]: somenteNumeros,
+    }));
+  };
+
+  const produtosFiltradosBaseSecundaria = (produtos || []).filter((produto) => {
+    const termoBusca = buscaProdutoBaseSecundaria.trim().toLowerCase();
+    if (!termoBusca) return true;
+    return String(produto?.nome || "").toLowerCase().includes(termoBusca);
+  });
 
   const extrairTimestampMovimentacao = (mov) => {
     const valorData =
@@ -847,6 +1157,10 @@ export function Dashboard() {
 
     return () => clearInterval(interval);
   }, [usuario?.role]);
+
+  useEffect(() => {
+    carregarBasesSecundarias();
+  }, [carregarBasesSecundarias]);
 
   const abrirDetalheAlertaInatividade = () => {
     const linhasHtml = alertaInatividadeLojas.lojas
@@ -2664,6 +2978,106 @@ export function Dashboard() {
                 <span className="text-2xl">🏭</span> Ver Depósito
               </button>
             </div>
+          </div>
+        )}
+
+        {isAdminEstrito && (
+          <div className="card-gradient mb-8 border-l-4 border-cyan-500 p-4 sm:p-8 rounded-xl shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                  <span className="bg-linear-to-br from-cyan-500 to-cyan-700 p-2 sm:p-3 rounded-xl text-white">
+                    🧱
+                  </span>
+                  Bases Secundarias
+                </h2>
+                <p className="text-gray-600 text-sm sm:text-base">
+                  Controle informativo por base: quantidade de produtos e
+                  modelos cadastrados.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2 rounded-lg shadow transition-colors"
+                onClick={abrirModalCriarBaseSecundaria}
+              >
+                Adicionar base secundaria
+              </button>
+            </div>
+
+            {loadingBasesSecundarias ? (
+              <div className="rounded-lg bg-white/70 border border-cyan-100 p-4 text-sm text-cyan-900">
+                Carregando bases secundarias...
+              </div>
+            ) : erroBasesSecundarias ? (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                <p className="text-sm text-red-700 mb-3">{erroBasesSecundarias}</p>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg"
+                  onClick={carregarBasesSecundarias}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : basesSecundarias.length === 0 ? (
+              <div className="rounded-lg bg-white/70 border border-gray-200 p-5 text-center">
+                <p className="text-4xl mb-2">📭</p>
+                <p className="text-gray-700 font-semibold">
+                  Nenhuma base secundária cadastrada.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {basesSecundarias.map((base) => (
+                  <article
+                    key={base.id}
+                    className="bg-white border border-cyan-100 rounded-xl p-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {base.nomeBase}
+                      </h3>
+                      <span
+                        className={`text-xs font-bold px-2 py-1 rounded-full ${
+                          base.ativo
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {base.ativo ? "Ativa" : "Inativa"}
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>Quantidade de produtos:</strong>{" "}
+                      {base.quantidadeProdutos}
+                    </p>
+
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>Modelos:</strong>{" "}
+                      {base.modelosProdutos || "Não informado"}
+                    </p>
+
+                    <p className="text-xs text-gray-500 mb-4">
+                      Última atualização:{" "}
+                      {formatarDataAtualizacaoBaseSecundaria(base.updatedAt)}
+                    </p>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold"
+                        onClick={() => abrirModalEditarBaseSecundaria(base)}
+                      >
+                        Editar
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -4545,6 +4959,199 @@ export function Dashboard() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isAdminEstrito && modalBaseSecundariaAberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+            <div className="bg-linear-to-r from-cyan-600 to-cyan-700 p-5 text-white">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl sm:text-2xl font-bold">
+                  {baseSecundariaEditando
+                    ? "Editar Base Secundaria"
+                    : "Adicionar Base Secundaria"}
+                </h2>
+                <button
+                  type="button"
+                  onClick={fecharModalBaseSecundaria}
+                  disabled={salvandoBaseSecundaria}
+                  className="rounded-lg p-2 hover:bg-white/20 transition-colors"
+                  aria-label="Fechar modal"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={salvarBaseSecundaria} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Nome da base*
+                </label>
+                <input
+                  type="text"
+                  value={formBaseSecundaria.nomeBase}
+                  onChange={(e) =>
+                    setFormBaseSecundaria((prev) => ({
+                      ...prev,
+                      nomeBase: e.target.value,
+                    }))
+                  }
+                  className="input-primary w-full border border-black"
+                  placeholder="Ex.: Base Secundaria 02"
+                  maxLength={120}
+                />
+                {errosFormBaseSecundaria.nomeBase && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {errosFormBaseSecundaria.nomeBase}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Quantidade total de produtos
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={produtosSelecionadosBaseSecundaria.reduce(
+                    (acc, produtoId) =>
+                      acc +
+                      (Number.parseInt(
+                        quantidadePorProdutoBaseSecundaria[produtoId],
+                        10,
+                      ) ||
+                        0),
+                    0,
+                  )}
+                  readOnly
+                  className="input-primary w-full border border-black"
+                />
+                {errosFormBaseSecundaria.quantidadeProdutos && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {errosFormBaseSecundaria.quantidadeProdutos}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Produtos cadastrados
+                </label>
+                <input
+                  type="text"
+                  value={buscaProdutoBaseSecundaria}
+                  onChange={(e) =>
+                    setBuscaProdutoBaseSecundaria(e.target.value)
+                  }
+                  className="input-primary w-full border border-black"
+                  placeholder="Buscar produto por nome"
+                />
+
+                <div className="mt-3 border border-gray-200 rounded-lg max-h-52 overflow-y-auto p-2 space-y-1 bg-gray-50">
+                  {produtosFiltradosBaseSecundaria.length === 0 ? (
+                    <p className="text-xs text-gray-500 p-2">
+                      Nenhum produto encontrado.
+                    </p>
+                  ) : (
+                    produtosFiltradosBaseSecundaria.map((produto) => {
+                      const produtoId = String(produto.id);
+                      const marcado =
+                        produtosSelecionadosBaseSecundaria.includes(produtoId);
+
+                      return (
+                        <div
+                          key={produtoId}
+                          className="flex items-center gap-2 text-sm text-gray-700 p-2 rounded hover:bg-white"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() =>
+                              toggleProdutoBaseSecundaria(produtoId)
+                            }
+                            className="w-4 h-4"
+                          />
+                          <span className="text-base">{produto?.emoji || "📦"}</span>
+                          <span className="flex-1">
+                            {produto?.nome || "Produto sem nome"}
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={
+                              quantidadePorProdutoBaseSecundaria[produtoId] || ""
+                            }
+                            onChange={(e) =>
+                              atualizarQuantidadeProdutoBaseSecundaria(
+                                produtoId,
+                                e.target.value,
+                              )
+                            }
+                            disabled={!marcado}
+                            placeholder="Qtd"
+                            className="w-20 px-2 py-1 border border-gray-300 rounded bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                          />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-600 mt-2">
+                  {produtosSelecionadosBaseSecundaria.length} produto(s)
+                  selecionado(s).
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  id="base-secundaria-ativo"
+                  type="checkbox"
+                  checked={formBaseSecundaria.ativo}
+                  onChange={(e) =>
+                    setFormBaseSecundaria((prev) => ({
+                      ...prev,
+                      ativo: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4"
+                />
+                <label
+                  htmlFor="base-secundaria-ativo"
+                  className="text-sm text-gray-700 font-medium"
+                >
+                  Base ativa
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={fecharModalBaseSecundaria}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50"
+                  disabled={salvandoBaseSecundaria}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-semibold"
+                  disabled={salvandoBaseSecundaria}
+                >
+                  {salvandoBaseSecundaria
+                    ? "Salvando..."
+                    : baseSecundariaEditando
+                      ? "Salvar edição"
+                      : "Adicionar base"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
