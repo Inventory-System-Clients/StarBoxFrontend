@@ -901,6 +901,11 @@ export default function RoteiroExecucao() {
 
     const validarPilotagemAtivaUsuario = async () => {
       try {
+        const veiculoRoteiroId = String(
+          roteiro?.veiculoId || roteiro?.veiculo?.id || "",
+        ).trim();
+        if (!veiculoRoteiroId) return false;
+
         const [ultimasMovRes, veiculosRes] = await Promise.all([
           api.get("/movimentacao-veiculos/ultimas"),
           api.get("/veiculos"),
@@ -910,40 +915,61 @@ export default function RoteiroExecucao() {
         const veiculosLista = Array.isArray(veiculosRes.data)
           ? veiculosRes.data
           : [];
+        const veiculoDoRoteiro = veiculosLista.find(
+          (veiculo) => String(veiculo?.id || "") === veiculoRoteiroId,
+        );
+
+        if (!veiculoDoRoteiro?.emUso) {
+          return false;
+        }
 
         const ultimasMovObj = ultimasMovRes.data || {};
         const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
           ? ultimasMovObj
           : Object.values(ultimasMovObj);
 
-        const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
-          const usuarioMovId = String(
-            mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
-          );
-          const tipoMov = String(mov?.tipo || "").toLowerCase();
-          const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
-          const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
+        const ultimaMovimentacaoVeiculoRoteiro = ultimasMovimentacoes.find(
+          (mov) =>
+            String(mov?.veiculoId || mov?.veiculo?.id || "") ===
+            veiculoRoteiroId,
+        );
 
-          return (
-            usuarioMovId === usuarioId &&
-            tipoMov === "retirada" &&
-            Boolean(veiculo?.emUso)
-          );
+        const usuarioUltimaMovimentacao = String(
+          ultimaMovimentacaoVeiculoRoteiro?.usuario?.id ||
+            ultimaMovimentacaoVeiculoRoteiro?.usuarioId ||
+            ultimaMovimentacaoVeiculoRoteiro?.funcionarioId ||
+            "",
+        );
+        const tipoUltimaMovimentacao = String(
+          ultimaMovimentacaoVeiculoRoteiro?.tipo || "",
+        ).toLowerCase();
+
+        const temRetiradaAtivaDoUsuarioNoVeiculoDoRoteiro =
+          tipoUltimaMovimentacao === "retirada" &&
+          usuarioUltimaMovimentacao === usuarioId;
+
+        if (temRetiradaAtivaDoUsuarioNoVeiculoDoRoteiro) {
+          return true;
+        }
+
+        const usuarioVinculadoAoVeiculo = String(
+          veiculoDoRoteiro?.usuario?.id ||
+            veiculoDoRoteiro?.usuarioId ||
+            veiculoDoRoteiro?.funcionarioId ||
+            veiculoDoRoteiro?.condutorId ||
+            "",
+        );
+
+        if (usuarioVinculadoAoVeiculo === usuarioId) {
+          return true;
+        }
+
+        const kmInicialPilotagemAtiva = obterKmInicialPilotagemAtiva({
+          usuarioId,
+          veiculoId: veiculoRoteiroId,
         });
 
-        const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
-          const usuarioVeiculoId = String(
-            veiculo?.usuario?.id ||
-              veiculo?.usuarioId ||
-              veiculo?.funcionarioId ||
-              veiculo?.condutorId ||
-              "",
-          );
-
-          return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
-        });
-
-        return temRetiradaAtiva || temVinculoDiretoNoVeiculo;
+        return Number.isFinite(Number(kmInicialPilotagemAtiva));
       } catch {
         setError(
           "Não foi possível validar a pilotagem do veículo. Tente novamente em instantes.",
@@ -1515,6 +1541,14 @@ export default function RoteiroExecucao() {
   const abrirModalFinalizacao = async () => {
     if (roteiroTemVeiculoAssociado(roteiro)) {
       try {
+        const veiculoRoteiroId = String(
+          roteiro?.veiculoId || roteiro?.veiculo?.id || "",
+        ).trim();
+        if (!veiculoRoteiroId) {
+          setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+          return;
+        }
+
         const [ultimasMovRes, veiculosRes] = await Promise.all([
           api.get("/movimentacao-veiculos/ultimas"),
           api.get("/veiculos"),
@@ -1524,40 +1558,59 @@ export default function RoteiroExecucao() {
         const veiculosLista = Array.isArray(veiculosRes.data)
           ? veiculosRes.data
           : [];
+        const veiculoDoRoteiro = veiculosLista.find(
+          (veiculo) => String(veiculo?.id || "") === veiculoRoteiroId,
+        );
+
+        if (!veiculoDoRoteiro?.emUso) {
+          setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+          return;
+        }
 
         const ultimasMovObj = ultimasMovRes.data || {};
         const ultimasMovimentacoes = Array.isArray(ultimasMovObj)
           ? ultimasMovObj
           : Object.values(ultimasMovObj);
 
-        const temRetiradaAtiva = ultimasMovimentacoes.some((mov) => {
-          const usuarioMovId = String(
-            mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
-          );
-          const tipoMov = String(mov?.tipo || "").toLowerCase();
-          const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "");
-          const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
+        const ultimaMovimentacaoVeiculoRoteiro = ultimasMovimentacoes.find(
+          (mov) =>
+            String(mov?.veiculoId || mov?.veiculo?.id || "") ===
+            veiculoRoteiroId,
+        );
 
-          return (
-            usuarioMovId === usuarioId &&
-            tipoMov === "retirada" &&
-            Boolean(veiculo?.emUso)
-          );
+        const usuarioUltimaMovimentacao = String(
+          ultimaMovimentacaoVeiculoRoteiro?.usuario?.id ||
+            ultimaMovimentacaoVeiculoRoteiro?.usuarioId ||
+            ultimaMovimentacaoVeiculoRoteiro?.funcionarioId ||
+            "",
+        );
+        const tipoUltimaMovimentacao = String(
+          ultimaMovimentacaoVeiculoRoteiro?.tipo || "",
+        ).toLowerCase();
+
+        const temRetiradaAtivaDoUsuarioNoVeiculoDoRoteiro =
+          tipoUltimaMovimentacao === "retirada" &&
+          usuarioUltimaMovimentacao === usuarioId;
+
+        const usuarioVinculadoAoVeiculo = String(
+          veiculoDoRoteiro?.usuario?.id ||
+            veiculoDoRoteiro?.usuarioId ||
+            veiculoDoRoteiro?.funcionarioId ||
+            veiculoDoRoteiro?.condutorId ||
+            "",
+        );
+
+        const kmInicialPilotagemAtiva = obterKmInicialPilotagemAtiva({
+          usuarioId,
+          veiculoId: veiculoRoteiroId,
         });
 
-        const temVinculoDiretoNoVeiculo = veiculosLista.some((veiculo) => {
-          const usuarioVeiculoId = String(
-            veiculo?.usuario?.id ||
-              veiculo?.usuarioId ||
-              veiculo?.funcionarioId ||
-              veiculo?.condutorId ||
-              "",
-          );
+        const usuarioTemPilotagemNoVeiculoDoRoteiro =
+          temRetiradaAtivaDoUsuarioNoVeiculoDoRoteiro ||
+          usuarioVinculadoAoVeiculo === usuarioId ||
+          Number.isFinite(Number(kmInicialPilotagemAtiva));
 
-          return Boolean(veiculo?.emUso) && usuarioVeiculoId === usuarioId;
-        });
-
-        if (temRetiradaAtiva || temVinculoDiretoNoVeiculo) {
+        if (usuarioTemPilotagemNoVeiculoDoRoteiro) {
           const mensagemBloqueio =
             "Para finalizar a rota, finalize primeiro a pilotagem do veículo. Você será redirecionado para Veículos.";
 
