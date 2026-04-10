@@ -2183,7 +2183,7 @@ export default function RoteiroExecucao() {
           </button>
           <button
             className="bg-gray-200 text-gray-700 py-2 px-6 rounded-lg font-bold"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/roteiros", { replace: true })}
           >
             Voltar
           </button>
