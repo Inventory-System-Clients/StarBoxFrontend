@@ -157,8 +157,7 @@ export default function ModalEditarMovimentacao({
 
   const totalPosCalculado = possuiDadosQuantidade
     ? (parseInt(formData.totalPre, 10) || 0) +
-      (parseInt(formData.abastecidas, 10) || 0) -
-      (parseInt(formData.sairam, 10) || 0)
+      (parseInt(formData.abastecidas, 10) || 0)
     : null;
 
   const valorFaturadoCalculado =
