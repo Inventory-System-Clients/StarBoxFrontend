@@ -150,12 +150,16 @@ export default function ModalEditarMovimentacao({
   };
 
   // Calcular valores automáticos (apenas para exibição)
-  const totalPosCalculado =
-    formData.totalPre && formData.abastecidas
-      ? parseInt(formData.totalPre) +
-        parseInt(formData.abastecidas) -
-        (parseInt(formData.sairam) || 0)
-      : null;
+  const possuiDadosQuantidade =
+    formData.totalPre !== "" ||
+    formData.abastecidas !== "" ||
+    formData.sairam !== "";
+
+  const totalPosCalculado = possuiDadosQuantidade
+    ? (parseInt(formData.totalPre, 10) || 0) +
+      (parseInt(formData.abastecidas, 10) || 0) -
+      (parseInt(formData.sairam, 10) || 0)
+    : null;
 
   const valorFaturadoCalculado =
     (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
