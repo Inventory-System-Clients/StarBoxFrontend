@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { salvarMovimentacaoWhatsAppPendenteLoja } from "../lib/roteiroFinalizacaoWhatsApp";
 
 export default function MovimentacaoMaquina() {
   const { roteiroId, lojaId, maquinaId } = useParams();
@@ -1217,11 +1218,19 @@ export default function MovimentacaoMaquina() {
         await enviarMovimentacao(true);
       }
 
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
       const mensagemWhatsApp = montarResumoWhatsApp();
-      const abriuWhatsApp = abrirWhatsAppComMensagem(
-        mensagemWhatsApp,
-        popupReservado,
-      );
+      salvarMovimentacaoWhatsAppPendenteLoja({
+        roteiroId,
+        usuarioId: usuario?.id,
+        lojaId,
+        maquinaId,
+        maquinaNome: maquina?.nome || maquina?.codigo || maquinaId,
+        mensagem: mensagemWhatsApp,
+      });
+      const abriuWhatsApp = true;
 
       if (!abriuWhatsApp) {
         setSuccess(
