@@ -639,6 +639,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
   lojasComManutencao,
   lojasSemManutencao,
   resumoConsumoProdutos,
+  maquinasComEdicao,
 }) => {
   const totalUsadas = Number.isFinite(Number(totalPeluciasUsadas))
     ? Number(totalPeluciasUsadas)
@@ -697,6 +698,10 @@ export const montarMensagemFinalizacaoRoteiro = ({
     Number.isFinite(consumoResumo.estoqueInicialTotal) &&
     Number.isFinite(consumoResumo.estoqueFinalTotal) &&
     Number.isFinite(consumoResumo.consumoTotalProdutos);
+  const maquinasComEdicaoLista = normalizarListaNomes(
+    toArray(maquinasComEdicao),
+    "nome",
+  );
   const linhasKm = possuiVeiculoAssociado
     ? [
         `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
@@ -731,6 +736,11 @@ export const montarMensagemFinalizacaoRoteiro = ({
 
     `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,
     `Manutencoes nao realizadas por ponto: ${formatarLista(manutencoesNaoFeitasPorPonto)}`,
+    ...(maquinasComEdicaoLista.length > 0
+      ? [
+          `Rota finalizada com edicao na maquina: ${formatarLista(maquinasComEdicaoLista)}`,
+        ]
+      : []),
   ].join("\n");
 };
 

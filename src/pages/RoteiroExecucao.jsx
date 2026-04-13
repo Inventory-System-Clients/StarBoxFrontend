@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
 import { Modal, AlertBox } from "../components/UIComponents";
 import ManutencaoModal from "../components/ManutencaoModal";
+import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 import { useAuth } from "../contexts/AuthContext";
 import {
   abrirWhatsAppComMensagem,
@@ -85,6 +86,27 @@ export default function RoteiroExecucao() {
     lojasSemManutencao: [],
   });
   const [tiposMaquinaPorId, setTiposMaquinaPorId] = useState({});
+  const [ultimasMovimentacoesPorMaquina, setUltimasMovimentacoesPorMaquina] =
+    useState({});
+  const [modalJustificativaEdicao, setModalJustificativaEdicao] = useState({
+    aberto: false,
+    justificativa: "",
+    maquina: null,
+    movimentacao: null,
+  });
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [movimentacaoParaEditar, setMovimentacaoParaEditar] = useState(null);
+  const [maquinasEditadasNaRota, setMaquinasEditadasNaRota] = useState([]);
+  const popupEdicaoMovimentacaoRef = useRef(null);
+
+  const perfisPermitidosEditarMovimentacaoRota = new Set([
+    "FUNCIONARIO",
+    "FUNCIONARIO_TODAS_LOJAS",
+    "ABASTECEDOR",
+    "FUNCIONARIO_ABASTECEDOR",
+  ]);
+  const EDICOES_MOVIMENTACAO_ROTA_STORAGE_PREFIX =
+    "starbox:roteiro:edicoes-movimentacao:";
 
   const lojaEstaConcluida = (status) =>
     ["concluido", "concluida", "finalizado", "finalizada"].includes(
@@ -116,6 +138,57 @@ export default function RoteiroExecucao() {
     Boolean(
       String(roteiroAtual?.veiculoId || roteiroAtual?.veiculo?.id || "").trim(),
     );
+
+  const roleUsuarioNormalizado = String(usuario?.role || "")
+    .trim()
+    .toUpperCase();
+  const usuarioPodeEditarMovimentacaoNaRota =
+    perfisPermitidosEditarMovimentacaoRota.has(roleUsuarioNormalizado) ||
+    roleUsuarioNormalizado.includes("FUNCIONARIO") ||
+    roleUsuarioNormalizado.includes("ABASTECEDOR");
+
+  const obterChaveEdicoesMovimentacaoRota = () => {
+    const roteiroId = String(id || "").trim();
+    const usuarioId = String(roteiro?.funcionarioId || usuario?.id || "").trim();
+    if (!roteiroId || !usuarioId) return "";
+    return `${EDICOES_MOVIMENTACAO_ROTA_STORAGE_PREFIX}${usuarioId}:${roteiroId}`;
+  };
+
+  const carregarEdicoesMovimentacaoRota = () => {
+    const chave = obterChaveEdicoesMovimentacaoRota();
+    if (!chave) return [];
+
+    try {
+      const bruto = window.localStorage.getItem(chave);
+      if (!bruto) return [];
+      const lista = JSON.parse(bruto);
+      return Array.isArray(lista) ? lista : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const salvarEdicoesMovimentacaoRota = (lista) => {
+    const chave = obterChaveEdicoesMovimentacaoRota();
+    if (!chave) return;
+
+    try {
+      window.localStorage.setItem(chave, JSON.stringify(lista));
+    } catch {
+      // Sem bloqueio de fluxo caso localStorage falhe.
+    }
+  };
+
+  const limparEdicoesMovimentacaoRota = () => {
+    const chave = obterChaveEdicoesMovimentacaoRota();
+    if (!chave) return;
+
+    try {
+      window.localStorage.removeItem(chave);
+    } catch {
+      // Sem bloqueio de fluxo caso localStorage falhe.
+    }
+  };
 
   const STATUS_MANUTENCAO_REALIZADA = new Set([
     "feito",
@@ -251,6 +324,224 @@ export default function RoteiroExecucao() {
       maquina?.modelo?.nome,
     ) || "Não informado";
 
+  const normalizarMovimentacoes = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.rows)) return payload.rows;
+    if (Array.isArray(payload?.movimentacoes)) return payload.movimentacoes;
+    if (payload && typeof payload === "object") {
+      const valores = Object.values(payload);
+      if (Array.isArray(valores)) return valores;
+    }
+    return [];
+  };
+
+  const normalizarIdTexto = (valor) =>
+    String(valor || "")
+      .trim()
+      .toLowerCase();
+
+  const obterUsuarioMovimentacao = (movimentacao) =>
+    normalizarIdTexto(
+      movimentacao?.usuarioId ||
+        movimentacao?.usuario_id ||
+        movimentacao?.funcionarioId ||
+        movimentacao?.funcionario_id ||
+        movimentacao?.userId ||
+        movimentacao?.createdBy ||
+        movimentacao?.usuario?.id ||
+        movimentacao?.funcionario?.id ||
+        "",
+    );
+
+  const obterUltimaMovimentacaoPorMaquina = (maquinaId) =>
+    ultimasMovimentacoesPorMaquina[String(maquinaId || "")] || null;
+
+  const podeEditarUltimaMovimentacaoDaMaquina = (maquina) => {
+    // Exibir para todas as roles quando a máquina já está finalizada.
+    return maquinaEstaConcluida(maquina?.status);
+  };
+
+  const registrarMaquinaEditadaNaRota = (maquina) => {
+    const maquinaId = String(maquina?.id || "").trim();
+    if (!maquinaId) return;
+
+    const nomeMaquina = obterNomeMaquinaExibicao(maquina);
+    const tipoMaquina = obterTipoMaquinaExibicao(maquina);
+
+    setMaquinasEditadasNaRota((prev) => {
+      const jaExiste = prev.some(
+        (item) => String(item?.id || "").trim() === maquinaId,
+      );
+      if (jaExiste) return prev;
+
+      const proximaLista = [
+        ...prev,
+        { id: maquinaId, nome: nomeMaquina, tipo: tipoMaquina },
+      ];
+      salvarEdicoesMovimentacaoRota(proximaLista);
+      return proximaLista;
+    });
+  };
+
+  const buscarUltimaMovimentacaoDaMaquina = async (maquinaId) => {
+    const resposta = await api.get("/movimentacoes", {
+      params: {
+        maquinaId,
+        limite: 1,
+      },
+    });
+
+    const lista = normalizarMovimentacoes(resposta?.data);
+    const listaOrdenada = Array.isArray(lista)
+      ? [...lista].sort((a, b) => {
+          const dataA = new Date(
+            a?.dataColeta || a?.createdAt || a?.updatedAt || 0,
+          ).getTime();
+          const dataB = new Date(
+            b?.dataColeta || b?.createdAt || b?.updatedAt || 0,
+          ).getTime();
+          if (dataA !== dataB) return dataB - dataA;
+          return String(b?.id || "").localeCompare(String(a?.id || ""));
+        })
+      : [];
+
+    return listaOrdenada[0] || null;
+  };
+
+  const abrirFluxoJustificativaEdicao = async (maquina) => {
+    let ultimaMov = obterUltimaMovimentacaoPorMaquina(maquina?.id);
+    if (!ultimaMov?.id) {
+      try {
+        ultimaMov = await buscarUltimaMovimentacaoDaMaquina(maquina?.id);
+        if (ultimaMov?.id) {
+          setUltimasMovimentacoesPorMaquina((prev) => ({
+            ...prev,
+            [String(maquina?.id || "")]: ultimaMov,
+          }));
+        }
+      } catch {
+        // Mensagem abaixo cobre falha de busca.
+      }
+    }
+
+    if (!ultimaMov?.id) {
+      setError(
+        "Não foi possível identificar a última movimentação desta máquina para edição.",
+      );
+      return;
+    }
+
+    setModalJustificativaEdicao({
+      aberto: true,
+      justificativa: "",
+      maquina,
+      movimentacao: {
+        ...ultimaMov,
+        maquina: ultimaMov?.maquina || {
+          id: maquina?.id,
+          nome: obterNomeMaquinaExibicao(maquina),
+          codigo: maquina?.codigo,
+          tipo: obterTipoMaquinaExibicao(maquina),
+          modelo: maquina?.modelo,
+          valorFicha: maquina?.valorFicha,
+        },
+      },
+    });
+  };
+
+  const confirmarJustificativaEdicao = () => {
+    const justificativa = String(modalJustificativaEdicao?.justificativa || "").trim();
+    if (!justificativa) {
+      setError("Informe a justificativa para editar a última movimentação.");
+      return;
+    }
+
+    const maquina = modalJustificativaEdicao?.maquina;
+    const movimentacao = modalJustificativaEdicao?.movimentacao;
+
+    popupEdicaoMovimentacaoRef.current = window.open("about:blank", "_blank");
+
+    const mensagemWhatsApp = [
+      "STAR BOX",
+      "*Solicitação de edição de movimentação na rota*",
+      `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+      `Roteiro: ${roteiro?.nome || "-"}`,
+      `Funcionário: ${usuario?.nome || "-"}`,
+      `Loja: ${lojaSelecionada?.nome || maquina?.loja?.nome || "-"}`,
+      `Máquina: ${obterNomeMaquinaExibicao(maquina)} | Tipo: ${obterTipoMaquinaExibicao(maquina)}`,
+      `Movimentação: ${movimentacao?.id || "-"}`,
+      "___________________________________",
+      `Justificativa: ${justificativa}`,
+    ].join("\n");
+
+    const abriuWhatsApp = abrirWhatsAppComMensagem(
+      mensagemWhatsApp,
+      popupEdicaoMovimentacaoRef.current,
+    );
+    popupEdicaoMovimentacaoRef.current = null;
+
+    if (!abriuWhatsApp) {
+      setSuccess(
+        "Justificativa registrada, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
+      );
+    }
+
+    setMovimentacaoParaEditar(modalJustificativaEdicao.movimentacao);
+    setModalEdicaoAberto(true);
+    setModalJustificativaEdicao({
+      aberto: false,
+      justificativa: "",
+      maquina: null,
+      movimentacao: null,
+    });
+  };
+
+  const fecharModalJustificativaEdicao = () => {
+    if (
+      popupEdicaoMovimentacaoRef.current &&
+      !popupEdicaoMovimentacaoRef.current.closed
+    ) {
+      popupEdicaoMovimentacaoRef.current.close();
+    }
+    popupEdicaoMovimentacaoRef.current = null;
+    setModalJustificativaEdicao({
+      aberto: false,
+      justificativa: "",
+      maquina: null,
+      movimentacao: null,
+    });
+  };
+
+  const atualizarMovimentacaoEditadaNaRota = (movimentacaoAtualizada) => {
+    const maquinaId = String(
+      movimentacaoAtualizada?.maquinaId || movimentacaoAtualizada?.maquina?.id || "",
+    ).trim();
+
+    if (maquinaId) {
+      setUltimasMovimentacoesPorMaquina((prev) => ({
+        ...prev,
+        [maquinaId]: {
+          ...movimentacaoAtualizada,
+          maquina:
+            movimentacaoAtualizada?.maquina ||
+            prev?.[maquinaId]?.maquina ||
+            null,
+        },
+      }));
+    }
+
+    const maquinaFonte =
+      (lojaSelecionada?.maquinas || []).find(
+        (item) => String(item?.id || "").trim() === maquinaId,
+      ) ||
+      movimentacaoAtualizada?.maquina ||
+      null;
+
+    if (maquinaFonte) {
+      registrarMaquinaEditadaNaRota(maquinaFonte);
+    }
+  };
+
   useEffect(() => {
     const carregarTiposFaltantes = async () => {
       const maquinasSelecionadas = Array.isArray(lojaSelecionada?.maquinas)
@@ -312,6 +603,70 @@ export default function RoteiroExecucao() {
     carregarTiposFaltantes();
   }, [lojaSelecionada, tiposMaquinaPorId]);
 
+  useEffect(() => {
+    const carregarUltimasMovimentacoesDaLoja = async () => {
+      const maquinasSelecionadas = Array.isArray(lojaSelecionada?.maquinas)
+        ? lojaSelecionada.maquinas
+        : [];
+
+      if (maquinasSelecionadas.length === 0) {
+        setUltimasMovimentacoesPorMaquina({});
+        return;
+      }
+
+      const respostas = await Promise.allSettled(
+        maquinasSelecionadas.map((maquina) =>
+          api.get("/movimentacoes", {
+            params: {
+              maquinaId: maquina.id,
+              limite: 1,
+            },
+          }),
+        ),
+      );
+
+      const ultimasPorMaquina = {};
+      respostas.forEach((resultado, index) => {
+        if (resultado.status !== "fulfilled") return;
+
+        const maquina = maquinasSelecionadas[index];
+        const lista = normalizarMovimentacoes(resultado.value?.data);
+        const listaOrdenada = Array.isArray(lista)
+          ? [...lista].sort((a, b) => {
+              const dataA = new Date(
+                a?.dataColeta || a?.createdAt || a?.updatedAt || 0,
+              ).getTime();
+              const dataB = new Date(
+                b?.dataColeta || b?.createdAt || b?.updatedAt || 0,
+              ).getTime();
+              if (dataA !== dataB) return dataB - dataA;
+              return String(b?.id || "").localeCompare(String(a?.id || ""));
+            })
+          : [];
+        const ultimaMovimentacao = listaOrdenada[0] || null;
+
+        if (ultimaMovimentacao?.id) {
+          ultimasPorMaquina[String(maquina.id)] = {
+            ...ultimaMovimentacao,
+            maquina:
+              ultimaMovimentacao?.maquina || {
+                id: maquina?.id,
+                nome: obterNomeMaquinaExibicao(maquina),
+                codigo: maquina?.codigo,
+                tipo: obterTipoMaquinaExibicao(maquina),
+                modelo: maquina?.modelo,
+                valorFicha: maquina?.valorFicha,
+              },
+          };
+        }
+      });
+
+      setUltimasMovimentacoesPorMaquina(ultimasPorMaquina);
+    };
+
+    carregarUltimasMovimentacoesDaLoja();
+  }, [lojaSelecionada]);
+
   const carregarDadosRoteiroExecucao = async (roteiroId) => {
     const endpoints = [
       `/roteiros/${roteiroId}/executar`,
@@ -343,6 +698,10 @@ export default function RoteiroExecucao() {
   useEffect(() => {
     carregarRoteiro();
   }, [id]);
+
+  useEffect(() => {
+    setMaquinasEditadasNaRota(carregarEdicoesMovimentacaoRota());
+  }, [id, roteiro?.funcionarioId, usuario?.id]);
 
   useEffect(() => {
     if (!roteiro?.id) return;
@@ -1585,6 +1944,9 @@ export default function RoteiroExecucao() {
         totalManutencoesRealizadas,
         lojasComManutencao,
         lojasSemManutencao,
+        maquinasComEdicao: maquinasEditadasNaRota.map(
+          (item) => `${item.nome} (Tipo: ${item.tipo})`,
+        ),
         resumoConsumoProdutos:
           saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null
             ? {
@@ -1621,6 +1983,8 @@ export default function RoteiroExecucao() {
           setSuccess("Resumo do roteiro enviado para confirmação no WhatsApp.");
         }
 
+        limparEdicoesMovimentacaoRota();
+        setMaquinasEditadasNaRota([]);
         setModalFinalizar({ aberto: false, etapa: 1, loading: false });
         await carregarRoteiro();
         return;
@@ -1663,6 +2027,8 @@ export default function RoteiroExecucao() {
         roteiroId: id,
         usuarioId: usuarioReferenciaId,
       });
+      limparEdicoesMovimentacaoRota();
+      setMaquinasEditadasNaRota([]);
 
       setModalFinalizar({ aberto: false, etapa: 1, loading: false });
       await carregarRoteiro();
@@ -1955,6 +2321,7 @@ export default function RoteiroExecucao() {
             <div
               className={`h-full transition-all ${
                 saldoGastoHoje <= 0
+
                   ? "bg-red-500"
                   : percentualSaldo < 0.25
                     ? "bg-yellow-500"
@@ -2257,29 +2624,42 @@ export default function RoteiroExecucao() {
                     const maquinaConcluida = maquinaEstaConcluida(
                       maquina.status,
                     );
+                    const podeEditarUltimaMovimentacao =
+                      podeEditarUltimaMovimentacaoDaMaquina(maquina);
                     return (
-                      <button
-                        key={maquina.id}
-                        className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
+                      <div key={maquina.id} className="flex items-center gap-2">
+                        <button
+                          className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
                       ${maquinaConcluida ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
                       ${maquinaConcluida ? "opacity-70 cursor-not-allowed" : ""}`}
-                        onClick={() => {
-                          if (maquinaConcluida) return;
-                          navigate(
-                            `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
-                          );
-                        }}
-                        disabled={maquinaConcluida}
-                      >
-                        <span>
-                          🖲️ {obterNomeMaquinaExibicao(maquina)} - Tipo: {obterTipoMaquinaExibicao(maquina)}
-                        </span>
-                        {maquinaConcluida && (
-                          <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
-                            Finalizada
+                          onClick={() => {
+                            if (maquinaConcluida) return;
+                            navigate(
+                              `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
+                            );
+                          }}
+                          disabled={maquinaConcluida}
+                        >
+                          <span>
+                            🖲️ {obterNomeMaquinaExibicao(maquina)} - Tipo: {obterTipoMaquinaExibicao(maquina)}
                           </span>
+                          {maquinaConcluida && (
+                            <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
+                              Finalizada
+                            </span>
+                          )}
+                        </button>
+
+                        {podeEditarUltimaMovimentacao && (
+                          <button
+                            className="px-3 py-2 rounded border border-amber-500 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100"
+                            onClick={() => abrirFluxoJustificativaEdicao(maquina)}
+                            title="Editar apenas a última movimentação feita por você"
+                          >
+                            Editar última movimentação
+                          </button>
                         )}
-                      </button>
+                      </div>
                     );
                   })(),
                 )
@@ -2509,6 +2889,70 @@ export default function RoteiroExecucao() {
             </div>
           </div>
         </Modal>
+
+        <Modal
+          isOpen={modalJustificativaEdicao.aberto}
+          onClose={fecharModalJustificativaEdicao}
+          title="Justificativa para editar movimentação"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-50 border-l-4 border-amber-400 rounded">
+              <p className="text-sm text-amber-900 font-semibold">
+                Antes de editar, informe obrigatoriamente o motivo. Esta
+                justificativa será enviada no WhatsApp.
+              </p>
+              {modalJustificativaEdicao?.maquina && (
+                <p className="text-xs text-amber-800 mt-2">
+                  Máquina: {obterNomeMaquinaExibicao(modalJustificativaEdicao.maquina)} | Tipo: {obterTipoMaquinaExibicao(modalJustificativaEdicao.maquina)}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Motivo da edição *
+              </label>
+              <textarea
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-300 outline-none"
+                rows="4"
+                placeholder="Explique por que você precisa editar esta movimentação..."
+                value={modalJustificativaEdicao.justificativa}
+                onChange={(e) =>
+                  setModalJustificativaEdicao((prev) => ({
+                    ...prev,
+                    justificativa: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="btn-secondary"
+                onClick={fecharModalJustificativaEdicao}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={confirmarJustificativaEdicao}
+              >
+                Continuar para edição
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {modalEdicaoAberto && movimentacaoParaEditar && (
+          <ModalEditarMovimentacao
+            movimentacao={movimentacaoParaEditar}
+            bloquearDataColeta={true}
+            onClose={() => {
+              setModalEdicaoAberto(false);
+              setMovimentacaoParaEditar(null);
+            }}
+            onSucesso={atualizarMovimentacaoEditadaNaRota}
+          />
+        )}
 
         <ManutencaoModal
           isOpen={modalManutencao}

@@ -28,6 +28,7 @@ export default function ModalEditarMovimentacao({
   movimentacao,
   onClose,
   onSucesso,
+  bloquearDataColeta = false,
 }) {
   const { usuario } = useAuth();
   const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
@@ -108,7 +109,9 @@ export default function ModalEditarMovimentacao({
           ? formData.observacoes || null
           : null,
         tipoOcorrencia: formData.tipoOcorrencia || "Normal",
-        dataColeta: formData.dataColeta || null,
+        dataColeta: bloquearDataColeta
+          ? movimentacao?.dataColeta || null
+          : formData.dataColeta || null,
       };
 
       // Enviar requisição PUT
@@ -166,19 +169,20 @@ export default function ModalEditarMovimentacao({
     >
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
-          {/* Data da Coleta */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              📅 Data da Coleta
-            </label>
-            <input
-              type="datetime-local"
-              name="dataColeta"
-              value={formData.dataColeta}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          {!bloquearDataColeta && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📅 Data da Coleta
+              </label>
+              <input
+                type="datetime-local"
+                name="dataColeta"
+                value={formData.dataColeta}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          )}
 
           {/* QUANTIDADES */}
           <div>
