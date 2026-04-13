@@ -74,7 +74,9 @@ export default function MovimentacaoMaquina() {
 
   const salvarTipoContadorMaquina = (idMaquina, tipo) => {
     const chave = obterChaveTipoContadorMaquina(idMaquina);
-    const tipoNormalizado = String(tipo || "").trim().toLowerCase();
+    const tipoNormalizado = String(tipo || "")
+      .trim()
+      .toLowerCase();
 
     if (
       !chave ||
@@ -239,24 +241,26 @@ export default function MovimentacaoMaquina() {
       try {
         const [maqRes, prodRes, ultimoProdRes, movRes, estoqueUsuarioRes] =
           await Promise.all([
-          api.get(`/maquinas/${maquinaId}`),
-          api.get("/produtos"),
-          api
-            .get(`/maquinas/${maquinaId}/ultimo-produto`)
-            .catch(() => ({ data: { produtoId: null } })),
-          api
-            .get(`/movimentacoes?maquinaId=${maquinaId}&limite=1`)
-            .catch(() => ({ data: [] })),
-          isPerfilFuncionario
-            ? api
-                .get("/estoque-usuarios/me")
-                .catch(() => ({ data: { estoque: [] } }))
-            : Promise.resolve({ data: { estoque: [] } }),
-        ]);
+            api.get(`/maquinas/${maquinaId}`),
+            api.get("/produtos"),
+            api
+              .get(`/maquinas/${maquinaId}/ultimo-produto`)
+              .catch(() => ({ data: { produtoId: null } })),
+            api
+              .get(`/movimentacoes?maquinaId=${maquinaId}&limite=1`)
+              .catch(() => ({ data: [] })),
+            isPerfilFuncionario
+              ? api
+                  .get("/estoque-usuarios/me")
+                  .catch(() => ({ data: { estoque: [] } }))
+              : Promise.resolve({ data: { estoque: [] } }),
+          ]);
         setMaquina(maqRes.data);
 
         const listaProdutos = Array.isArray(prodRes.data) ? prodRes.data : [];
-        const estoqueUsuarioData = Array.isArray(estoqueUsuarioRes?.data?.estoque)
+        const estoqueUsuarioData = Array.isArray(
+          estoqueUsuarioRes?.data?.estoque,
+        )
           ? estoqueUsuarioRes.data.estoque
           : Array.isArray(estoqueUsuarioRes?.data)
             ? estoqueUsuarioRes.data
@@ -309,9 +313,8 @@ export default function MovimentacaoMaquina() {
           maqRes.data?.capacidadePadrao ?? maqRes.data?.capacidade ?? 0,
         );
         const tipoContadorSalvo = obterTipoContadorSalvo(maquinaId);
-        const tipoContadorInferido = inferirTipoContadorMovimentacao(
-          ultimaMovimentacao,
-        );
+        const tipoContadorInferido =
+          inferirTipoContadorMovimentacao(ultimaMovimentacao);
         const tipoContadorInicial =
           tipoContadorSalvo || tipoContadorInferido || "mecanico";
         const usarContadorDigitalInicial = tipoContadorInicial === "digital";
@@ -522,12 +525,7 @@ export default function MovimentacaoMaquina() {
     );
 
     return Number.isFinite(fallback) ? Math.max(0, Math.round(fallback)) : null;
-  }, [
-    formData,
-    resumoCalculo,
-    isPrimeiraMovimentacao,
-    ultimaMovimentacao,
-  ]);
+  }, [formData, resumoCalculo, isPrimeiraMovimentacao, ultimaMovimentacao]);
 
   useEffect(() => {
     if (!maquina || !isPrimeiraMovimentacao) return;
@@ -598,7 +596,10 @@ export default function MovimentacaoMaquina() {
     }
 
     const camposContadorAtivo = obterCamposContadorAtivo(formData);
-    const contadorOutDigitado = parseInt(camposContadorAtivo.contadorOutAtual, 10);
+    const contadorOutDigitado = parseInt(
+      camposContadorAtivo.contadorOutAtual,
+      10,
+    );
     const totalPreInformado = parseInt(formData.quantidadeAtualMaquina, 10);
 
     if (!resumoCalculo) {
@@ -710,7 +711,9 @@ export default function MovimentacaoMaquina() {
   };
 
   const capacidadePadraoMaquina = useMemo(() => {
-    const numero = Number(maquina?.capacidadePadrao ?? maquina?.capacidade ?? 0);
+    const numero = Number(
+      maquina?.capacidadePadrao ?? maquina?.capacidade ?? 0,
+    );
     return Number.isFinite(numero) && numero > 0 ? Math.round(numero) : 0;
   }, [maquina?.capacidadePadrao, maquina?.capacidade]);
 
@@ -736,7 +739,10 @@ export default function MovimentacaoMaquina() {
 
     if (quantidadeAtualUltimaMovimentacao !== null) {
       if (capacidadePadraoMaquina > 0) {
-        return Math.max(capacidadePadraoMaquina, quantidadeAtualUltimaMovimentacao);
+        return Math.max(
+          capacidadePadraoMaquina,
+          quantidadeAtualUltimaMovimentacao,
+        );
       }
 
       return quantidadeAtualUltimaMovimentacao;
@@ -765,20 +771,46 @@ export default function MovimentacaoMaquina() {
     });
   }, [isFuncionarioAbastecedor, quantidadeBaseAbastecedor]);
 
-  const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
-    const textoCodificado = encodeURIComponent(mensagem);
-    const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
-      navigator.userAgent,
+  const isDispositivoMovel = () => {
+    if (typeof window === "undefined" || typeof navigator === "undefined") {
+      return false;
+    }
+
+    if (navigator.userAgentData?.mobile) {
+      return true;
+    }
+
+    const userAgent = String(
+      navigator.userAgent || navigator.vendor || window.opera || "",
     );
 
-    // No desktop, usar WhatsApp Web evita abrir automaticamente no app Business.
-    const whatsappUrl = isMobile
-      ? `https://wa.me/?text=${textoCodificado}`
-      : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+    return (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(
+        userAgent,
+      ) ||
+      (navigator.maxTouchPoints > 1 && /Macintosh/i.test(userAgent))
+    );
+  };
+
+  const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
+    const textoCodificado = encodeURIComponent(mensagem);
+    const isMobile = isDispositivoMovel();
+    const whatsappAppUrl = `whatsapp://send?text=${textoCodificado}`;
+    const whatsappMobileFallbackUrl = `https://wa.me/?text=${textoCodificado}`;
+    const whatsappDesktopUrl = `https://web.whatsapp.com/send?text=${textoCodificado}`;
+    const whatsappUrl = isMobile ? whatsappAppUrl : whatsappDesktopUrl;
 
     if (popupReservado && !popupReservado.closed) {
       popupReservado.location.href = whatsappUrl;
       popupReservado.focus?.();
+
+      if (isMobile) {
+        window.setTimeout(() => {
+          if (popupReservado.closed) return;
+          popupReservado.location.href = whatsappMobileFallbackUrl;
+        }, 1200);
+      }
+
       return true;
     }
 
@@ -789,6 +821,12 @@ export default function MovimentacaoMaquina() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    if (isMobile) {
+      window.setTimeout(() => {
+        window.location.href = whatsappMobileFallbackUrl;
+      }, 1200);
+    }
 
     return true;
   };
@@ -833,7 +871,10 @@ export default function MovimentacaoMaquina() {
     const { inAnterior, inAtual, outAnterior, outAtual } =
       obterResumoContadores();
 
-    const diferencaIn = Math.max(0, Number(inAtual || 0) - Number(inAnterior || 0));
+    const diferencaIn = Math.max(
+      0,
+      Number(inAtual || 0) - Number(inAnterior || 0),
+    );
     const diferencaOut = Math.max(
       0,
       Number(outAtual || 0) - Number(outAnterior || 0),
@@ -1052,7 +1093,8 @@ export default function MovimentacaoMaquina() {
             {
               produtoId: formData.produto_id,
               quantidadeSaiu: 0,
-              quantidadeAbastecida: parseInt(formData.quantidadeAdicionada) || 0,
+              quantidadeAbastecida:
+                parseInt(formData.quantidadeAdicionada) || 0,
               retiradaProduto: parseInt(formData.retiradaProduto) || 0,
               retiradaProdutoDevolverEstoque:
                 formData.retiradaProdutoDevolverEstoque || false,
@@ -1323,7 +1365,10 @@ export default function MovimentacaoMaquina() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs font-semibold text-indigo-700 mb-1">
-                        Contador entrada anterior: {formatarValorConfirmacao(resumoContadoresPreview.inAnterior)}
+                        Contador entrada anterior:{" "}
+                        {formatarValorConfirmacao(
+                          resumoContadoresPreview.inAnterior,
+                        )}
                       </p>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         📥 Contador Entrada Mecânico (Entrada)
@@ -1348,7 +1393,10 @@ export default function MovimentacaoMaquina() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-indigo-700 mb-1">
-                        OUT anterior: {formatarValorConfirmacao(resumoContadoresPreview.outAnterior)}
+                        OUT anterior:{" "}
+                        {formatarValorConfirmacao(
+                          resumoContadoresPreview.outAnterior,
+                        )}
                       </p>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         📤 Contador Saída Mecânico (Saída)
@@ -1396,7 +1444,10 @@ export default function MovimentacaoMaquina() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div>
                       <p className="text-xs font-semibold text-indigo-700 mb-1">
-                        Contador entrada: {formatarValorConfirmacao(resumoContadoresPreview.inAnterior)}
+                        Contador entrada:{" "}
+                        {formatarValorConfirmacao(
+                          resumoContadoresPreview.inAnterior,
+                        )}
                       </p>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         📥 Contador Entrada Digital
@@ -1421,7 +1472,10 @@ export default function MovimentacaoMaquina() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-indigo-700 mb-1">
-                        OUT anterior: {formatarValorConfirmacao(resumoContadoresPreview.outAnterior)}
+                        OUT anterior:{" "}
+                        {formatarValorConfirmacao(
+                          resumoContadoresPreview.outAnterior,
+                        )}
                       </p>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         📤 Contador Saída Digital
@@ -1474,8 +1528,7 @@ export default function MovimentacaoMaquina() {
                       {resumoCalculo.contadorOutSugerido || 0}
                     </p>
                     <p className="text-xs text-indigo-700">
-                      Era para ter na máquina:{" "}
-                      {quantidadeAtualSugerida ?? 0}
+                      Era para ter na máquina: {quantidadeAtualSugerida ?? 0}
                     </p>
                     <p className="text-xs text-indigo-700">
                       Sugestão de abastecimento: {sugestaoAbastecimento ?? 0}
@@ -1489,7 +1542,16 @@ export default function MovimentacaoMaquina() {
                       Pré-cálculo antes de salvar
                     </p>
                     <p className="text-xs text-emerald-800 mt-1">
-                      Jogou tanto antes: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | Jogou tanto agora: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença de jogadas para o atual: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
+                      Jogou tanto antes:{" "}
+                      {formatarValorConfirmacao(
+                        resumoPreConfirmacao.inAnterior,
+                      )}{" "}
+                      | Jogou tanto agora:{" "}
+                      {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} |
+                      Diferença de jogadas para o atual:{" "}
+                      {formatarValorConfirmacao(
+                        resumoPreConfirmacao.diferencaIn,
+                      )}
                     </p>
                   </div>
                 )}
@@ -1545,8 +1607,8 @@ export default function MovimentacaoMaquina() {
                 </p>
                 {quantidadeAtualSugerida !== null && (
                   <p className="text-xs text-indigo-700 mt-1 font-semibold">
-                    Sugestão automática: {quantidadeAtualSugerida} (pela saída do
-                    contador OUT desde a última movimentação)
+                    Sugestão automática: {quantidadeAtualSugerida} (pela saída
+                    do contador OUT desde a última movimentação)
                   </p>
                 )}
               </div>
@@ -1735,16 +1797,28 @@ export default function MovimentacaoMaquina() {
                 </h4>
                 <div className="space-y-1 text-sm text-gray-700">
                   <p>
-                    Contador entrada preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.inAtual)}</strong>
+                    Contador entrada preenchido:{" "}
+                    <strong>
+                      {formatarValorConfirmacao(dadosConfirmacao.inAtual)}
+                    </strong>
                   </p>
                   <p>
-                    Contador saida preenchido: <strong>{formatarValorConfirmacao(dadosConfirmacao.outAtual)}</strong>
+                    Contador saida preenchido:{" "}
+                    <strong>
+                      {formatarValorConfirmacao(dadosConfirmacao.outAtual)}
+                    </strong>
                   </p>
                   <p>
-                    Jogou: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}</strong>
+                    Jogou:{" "}
+                    <strong>
+                      {formatarValorConfirmacao(dadosConfirmacao.diferencaIn)}
+                    </strong>
                   </p>
                   <p>
-                    Saiu: <strong>{formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}</strong>
+                    Saiu:{" "}
+                    <strong>
+                      {formatarValorConfirmacao(dadosConfirmacao.diferencaOut)}
+                    </strong>
                   </p>
                 </div>
                 <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
