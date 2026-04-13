@@ -1489,7 +1489,7 @@ export default function MovimentacaoMaquina() {
                       Pré-cálculo antes de salvar
                     </p>
                     <p className="text-xs text-emerald-800 mt-1">
-                      Contador entrada anterior: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | Contador entrada atual: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença contador entrada: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
+                      Jogou tanto antes: {formatarValorConfirmacao(resumoPreConfirmacao.inAnterior)} | Jogou tanto agora: {formatarValorConfirmacao(resumoPreConfirmacao.inAtual)} | Diferença de jogadas para o atual: {formatarValorConfirmacao(resumoPreConfirmacao.diferencaIn)}
                     </p>
                   </div>
                 )}

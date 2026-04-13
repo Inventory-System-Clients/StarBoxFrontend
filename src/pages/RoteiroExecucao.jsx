@@ -84,6 +84,7 @@ export default function RoteiroExecucao() {
     lojasComManutencao: [],
     lojasSemManutencao: [],
   });
+  const [tiposMaquinaPorId, setTiposMaquinaPorId] = useState({});
 
   const lojaEstaConcluida = (status) =>
     ["concluido", "concluida", "finalizado", "finalizada"].includes(
@@ -220,6 +221,120 @@ export default function RoteiroExecucao() {
     return Number(texto.replace(",", "."));
   };
 
+  const extrairTextoValido = (...valores) => {
+    for (const valor of valores) {
+      if (valor === null || valor === undefined) continue;
+      if (typeof valor === "string") {
+        const texto = valor.trim();
+        if (texto) return texto;
+        continue;
+      }
+      if (typeof valor === "number") {
+        return String(valor);
+      }
+    }
+    return "";
+  };
+
+  const obterNomeMaquinaExibicao = (maquina) =>
+    extrairTextoValido(maquina?.nome, maquina?.codigo) || "-";
+
+  const obterTipoMaquinaExibicao = (maquina) =>
+    extrairTextoValido(
+      tiposMaquinaPorId[String(maquina?.id || "")],
+      maquina?.tipo,
+      maquina?.tipoMaquina,
+      maquina?.modelo,
+      maquina?.modeloMaquina,
+      maquina?.tipoNome,
+      maquina?.tipo?.nome,
+      maquina?.modelo?.nome,
+    ) || "Não informado";
+
+  useEffect(() => {
+    const carregarTiposFaltantes = async () => {
+      const maquinasSelecionadas = Array.isArray(lojaSelecionada?.maquinas)
+        ? lojaSelecionada.maquinas
+        : [];
+
+      const idsParaBuscar = maquinasSelecionadas
+        .map((maquina) => String(maquina?.id || "").trim())
+        .filter(Boolean)
+        .filter((idMaquina) => {
+          const maquina = maquinasSelecionadas.find(
+            (item) => String(item?.id || "").trim() === idMaquina,
+          );
+          const tipoNoPayload = extrairTextoValido(
+            maquina?.tipo,
+            maquina?.tipoMaquina,
+            maquina?.modelo,
+            maquina?.modeloMaquina,
+            maquina?.tipoNome,
+            maquina?.tipo?.nome,
+            maquina?.modelo?.nome,
+          );
+
+          return !tipoNoPayload && !tiposMaquinaPorId[idMaquina];
+        });
+
+      if (idsParaBuscar.length === 0) return;
+
+      const resultados = await Promise.allSettled(
+        idsParaBuscar.map((idMaquina) => api.get(`/maquinas/${idMaquina}`)),
+      );
+
+      const novosTipos = {};
+      resultados.forEach((resultado, index) => {
+        if (resultado.status !== "fulfilled") return;
+
+        const idMaquina = idsParaBuscar[index];
+        const dadosMaquina = resultado.value?.data || {};
+        const tipoResolvido = extrairTextoValido(
+          dadosMaquina?.tipo,
+          dadosMaquina?.tipoMaquina,
+          dadosMaquina?.modelo,
+          dadosMaquina?.modeloMaquina,
+          dadosMaquina?.tipoNome,
+          dadosMaquina?.tipo?.nome,
+          dadosMaquina?.modelo?.nome,
+        );
+
+        if (tipoResolvido) {
+          novosTipos[idMaquina] = tipoResolvido;
+        }
+      });
+
+      if (Object.keys(novosTipos).length > 0) {
+        setTiposMaquinaPorId((prev) => ({ ...prev, ...novosTipos }));
+      }
+    };
+
+    carregarTiposFaltantes();
+  }, [lojaSelecionada, tiposMaquinaPorId]);
+
+  const carregarDadosRoteiroExecucao = async (roteiroId) => {
+    const endpoints = [
+      `/roteiros/${roteiroId}/executar`,
+      `/roteiros/${roteiroId}`,
+    ];
+    let ultimoErro404 = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        return await api.get(endpoint);
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 404) {
+          ultimoErro404 = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw ultimoErro404 || new Error("Roteiro não encontrado.");
+  };
+
   const getLabelCategoriaGasto = (categoria) =>
     CATEGORIAS_GASTO.find((item) => item.value === categoria)?.label ||
     categoria ||
@@ -346,7 +461,7 @@ export default function RoteiroExecucao() {
     try {
       setLoading(true);
       setErroCarregamentoInicial("");
-      const res = await api.get(`/roteiros/${id}/executar`);
+      const res = await carregarDadosRoteiroExecucao(id);
       setRoteiro(res.data);
 
       const usuarioReferenciaId = String(
@@ -444,7 +559,13 @@ export default function RoteiroExecucao() {
 
       console.log("Roteiro carregado:", res.data);
     } catch (err) {
-      setErroCarregamentoInicial("Erro ao buscar roteiro.");
+      if (err?.response?.status === 404) {
+        setErroCarregamentoInicial(
+          "Roteiro não encontrado para execução. Verifique se o roteiro existe ou se o endpoint /executar está disponível no backend.",
+        );
+      } else {
+        setErroCarregamentoInicial("Erro ao buscar roteiro.");
+      }
     } finally {
       setLoading(false);
     }
@@ -489,9 +610,25 @@ export default function RoteiroExecucao() {
           !lojaEstaConcluida(l.status) && !lojasPendentesJustificadas.has(l.id),
       );
 
-      // Se não é a próxima loja na ordem e ainda tem lojas pendentes antes
-      if (
+      const ordemLojaSelecionada = Number(loja?.ordem || 0);
+      const ordemProximaLoja = Number(proximaLoja?.ordem || 0);
+      const indiceLojaSelecionada = lojasOrdenadas.findIndex(
+        (item) => item.id === loja?.id,
+      );
+      const indiceProximaLoja = lojasOrdenadas.findIndex(
+        (item) => item.id === proximaLoja?.id,
+      );
+      const pulouParaFrente =
         proximaLoja &&
+        ((Number.isFinite(ordemLojaSelecionada) &&
+          Number.isFinite(ordemProximaLoja) &&
+          ordemLojaSelecionada > ordemProximaLoja) ||
+          (ordemLojaSelecionada === ordemProximaLoja &&
+            indiceLojaSelecionada > indiceProximaLoja));
+
+      // Solicita justificativa apenas quando a seleção quebrar a ordem para frente.
+      if (
+        pulouParaFrente &&
         proximaLoja.id !== loja.id &&
         !lojaEstaConcluida(loja.status)
       ) {
@@ -2134,9 +2271,8 @@ export default function RoteiroExecucao() {
                         }}
                         disabled={maquinaConcluida}
                       >
-                        <span>🖲️ {maquina.nome}</span>
-                        <span className="text-xs text-gray-500 ml-2">
-                          ({maquina.tipo})
+                        <span>
+                          🖲️ {obterNomeMaquinaExibicao(maquina)} - Tipo: {obterTipoMaquinaExibicao(maquina)}
                         </span>
                         {maquinaConcluida && (
                           <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
@@ -2331,8 +2467,7 @@ export default function RoteiroExecucao() {
                 <option value="">Selecione uma máquina</option>
                 {(lojaSelecionada?.maquinas || []).map((maquina) => (
                   <option key={maquina.id} value={maquina.id}>
-                    {maquina.codigo || "-"}
-                    {maquina.nome ? ` - ${maquina.nome}` : ""}
+                    {obterNomeMaquinaExibicao(maquina)} - Tipo: {obterTipoMaquinaExibicao(maquina)}
                   </option>
                 ))}
               </select>
