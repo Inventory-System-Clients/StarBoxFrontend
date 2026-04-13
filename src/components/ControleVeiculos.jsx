@@ -322,6 +322,26 @@ export default function ControleVeiculos({
     setFormFinalizar((prev) => ({ ...prev, [name]: value }));
   };
 
+  const validarLimiteKmPorUltimaMovimentacao = (veiculo, kmInformado) => {
+    const ultimaMov = ultimasMovs?.[veiculo?.id];
+    const kmUltimaMov = Number(ultimaMov?.km);
+
+    if (!Number.isFinite(kmUltimaMov)) {
+      return { permitido: true };
+    }
+
+    const limiteMaximo = kmUltimaMov + 10000;
+    if (kmInformado > limiteMaximo) {
+      return {
+        permitido: false,
+        kmUltimaMov,
+        limiteMaximo,
+      };
+    }
+
+    return { permitido: true };
+  };
+
   // Exemplo: para atualizar o status do veículo na API, use fetch/axios e depois onRefresh()
   const pilotarVeiculo = async () => {
     if (!veiculoSelecionado || salvando) return;
@@ -336,6 +356,22 @@ export default function ControleVeiculos({
       });
       return;
     }
+
+    const validacaoKmPilotar = validarLimiteKmPorUltimaMovimentacao(
+      veiculoSelecionado,
+      kmValue,
+    );
+
+    if (!validacaoKmPilotar.permitido) {
+      Swal.fire({
+        icon: "warning",
+        title: "KM acima do limite",
+        text: `O KM informado (${kmValue}) excede o limite permitido com base na última movimentação (${validacaoKmPilotar.kmUltimaMov}). Máximo aceito: ${validacaoKmPilotar.limiteMaximo}.`,
+        confirmButtonColor: "#62A1D9",
+      });
+      return;
+    }
+
     setSalvando(true);
     try {
       await api.put(`/veiculos/${veiculoSelecionado.id}`, {
@@ -410,6 +446,22 @@ export default function ControleVeiculos({
       });
       return;
     }
+
+    const validacaoKmFinalizar = validarLimiteKmPorUltimaMovimentacao(
+      veiculoSelecionado,
+      kmValue,
+    );
+
+    if (!validacaoKmFinalizar.permitido) {
+      Swal.fire({
+        icon: "warning",
+        title: "KM acima do limite",
+        text: `O KM informado (${kmValue}) excede o limite permitido com base na última movimentação (${validacaoKmFinalizar.kmUltimaMov}). Máximo aceito: ${validacaoKmFinalizar.limiteMaximo}.`,
+        confirmButtonColor: "#62A1D9",
+      });
+      return;
+    }
+
     setFinalizando(true);
     try {
       await api.put(`/veiculos/${veiculoSelecionado.id}`, {
