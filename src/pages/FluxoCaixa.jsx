@@ -796,17 +796,6 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
               minimumFractionDigits: 2,
             })}
           </span>
-          {fluxo.valorEsperado &&
-            Math.abs(
-              fluxo.valorEsperado - (fluxo.movimentacao?.valorFaturado || 0),
-            ) > 0.01 && (
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800"
-                title="Valor ajustado manualmente"
-              >
-                ✏️ Editado
-              </span>
-            )}
         </div>
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
