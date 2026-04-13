@@ -793,40 +793,56 @@ export default function MovimentacaoMaquina() {
   };
 
   const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
-    const textoCodificado = encodeURIComponent(mensagem);
+    const textoCodificado = encodeURIComponent(mensagem || "");
     const isMobile = isDispositivoMovel();
+    const userAgent = String(
+      navigator.userAgent || navigator.vendor || window.opera || "",
+    );
+    const isAndroid = /Android/i.test(userAgent);
     const whatsappAppUrl = `whatsapp://send?text=${textoCodificado}`;
+    const whatsappAndroidIntentUrl = `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+    const whatsappAndroidBusinessIntentUrl = `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`;
     const whatsappMobileFallbackUrl = `https://wa.me/?text=${textoCodificado}`;
     const whatsappDesktopUrl = `https://web.whatsapp.com/send?text=${textoCodificado}`;
-    const whatsappUrl = isMobile ? whatsappAppUrl : whatsappDesktopUrl;
 
-    if (popupReservado && !popupReservado.closed) {
-      popupReservado.location.href = whatsappUrl;
-      popupReservado.focus?.();
+    const redirecionarSeAindaVisivel = (url, delay) => {
+      window.setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          window.location.href = url;
+        }
+      }, delay);
+    };
 
-      if (isMobile) {
-        window.setTimeout(() => {
-          if (popupReservado.closed) return;
-          popupReservado.location.href = whatsappMobileFallbackUrl;
-        }, 1200);
+    if (isMobile) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
       }
 
+      if (isAndroid) {
+        window.location.href = whatsappAndroidIntentUrl;
+        redirecionarSeAindaVisivel(whatsappAndroidBusinessIntentUrl, 700);
+        redirecionarSeAindaVisivel(whatsappMobileFallbackUrl, 1800);
+        return true;
+      }
+
+      window.location.href = whatsappAppUrl;
+      redirecionarSeAindaVisivel(whatsappMobileFallbackUrl, 1200);
+      return true;
+    }
+
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.location.href = whatsappDesktopUrl;
+      popupReservado.focus?.();
       return true;
     }
 
     const link = document.createElement("a");
-    link.href = whatsappUrl;
+    link.href = whatsappDesktopUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    if (isMobile) {
-      window.setTimeout(() => {
-        window.location.href = whatsappMobileFallbackUrl;
-      }, 1200);
-    }
 
     return true;
   };
@@ -1163,7 +1179,9 @@ export default function MovimentacaoMaquina() {
           confirmarUsoEstoqueLoja,
         });
 
-      const popupReservado = window.open("about:blank", "_blank");
+      const popupReservado = isDispositivoMovel()
+        ? null
+        : window.open("about:blank", "_blank");
 
       try {
         await enviarMovimentacao(false);
