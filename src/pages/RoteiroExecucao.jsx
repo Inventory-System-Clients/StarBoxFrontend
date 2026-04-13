@@ -12,10 +12,12 @@ import {
   extrairKmMovimentacoesRoteiro,
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
+  montarMensagemMovimentacoesWhatsAppLoja,
   obterManutencaoResumoSnapshotRoteiro,
   obterKmInicialPilotagemAtiva,
   obterEstoqueInicialSnapshotRoteiro,
   obterKmInicialPilotagemSnapshotRoteiro,
+  removerMovimentacoesWhatsAppPendentesLoja,
   salvarManutencaoResumoSnapshotRoteiro,
   removerEstoqueInicialSnapshotRoteiro,
   removerKmInicialPilotagemSnapshotRoteiro,
@@ -123,6 +125,22 @@ export default function RoteiroExecucao() {
       String(status || "").toLowerCase(),
     );
 
+  const enviarWhatsAppLoja = (loja) => {
+    if (!loja?.id) return;
+    const mensagem = montarMensagemMovimentacoesWhatsAppLoja({
+      roteiroId: id,
+      usuarioId: usuario?.id,
+      lojaId: loja.id,
+    });
+    if (!mensagem) return;
+    abrirWhatsAppComMensagem(mensagem);
+    removerMovimentacoesWhatsAppPendentesLoja({
+      roteiroId: id,
+      usuarioId: usuario?.id,
+      lojaId: loja.id,
+    });
+  };
+
   const roteiroTemPendencias = (roteiroAtual) => {
     const lojas = Array.isArray(roteiroAtual?.lojas) ? roteiroAtual.lojas : [];
     return lojas.some((loja) => {
@@ -149,7 +167,9 @@ export default function RoteiroExecucao() {
 
   const obterChaveEdicoesMovimentacaoRota = () => {
     const roteiroId = String(id || "").trim();
-    const usuarioId = String(roteiro?.funcionarioId || usuario?.id || "").trim();
+    const usuarioId = String(
+      roteiro?.funcionarioId || usuario?.id || "",
+    ).trim();
     if (!roteiroId || !usuarioId) return "";
     return `${EDICOES_MOVIMENTACAO_ROTA_STORAGE_PREFIX}${usuarioId}:${roteiroId}`;
   };
@@ -450,7 +470,9 @@ export default function RoteiroExecucao() {
   };
 
   const confirmarJustificativaEdicao = () => {
-    const justificativa = String(modalJustificativaEdicao?.justificativa || "").trim();
+    const justificativa = String(
+      modalJustificativaEdicao?.justificativa || "",
+    ).trim();
     if (!justificativa) {
       setError("Informe a justificativa para editar a última movimentação.");
       return;
@@ -514,7 +536,9 @@ export default function RoteiroExecucao() {
 
   const atualizarMovimentacaoEditadaNaRota = (movimentacaoAtualizada) => {
     const maquinaId = String(
-      movimentacaoAtualizada?.maquinaId || movimentacaoAtualizada?.maquina?.id || "",
+      movimentacaoAtualizada?.maquinaId ||
+        movimentacaoAtualizada?.maquina?.id ||
+        "",
     ).trim();
 
     if (maquinaId) {
@@ -648,15 +672,14 @@ export default function RoteiroExecucao() {
         if (ultimaMovimentacao?.id) {
           ultimasPorMaquina[String(maquina.id)] = {
             ...ultimaMovimentacao,
-            maquina:
-              ultimaMovimentacao?.maquina || {
-                id: maquina?.id,
-                nome: obterNomeMaquinaExibicao(maquina),
-                codigo: maquina?.codigo,
-                tipo: obterTipoMaquinaExibicao(maquina),
-                modelo: maquina?.modelo,
-                valorFicha: maquina?.valorFicha,
-              },
+            maquina: ultimaMovimentacao?.maquina || {
+              id: maquina?.id,
+              nome: obterNomeMaquinaExibicao(maquina),
+              codigo: maquina?.codigo,
+              tipo: obterTipoMaquinaExibicao(maquina),
+              modelo: maquina?.modelo,
+              valorFicha: maquina?.valorFicha,
+            },
           };
         }
       });
@@ -760,6 +783,16 @@ export default function RoteiroExecucao() {
           replace: true,
           state: Object.keys(proximoState).length > 0 ? proximoState : {},
         });
+        // Quando voltar de uma movimentação, verificar se todas as máquinas da
+        // loja estão finalizadas. Se sim, enviar WhatsApp combinado da loja.
+        if (location.state?.origemMovimentacao) {
+          const todasFinalizadas =
+            loja.maquinas?.length > 0 &&
+            loja.maquinas.every((m) => maquinaEstaConcluida(m.status));
+          if (todasFinalizadas) {
+            enviarWhatsAppLoja(loja);
+          }
+        }
       }
     }
   }, [roteiro, location.state]);
@@ -954,6 +987,11 @@ export default function RoteiroExecucao() {
   };
 
   const handleSelecionarLoja = async (loja) => {
+    // Enviar WhatsApp pendente da loja anterior ao trocar de loja
+    if (lojaSelecionada && lojaSelecionada.id !== loja.id) {
+      enviarWhatsAppLoja(lojaSelecionada);
+    }
+
     // Verificar ordem das lojas
     if (roteiro?.lojas) {
       const lojasPendentesJustificadas = new Set(
@@ -1076,6 +1114,11 @@ export default function RoteiroExecucao() {
           ),
         };
       });
+
+      // Enviar WhatsApp pendente da loja anterior ao trocar de loja
+      if (lojaSelecionada && lojaSelecionada.id !== loja.id) {
+        enviarWhatsAppLoja(lojaSelecionada);
+      }
 
       setLojaSelecionada(loja);
 
@@ -2321,7 +2364,6 @@ export default function RoteiroExecucao() {
             <div
               className={`h-full transition-all ${
                 saldoGastoHoje <= 0
-
                   ? "bg-red-500"
                   : percentualSaldo < 0.25
                     ? "bg-yellow-500"
@@ -2641,7 +2683,8 @@ export default function RoteiroExecucao() {
                           disabled={maquinaConcluida}
                         >
                           <span>
-                            🖲️ {obterNomeMaquinaExibicao(maquina)} - Tipo: {obterTipoMaquinaExibicao(maquina)}
+                            🖲️ {obterNomeMaquinaExibicao(maquina)} - Tipo:{" "}
+                            {obterTipoMaquinaExibicao(maquina)}
                           </span>
                           {maquinaConcluida && (
                             <span className="ml-2 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
@@ -2653,7 +2696,9 @@ export default function RoteiroExecucao() {
                         {podeEditarUltimaMovimentacao && (
                           <button
                             className="px-3 py-2 rounded border border-amber-500 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100"
-                            onClick={() => abrirFluxoJustificativaEdicao(maquina)}
+                            onClick={() =>
+                              abrirFluxoJustificativaEdicao(maquina)
+                            }
                             title="Editar apenas a última movimentação feita por você"
                           >
                             Editar última movimentação
@@ -2847,7 +2892,8 @@ export default function RoteiroExecucao() {
                 <option value="">Selecione uma máquina</option>
                 {(lojaSelecionada?.maquinas || []).map((maquina) => (
                   <option key={maquina.id} value={maquina.id}>
-                    {obterNomeMaquinaExibicao(maquina)} - Tipo: {obterTipoMaquinaExibicao(maquina)}
+                    {obterNomeMaquinaExibicao(maquina)} - Tipo:{" "}
+                    {obterTipoMaquinaExibicao(maquina)}
                   </option>
                 ))}
               </select>
@@ -2904,7 +2950,10 @@ export default function RoteiroExecucao() {
               </p>
               {modalJustificativaEdicao?.maquina && (
                 <p className="text-xs text-amber-800 mt-2">
-                  Máquina: {obterNomeMaquinaExibicao(modalJustificativaEdicao.maquina)} | Tipo: {obterTipoMaquinaExibicao(modalJustificativaEdicao.maquina)}
+                  Máquina:{" "}
+                  {obterNomeMaquinaExibicao(modalJustificativaEdicao.maquina)} |
+                  Tipo:{" "}
+                  {obterTipoMaquinaExibicao(modalJustificativaEdicao.maquina)}
                 </p>
               )}
             </div>

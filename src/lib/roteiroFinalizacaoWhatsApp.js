@@ -365,10 +365,15 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
   if (itens.length === 0) return "";
   if (itens.length === 1) return itens[0].mensagem;
 
-  return itens.map((item) => item.mensagem).join("\n\n====================\n\n");
+  return itens
+    .map((item) => item.mensagem)
+    .join("\n\n====================\n\n");
 };
 
-export const obterManutencaoResumoSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+export const obterManutencaoResumoSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
   if (!chave) return null;
 
@@ -440,7 +445,10 @@ export const salvarManutencaoResumoSnapshotRoteiro = ({
   }
 };
 
-export const removerManutencaoResumoSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+export const removerManutencaoResumoSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
   if (!chave) return false;
 
@@ -803,7 +811,9 @@ export const montarMensagemFinalizacaoRoteiro = ({
     manutencoesNaoFeitasBrutas,
     "descricao",
   );
-  const totalManutencoesFeitas = Number.isFinite(Number(totalManutencoesRealizadas))
+  const totalManutencoesFeitas = Number.isFinite(
+    Number(totalManutencoesRealizadas),
+  )
     ? Number(totalManutencoesRealizadas)
     : manutencoesFeitasLista.length;
   const lojasComManutencaoLista = normalizarListaNomes(
@@ -863,7 +873,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
     `Total de manutencoes realizadas: ${totalManutencoesFeitas}`,
     `Lojas com manutencao realizada: ${formatarLista(lojasComManutencaoLista)}`,
-    
+
     `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,
 
     `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,
@@ -878,21 +888,55 @@ export const montarMensagemFinalizacaoRoteiro = ({
 
 export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
   const textoCodificado = encodeURIComponent(String(mensagem || ""));
-  const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
-    navigator.userAgent,
+  const userAgent = String(
+    navigator.userAgent || navigator.vendor || window?.opera || "",
   );
+  const isMobile =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(
+      userAgent,
+    ) ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/i.test(userAgent));
+  const isAndroid = /Android/i.test(userAgent);
 
-  const whatsappUrl = isMobile
-    ? `https://wa.me/?text=${textoCodificado}`
-    : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+  const redirecionarSeAindaVisivel = (url, delay) => {
+    window.setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        window.location.href = url;
+      }
+    }, delay);
+  };
+
+  if (isMobile) {
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.close();
+    }
+    if (isAndroid) {
+      window.location.href = `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+      redirecionarSeAindaVisivel(
+        `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`,
+        700,
+      );
+      redirecionarSeAindaVisivel(
+        `https://wa.me/?text=${textoCodificado}`,
+        1800,
+      );
+      return true;
+    }
+    window.location.href = `whatsapp://send?text=${textoCodificado}`;
+    redirecionarSeAindaVisivel(`https://wa.me/?text=${textoCodificado}`, 1200);
+    return true;
+  }
 
   if (popupReservado && !popupReservado.closed) {
-    popupReservado.location.href = whatsappUrl;
+    popupReservado.location.href = `https://web.whatsapp.com/send?text=${textoCodificado}`;
     popupReservado.focus?.();
     return true;
   }
 
-  const novaAba = window.open(whatsappUrl, "_blank");
+  const novaAba = window.open(
+    `https://web.whatsapp.com/send?text=${textoCodificado}`,
+    "_blank",
+  );
   if (novaAba && !novaAba.closed) {
     novaAba.focus?.();
     return true;
