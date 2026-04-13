@@ -786,6 +786,7 @@ export function LojaDetalhes() {
                           </h4>
                           <p className="text-sm text-gray-500">
                             {maquina.codigo}
+                            {maquina.tipo ? ` | ${maquina.tipo}` : ""}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
