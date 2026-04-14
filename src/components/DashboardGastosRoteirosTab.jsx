@@ -56,7 +56,6 @@ export default function DashboardGastosRoteirosTab() {
   const [resumo, setResumo] = useState({
     totalRegistros: 0,
     totalValor: 0,
-    saldoDisponivel: 0,
     gastos: [],
   });
   const [loading, setLoading] = useState(false);
@@ -177,7 +176,6 @@ export default function DashboardGastosRoteirosTab() {
       setResumo({
         totalRegistros: Number(data.totalRegistros || 0),
         totalValor: Number(data.totalValor || 0),
-        saldoDisponivel: Number(data.saldoDisponivel || 0),
         gastos: Array.isArray(data.gastos) ? data.gastos : [],
       });
     } catch (err) {
@@ -187,7 +185,6 @@ export default function DashboardGastosRoteirosTab() {
       setResumo({
         totalRegistros: 0,
         totalValor: 0,
-        saldoDisponivel: 0,
         gastos: [],
       });
     } finally {
@@ -257,7 +254,7 @@ export default function DashboardGastosRoteirosTab() {
             Total: {formatarMoedaBRL(resumo.totalValor)}
           </span>
           <span className="badge bg-emerald-100 text-emerald-700 border-emerald-300">
-            Disponível: {formatarMoedaBRL(resumo.saldoDisponivel)}
+            Sobra: {formatarMoedaBRL(resumoSobraRotasFiltradas.totalSobra)}
           </span>
         </div>
       </div>
