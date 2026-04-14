@@ -18,6 +18,7 @@ import {
   obterEstoqueInicialSnapshotRoteiro,
   obterKmInicialPilotagemSnapshotRoteiro,
   removerMovimentacoesWhatsAppPendentesLoja,
+  salvarMovimentacaoWhatsAppPendenteLoja,
   salvarManutencaoResumoSnapshotRoteiro,
   removerEstoqueInicialSnapshotRoteiro,
   removerKmInicialPilotagemSnapshotRoteiro,
@@ -100,6 +101,20 @@ export default function RoteiroExecucao() {
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [movimentacaoParaEditar, setMovimentacaoParaEditar] = useState(null);
   const [maquinasEditadasNaRota, setMaquinasEditadasNaRota] = useState([]);
+  const [abastecimentosExtrasNaRota, setAbastecimentosExtrasNaRota] = useState(
+    [],
+  );
+  const [modalAbastecimentoExtra, setModalAbastecimentoExtra] = useState({
+    aberto: false,
+    maquina: null,
+    movimentacao: null,
+    quantidade: "",
+    produtoId: "",
+    loading: false,
+  });
+  const [produtosAbastecimentoExtra, setProdutosAbastecimentoExtra] = useState(
+    [],
+  );
 
   const perfisPermitidosEditarMovimentacaoRota = new Set([
     "FUNCIONARIO",
@@ -471,12 +486,160 @@ export default function RoteiroExecucao() {
     return alteracoes;
   };
 
-  const abrirNovaLeituraMaquina = (maquina) => {
-    if (!roteiro?.id || !lojaSelecionada?.id || !maquina?.id) return;
+  const abrirModalAbastecimentoExtra = async (maquina) => {
+    let ultimaMov = obterUltimaMovimentacaoPorMaquina(maquina?.id);
 
-    navigate(
-      `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
-    );
+    if (!ultimaMov?.id) {
+      try {
+        ultimaMov = await buscarUltimaMovimentacaoDaMaquina(maquina?.id);
+        if (ultimaMov?.id) {
+          setUltimasMovimentacoesPorMaquina((prev) => ({
+            ...prev,
+            [String(maquina?.id || "")]: ultimaMov,
+          }));
+        }
+      } catch {
+        // Erro tratado abaixo.
+      }
+    }
+
+    if (!ultimaMov?.id) {
+      setError(
+        "Não foi possível identificar a última movimentação desta máquina para abastecimento.",
+      );
+      return;
+    }
+
+    try {
+      const params = {};
+      if (usuario?.id) params.usuarioId = usuario.id;
+      if (lojaSelecionada?.id) params.lojaId = lojaSelecionada.id;
+      const res = await api.get("/produtos/com-estoque", { params });
+      setProdutosAbastecimentoExtra(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setProdutosAbastecimentoExtra([]);
+    }
+
+    setModalAbastecimentoExtra({
+      aberto: true,
+      maquina,
+      movimentacao: ultimaMov,
+      quantidade: "",
+      produtoId: "",
+      loading: false,
+    });
+  };
+
+  const fecharModalAbastecimentoExtra = () => {
+    if (modalAbastecimentoExtra.loading) return;
+    setModalAbastecimentoExtra({
+      aberto: false,
+      maquina: null,
+      movimentacao: null,
+      quantidade: "",
+      produtoId: "",
+      loading: false,
+    });
+  };
+
+  const salvarAbastecimentoExtra = async () => {
+    const quantidadeNumero = Number(modalAbastecimentoExtra.quantidade || 0);
+    const produtoId = String(modalAbastecimentoExtra.produtoId || "").trim();
+
+    if (!Number.isFinite(quantidadeNumero) || quantidadeNumero <= 0) {
+      setError("Informe uma quantidade válida para abastecimento.");
+      return;
+    }
+
+    if (!produtoId) {
+      setError("Selecione o produto abastecido.");
+      return;
+    }
+
+    if (!modalAbastecimentoExtra.movimentacao?.id) {
+      setError("Movimentação base não encontrada para abastecimento.");
+      return;
+    }
+
+    try {
+      setModalAbastecimentoExtra((prev) => ({ ...prev, loading: true }));
+
+      const res = await api.patch(
+        `/movimentacoes/${modalAbastecimentoExtra.movimentacao.id}/abastecimento-extra`,
+        {
+          produtoId,
+          quantidadeAbastecida: quantidadeNumero,
+        },
+      );
+
+      const movimentacaoAtualizada = res.data;
+      const maquina =
+        modalAbastecimentoExtra.maquina || movimentacaoAtualizada?.maquina;
+      const nomeMaquina = obterNomeMaquinaExibicao(maquina);
+      const tipoMaquina = obterTipoMaquinaExibicao(maquina);
+      const produtoSelecionado = produtosAbastecimentoExtra.find(
+        (item) => String(item?.id || "") === produtoId,
+      );
+      const nomeProduto =
+        produtoSelecionado?.nome ||
+        movimentacaoAtualizada?.detalhesProdutos?.find(
+          (item) => String(item?.produtoId || "") === produtoId,
+        )?.produto?.nome ||
+        produtoId;
+
+      setUltimasMovimentacoesPorMaquina((prev) => ({
+        ...prev,
+        [String(maquina?.id || "")]: movimentacaoAtualizada,
+      }));
+
+      setAbastecimentosExtrasNaRota((prev) => [
+        ...prev,
+        {
+          maquinaNome: nomeMaquina,
+          tipoMaquina,
+          produtoNome: nomeProduto,
+          quantidade: quantidadeNumero,
+        },
+      ]);
+
+      const mensagemWhatsApp = [
+        "STAR BOX",
+        "*Abastecimento extra na rota*",
+        `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+        `Roteiro: ${roteiro?.nome || "-"}`,
+        `Funcionário: ${usuario?.nome || "-"}`,
+        `Loja: ${lojaSelecionada?.nome || "-"}`,
+        `Máquina: ${nomeMaquina} | Tipo: ${tipoMaquina}`,
+        `Produto abastecido: ${nomeProduto}`,
+        `Quantidade abastecida: ${quantidadeNumero}`,
+      ].join("\n");
+
+      salvarMovimentacaoWhatsAppPendenteLoja({
+        roteiroId: id,
+        usuarioId: usuario?.id,
+        lojaId: lojaSelecionada?.id,
+        maquinaId: maquina?.id,
+        maquinaNome: nomeMaquina,
+        mensagem: mensagemWhatsApp,
+      });
+
+      enviarWhatsAppLoja(lojaSelecionada);
+      setSuccess("Abastecimento extra salvo com sucesso!");
+      setModalAbastecimentoExtra({
+        aberto: false,
+        maquina: null,
+        movimentacao: null,
+        quantidade: "",
+        produtoId: "",
+        loading: false,
+      });
+      await carregarRoteiro();
+    } catch (err) {
+      setError(
+        err?.response?.data?.error || "Erro ao salvar abastecimento extra.",
+      );
+      setModalAbastecimentoExtra((prev) => ({ ...prev, loading: false }));
+    }
   };
 
   const buscarUltimaMovimentacaoDaMaquina = async (maquinaId) => {
@@ -2074,6 +2237,10 @@ export default function RoteiroExecucao() {
         totalManutencoesRealizadas,
         lojasComManutencao,
         lojasSemManutencao,
+        abastecimentosExtras: abastecimentosExtrasNaRota.map(
+          (item) =>
+            `${item.maquinaNome} (Tipo: ${item.tipoMaquina}) - ${item.produtoNome}: +${item.quantidade}`,
+        ),
         maquinasComEdicao: maquinasEditadasNaRota.map(
           (item) => `${item.nome} (Tipo: ${item.tipo})`,
         ),
@@ -2783,10 +2950,12 @@ export default function RoteiroExecucao() {
                         {maquinaConcluida && (
                           <button
                             className="px-3 py-2 rounded border border-blue-500 bg-blue-50 text-blue-800 text-xs font-semibold hover:bg-blue-100"
-                            onClick={() => abrirNovaLeituraMaquina(maquina)}
-                            title="Abrir a máquina novamente para lançar uma nova leitura"
+                            onClick={() =>
+                              abrirModalAbastecimentoExtra(maquina)
+                            }
+                            title="Lançar apenas abastecimento extra sem alterar contadores"
                           >
-                            Nova leitura
+                            Abastecimento extra
                           </button>
                         )}
 
@@ -3084,6 +3253,96 @@ export default function RoteiroExecucao() {
                 onClick={confirmarJustificativaEdicao}
               >
                 Enviar justificativa
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={modalAbastecimentoExtra.aberto}
+          onClose={fecharModalAbastecimentoExtra}
+          title="Abastecimento extra da máquina"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 border-l-4 border-blue-500 rounded">
+              <p className="text-sm text-blue-900 font-semibold">
+                Este lançamento altera somente o abastecimento da máquina.
+              </p>
+              <p className="text-xs text-blue-800 mt-1">
+                Não altera contador IN/OUT, apenas soma pelúcias na máquina e
+                desconta do estoque do usuário.
+              </p>
+              {modalAbastecimentoExtra?.maquina && (
+                <p className="text-xs text-blue-800 mt-2">
+                  Máquina:{" "}
+                  {obterNomeMaquinaExibicao(modalAbastecimentoExtra.maquina)} |
+                  Tipo:{" "}
+                  {obterTipoMaquinaExibicao(modalAbastecimentoExtra.maquina)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Produto abastecido *
+              </label>
+              <select
+                className="w-full p-3 border rounded-lg bg-white"
+                value={modalAbastecimentoExtra.produtoId}
+                onChange={(e) =>
+                  setModalAbastecimentoExtra((prev) => ({
+                    ...prev,
+                    produtoId: e.target.value,
+                  }))
+                }
+                disabled={modalAbastecimentoExtra.loading}
+              >
+                <option value="">Selecione um produto</option>
+                {produtosAbastecimentoExtra.map((produto) => (
+                  <option key={produto.id} value={produto.id}>
+                    {produto.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Quantidade abastecida *
+              </label>
+              <input
+                type="number"
+                min="1"
+                className="w-full p-3 border rounded-lg"
+                placeholder="Ex: 10"
+                value={modalAbastecimentoExtra.quantidade}
+                onChange={(e) =>
+                  setModalAbastecimentoExtra((prev) => ({
+                    ...prev,
+                    quantidade: e.target.value,
+                  }))
+                }
+                disabled={modalAbastecimentoExtra.loading}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                className="btn-secondary"
+                onClick={fecharModalAbastecimentoExtra}
+                disabled={modalAbastecimentoExtra.loading}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={salvarAbastecimentoExtra}
+                disabled={modalAbastecimentoExtra.loading}
+              >
+                {modalAbastecimentoExtra.loading
+                  ? "Salvando..."
+                  : "Salvar abastecimento"}
               </button>
             </div>
           </div>

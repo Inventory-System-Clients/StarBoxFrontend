@@ -778,6 +778,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
   totalManutencoesRealizadas,
   lojasComManutencao,
   lojasSemManutencao,
+  abastecimentosExtras,
   resumoConsumoProdutos,
   maquinasComEdicao,
 }) => {
@@ -844,6 +845,10 @@ export const montarMensagemFinalizacaoRoteiro = ({
     toArray(maquinasComEdicao),
     "nome",
   );
+  const abastecimentosExtrasLista = normalizarListaNomes(
+    toArray(abastecimentosExtras),
+    "descricao",
+  );
   const linhasKm = possuiVeiculoAssociado
     ? [
         `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
@@ -881,6 +886,11 @@ export const montarMensagemFinalizacaoRoteiro = ({
     ...(maquinasComEdicaoLista.length > 0
       ? [
           `Rota finalizada com edicao na maquina: ${formatarLista(maquinasComEdicaoLista)}`,
+        ]
+      : []),
+    ...(abastecimentosExtrasLista.length > 0
+      ? [
+          `Abastecimentos extras na rota: ${formatarLista(abastecimentosExtrasLista)}`,
         ]
       : []),
   ].join("\n");
