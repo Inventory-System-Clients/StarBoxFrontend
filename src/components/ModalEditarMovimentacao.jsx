@@ -48,18 +48,36 @@ export default function ModalEditarMovimentacao({
     dataColeta: "",
   });
 
-  // Carregar produtos disponíveis
+  // Carregar produtos disponíveis com estoque
   useEffect(() => {
     const carregarProdutos = async () => {
       try {
-        const res = await api.get("/produtos");
+        if (!movimentacao) return;
+
+        // Pegat lojaId da máquina associada à movimentação
+        const lojaId = movimentacao?.maquina?.lojaId;
+        const usuarioId = movimentacao.usuarioId;
+
+        if (!lojaId && !usuarioId) {
+          console.warn(
+            "Não foi possível determinar usuarioId ou lojaId para filtrar produtos",
+          );
+          return;
+        }
+
+        // Chamar novo endpoint que filtra por estoque
+        const params = {};
+        if (usuarioId) params.usuarioId = usuarioId;
+        if (lojaId) params.lojaId = lojaId;
+
+        const res = await api.get("/produtos/com-estoque", { params });
         setProdutos(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
-        console.error("Erro ao carregar produtos:", err);
+        console.error("Erro ao carregar produtos com estoque:", err);
       }
     };
     carregarProdutos();
-  }, []);
+  }, [movimentacao]);
 
   // Preencher formulário com dados da movimentação ao abrir
   useEffect(() => {
