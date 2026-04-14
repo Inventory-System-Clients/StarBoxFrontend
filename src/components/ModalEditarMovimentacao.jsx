@@ -33,6 +33,8 @@ export default function ModalEditarMovimentacao({
   const { usuario } = useAuth();
   const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
   const [loading, setLoading] = useState(false);
+  const [produtos, setProdutos] = useState([]);
+  const [produtoIdSelecionado, setProdutoIdSelecionado] = useState(null);
   const [formData, setFormData] = useState({
     totalPre: "",
     sairam: "",
@@ -45,6 +47,19 @@ export default function ModalEditarMovimentacao({
     tipoOcorrencia: "Normal",
     dataColeta: "",
   });
+
+  // Carregar produtos disponíveis
+  useEffect(() => {
+    const carregarProdutos = async () => {
+      try {
+        const res = await api.get("/produtos");
+        setProdutos(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Erro ao carregar produtos:", err);
+      }
+    };
+    carregarProdutos();
+  }, []);
 
   // Preencher formulário com dados da movimentação ao abrir
   useEffect(() => {
@@ -66,6 +81,11 @@ export default function ModalEditarMovimentacao({
         tipoOcorrencia: movimentacao.tipoOcorrencia || "Normal",
         dataColeta: dataFormatada,
       });
+
+      // Definir produto atual abastecido
+      const produtoAtual =
+        movimentacao.detalhesProdutos?.[0]?.produtoId || null;
+      setProdutoIdSelecionado(produtoAtual);
     }
   }, [movimentacao]);
 
@@ -112,6 +132,7 @@ export default function ModalEditarMovimentacao({
         dataColeta: bloquearDataColeta
           ? movimentacao?.dataColeta || null
           : formData.dataColeta || null,
+        produtoId: produtoIdSelecionado || null,
       };
 
       // Enviar requisição PUT
@@ -303,6 +324,38 @@ export default function ModalEditarMovimentacao({
                   placeholder="Digital + Analógico"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* SELEÇÃO DE PRODUTO */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              📦 Produto Abastecido
+            </h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Qual produto está nesta máquina?
+              </label>
+              <select
+                value={produtoIdSelecionado || ""}
+                onChange={(e) =>
+                  setProdutoIdSelecionado(e.target.value || null)
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Selecione um produto...</option>
+                {produtos.map((produto) => (
+                  <option key={produto.id} value={produto.id}>
+                    {produto.nome}
+                  </option>
+                ))}
+              </select>
+              {produtoIdSelecionado && (
+                <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200 text-sm text-blue-800">
+                  ⚠️ Se trocar o produto, o sistema ajustará automaticamente os
+                  estoques.
+                </div>
+              )}
             </div>
           </div>
 
