@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
 import { AlertBox } from "./UIComponents";
 
@@ -61,6 +61,101 @@ export default function DashboardGastosRoteirosTab() {
   const [loading, setLoading] = useState(false);
   const [loadingFiltros, setLoadingFiltros] = useState(false);
   const [error, setError] = useState("");
+
+  const resumoSobraRotasFiltradas = useMemo(() => {
+    const mapa = new Map();
+
+    const obterInfoRoteiro = (roteiroId) => {
+      const id = String(roteiroId || "").trim();
+      if (!id) return null;
+
+      return (
+        roteiros.find((item) => String(item?.id || "").trim() === id) || null
+      );
+    };
+
+    for (const gasto of Array.isArray(resumo.gastos) ? resumo.gastos : []) {
+      const roteiroId = String(gasto?.roteiro?.id || gasto?.roteiroId || "").trim();
+      if (!roteiroId) continue;
+
+      const atual =
+        mapa.get(roteiroId) || {
+          roteiroId,
+          nomeRoteiro: gasto?.roteiro?.nome || "Roteiro",
+          totalGastoFiltrado: 0,
+          sobraDireta: null,
+          orcamentoDiario: null,
+        };
+
+      atual.totalGastoFiltrado += Number(gasto?.valor || 0);
+
+      const sobraNoGasto = Number(
+        gasto?.sobraValorDespesa ??
+          gasto?.saldoDespesa ??
+          gasto?.saldoGastoHoje ??
+          gasto?.roteiro?.saldoGastoHoje,
+      );
+      if (Number.isFinite(sobraNoGasto)) {
+        atual.sobraDireta = sobraNoGasto;
+      }
+
+      const orcamentoNoGasto = Number(
+        gasto?.orcamentoDiario ?? gasto?.roteiro?.orcamentoDiario,
+      );
+      if (Number.isFinite(orcamentoNoGasto)) {
+        atual.orcamentoDiario = orcamentoNoGasto;
+      }
+
+      const infoRoteiro = obterInfoRoteiro(roteiroId);
+      if (infoRoteiro) {
+        atual.nomeRoteiro = infoRoteiro?.nome || atual.nomeRoteiro;
+
+        const saldoNoRoteiro = Number(infoRoteiro?.saldoGastoHoje);
+        if (Number.isFinite(saldoNoRoteiro)) {
+          atual.sobraDireta = saldoNoRoteiro;
+        }
+
+        const orcamentoNoRoteiro = Number(infoRoteiro?.orcamentoDiario);
+        if (Number.isFinite(orcamentoNoRoteiro)) {
+          atual.orcamentoDiario = orcamentoNoRoteiro;
+        }
+      }
+
+      mapa.set(roteiroId, atual);
+    }
+
+    const rotas = Array.from(mapa.values())
+      .map((item) => {
+        const sobraCalculada =
+          Number.isFinite(item.sobraDireta)
+            ? item.sobraDireta
+            : Number.isFinite(item.orcamentoDiario)
+              ? item.orcamentoDiario - item.totalGastoFiltrado
+              : null;
+
+        return {
+          ...item,
+          sobra: Number.isFinite(sobraCalculada) ? sobraCalculada : null,
+        };
+      })
+      .sort((a, b) =>
+        String(a.nomeRoteiro || "").localeCompare(
+          String(b.nomeRoteiro || ""),
+          "pt-BR",
+          { sensitivity: "base" },
+        ),
+      );
+
+    const totalSobra = rotas.reduce(
+      (acc, rota) => acc + (Number.isFinite(rota.sobra) ? rota.sobra : 0),
+      0,
+    );
+
+    return {
+      totalSobra,
+      rotas,
+    };
+  }, [resumo.gastos, roteiros]);
 
   const buscarGastos = async (filtrosAlvo = filtros) => {
     try {
@@ -155,8 +250,30 @@ export default function DashboardGastosRoteirosTab() {
           <span className="badge bg-green-100 text-green-700 border-green-300">
             Total: {formatarMoedaBRL(resumo.totalValor)}
           </span>
+          <span className="badge bg-emerald-100 text-emerald-700 border-emerald-300">
+            Sobra: {formatarMoedaBRL(resumoSobraRotasFiltradas.totalSobra)}
+          </span>
         </div>
       </div>
+
+      {resumoSobraRotasFiltradas.rotas.length > 0 && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+          <p className="text-xs font-bold text-emerald-800 mb-2">
+            Sobra por rota filtrada
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {resumoSobraRotasFiltradas.rotas.map((rota) => (
+              <span
+                key={rota.roteiroId}
+                className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs text-emerald-800"
+                title={`Gasto no período: ${formatarMoedaBRL(rota.totalGastoFiltrado)}`}
+              >
+                {rota.nomeRoteiro}: {Number.isFinite(rota.sobra) ? formatarMoedaBRL(rota.sobra) : "Não informado"}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4">
