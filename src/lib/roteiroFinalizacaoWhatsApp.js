@@ -14,6 +14,8 @@ const KM_INICIAL_PILOTAGEM_ATIVA_STORAGE_PREFIX =
   "starbox:pilotagem:km-inicial:";
 const MANUTENCAO_RESUMO_ROTEIRO_STORAGE_PREFIX =
   "starbox:roteiro:manutencao-resumo:";
+const MOVIMENTACOES_WHATSAPP_LOJA_STORAGE_PREFIX =
+  "starbox:roteiro:movimentacoes-whatsapp-loja:";
 
 const normalizarTexto = (valor) => String(valor || "").trim();
 
@@ -236,7 +238,142 @@ const montarChaveManutencaoResumoRoteiro = ({ roteiroId, usuarioId }) => {
   return `${MANUTENCAO_RESUMO_ROTEIRO_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}`;
 };
 
-export const obterManutencaoResumoSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+const montarChaveMovimentacoesWhatsAppLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+}) => {
+  const roteiroNormalizado = normalizarTexto(roteiroId);
+  const usuarioNormalizado = normalizarTexto(usuarioId);
+  const lojaNormalizada = normalizarTexto(lojaId);
+
+  if (!roteiroNormalizado || !usuarioNormalizado || !lojaNormalizada) return "";
+  return `${MOVIMENTACOES_WHATSAPP_LOJA_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}:${lojaNormalizada}`;
+};
+
+export const obterMovimentacoesWhatsAppPendentesLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+}) => {
+  const chave = montarChaveMovimentacoesWhatsAppLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+  if (!chave) return [];
+
+  try {
+    const bruto = window.localStorage.getItem(chave);
+    if (!bruto) return [];
+
+    const payload = JSON.parse(bruto);
+    const itens = Array.isArray(payload?.itens) ? payload.itens : [];
+
+    return itens
+      .map((item) => ({
+        maquinaId: normalizarTexto(item?.maquinaId),
+        maquinaNome: normalizarTexto(item?.maquinaNome),
+        mensagem: String(item?.mensagem || "").trim(),
+        createdAt: item?.createdAt || null,
+      }))
+      .filter((item) => item.mensagem);
+  } catch {
+    return [];
+  }
+};
+
+export const salvarMovimentacaoWhatsAppPendenteLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+  maquinaId,
+  maquinaNome,
+  mensagem,
+}) => {
+  const chave = montarChaveMovimentacoesWhatsAppLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+  const mensagemNormalizada = String(mensagem || "").trim();
+
+  if (!chave || !mensagemNormalizada) return false;
+
+  try {
+    const itensAtuais = obterMovimentacoesWhatsAppPendentesLoja({
+      roteiroId,
+      usuarioId,
+      lojaId,
+    });
+
+    itensAtuais.push({
+      maquinaId: normalizarTexto(maquinaId),
+      maquinaNome: normalizarTexto(maquinaNome),
+      mensagem: mensagemNormalizada,
+      createdAt: new Date().toISOString(),
+    });
+
+    window.localStorage.setItem(
+      chave,
+      JSON.stringify({
+        roteiroId: String(roteiroId),
+        usuarioId: String(usuarioId),
+        lojaId: String(lojaId),
+        itens: itensAtuais,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const removerMovimentacoesWhatsAppPendentesLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+}) => {
+  const chave = montarChaveMovimentacoesWhatsAppLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+  if (!chave) return false;
+
+  try {
+    window.localStorage.removeItem(chave);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const montarMensagemMovimentacoesWhatsAppLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+}) => {
+  const itens = obterMovimentacoesWhatsAppPendentesLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+
+  if (itens.length === 0) return "";
+  if (itens.length === 1) return itens[0].mensagem;
+
+  return itens
+    .map((item) => item.mensagem)
+    .join("\n\n====================\n\n");
+};
+
+export const obterManutencaoResumoSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
   if (!chave) return null;
 
@@ -308,7 +445,10 @@ export const salvarManutencaoResumoSnapshotRoteiro = ({
   }
 };
 
-export const removerManutencaoResumoSnapshotRoteiro = ({ roteiroId, usuarioId }) => {
+export const removerManutencaoResumoSnapshotRoteiro = ({
+  roteiroId,
+  usuarioId,
+}) => {
   const chave = montarChaveManutencaoResumoRoteiro({ roteiroId, usuarioId });
   if (!chave) return false;
 
@@ -638,6 +778,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
   totalManutencoesRealizadas,
   lojasComManutencao,
   lojasSemManutencao,
+  abastecimentosExtras,
   resumoConsumoProdutos,
   maquinasComEdicao,
 }) => {
@@ -671,7 +812,9 @@ export const montarMensagemFinalizacaoRoteiro = ({
     manutencoesNaoFeitasBrutas,
     "descricao",
   );
-  const totalManutencoesFeitas = Number.isFinite(Number(totalManutencoesRealizadas))
+  const totalManutencoesFeitas = Number.isFinite(
+    Number(totalManutencoesRealizadas),
+  )
     ? Number(totalManutencoesRealizadas)
     : manutencoesFeitasLista.length;
   const lojasComManutencaoLista = normalizarListaNomes(
@@ -702,6 +845,10 @@ export const montarMensagemFinalizacaoRoteiro = ({
     toArray(maquinasComEdicao),
     "nome",
   );
+  const abastecimentosExtrasLista = normalizarListaNomes(
+    toArray(abastecimentosExtras),
+    "descricao",
+  );
   const linhasKm = possuiVeiculoAssociado
     ? [
         `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
@@ -731,7 +878,7 @@ export const montarMensagemFinalizacaoRoteiro = ({
     `Sobra valor despesa: ${formatarMoedaBRL(sobraValorDespesa)}`,
     `Total de manutencoes realizadas: ${totalManutencoesFeitas}`,
     `Lojas com manutencao realizada: ${formatarLista(lojasComManutencaoLista)}`,
-    
+
     `Manutencoes realizadas (${manutencoesFeitasLista.length}): ${formatarLista(manutencoesFeitasLista)}`,
 
     `Manutencoes nao realizadas (${manutencoesNaoFeitasLista.length}): ${formatarLista(manutencoesNaoFeitasLista)}`,
@@ -741,26 +888,65 @@ export const montarMensagemFinalizacaoRoteiro = ({
           `Rota finalizada com edicao na maquina: ${formatarLista(maquinasComEdicaoLista)}`,
         ]
       : []),
+    ...(abastecimentosExtrasLista.length > 0
+      ? [
+          `Abastecimentos extras na rota: ${formatarLista(abastecimentosExtrasLista)}`,
+        ]
+      : []),
   ].join("\n");
 };
 
 export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
   const textoCodificado = encodeURIComponent(String(mensagem || ""));
-  const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
-    navigator.userAgent,
+  const userAgent = String(
+    navigator.userAgent || navigator.vendor || window?.opera || "",
   );
+  const isMobile =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(
+      userAgent,
+    ) ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/i.test(userAgent));
+  const isAndroid = /Android/i.test(userAgent);
 
-  const whatsappUrl = isMobile
-    ? `https://wa.me/?text=${textoCodificado}`
-    : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+  const redirecionarSeAindaVisivel = (url, delay) => {
+    window.setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        window.location.href = url;
+      }
+    }, delay);
+  };
+
+  if (isMobile) {
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.close();
+    }
+    if (isAndroid) {
+      window.location.href = `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+      redirecionarSeAindaVisivel(
+        `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`,
+        700,
+      );
+      redirecionarSeAindaVisivel(
+        `https://wa.me/?text=${textoCodificado}`,
+        1800,
+      );
+      return true;
+    }
+    window.location.href = `whatsapp://send?text=${textoCodificado}`;
+    redirecionarSeAindaVisivel(`https://wa.me/?text=${textoCodificado}`, 1200);
+    return true;
+  }
 
   if (popupReservado && !popupReservado.closed) {
-    popupReservado.location.href = whatsappUrl;
+    popupReservado.location.href = `https://web.whatsapp.com/send?text=${textoCodificado}`;
     popupReservado.focus?.();
     return true;
   }
 
-  const novaAba = window.open(whatsappUrl, "_blank");
+  const novaAba = window.open(
+    `https://web.whatsapp.com/send?text=${textoCodificado}`,
+    "_blank",
+  );
   if (novaAba && !novaAba.closed) {
     novaAba.focus?.();
     return true;

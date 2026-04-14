@@ -33,6 +33,8 @@ export default function ModalEditarMovimentacao({
   const { usuario } = useAuth();
   const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
   const [loading, setLoading] = useState(false);
+  const [produtos, setProdutos] = useState([]);
+  const [produtoIdSelecionado, setProdutoIdSelecionado] = useState(null);
   const [formData, setFormData] = useState({
     totalPre: "",
     sairam: "",
@@ -45,6 +47,37 @@ export default function ModalEditarMovimentacao({
     tipoOcorrencia: "Normal",
     dataColeta: "",
   });
+
+  // Carregar produtos disponíveis com estoque
+  useEffect(() => {
+    const carregarProdutos = async () => {
+      try {
+        if (!movimentacao) return;
+
+        // Pegat lojaId da máquina associada à movimentação
+        const lojaId = movimentacao?.maquina?.lojaId;
+        const usuarioId = movimentacao.usuarioId;
+
+        if (!lojaId && !usuarioId) {
+          console.warn(
+            "Não foi possível determinar usuarioId ou lojaId para filtrar produtos",
+          );
+          return;
+        }
+
+        // Chamar novo endpoint que filtra por estoque
+        const params = {};
+        if (usuarioId) params.usuarioId = usuarioId;
+        if (lojaId) params.lojaId = lojaId;
+
+        const res = await api.get("/produtos/com-estoque", { params });
+        setProdutos(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Erro ao carregar produtos com estoque:", err);
+      }
+    };
+    carregarProdutos();
+  }, [movimentacao]);
 
   // Preencher formulário com dados da movimentação ao abrir
   useEffect(() => {
@@ -66,6 +99,11 @@ export default function ModalEditarMovimentacao({
         tipoOcorrencia: movimentacao.tipoOcorrencia || "Normal",
         dataColeta: dataFormatada,
       });
+
+      // Definir produto atual abastecido
+      const produtoAtual =
+        movimentacao.detalhesProdutos?.[0]?.produtoId || null;
+      setProdutoIdSelecionado(produtoAtual);
     }
   }, [movimentacao]);
 
@@ -112,6 +150,7 @@ export default function ModalEditarMovimentacao({
         dataColeta: bloquearDataColeta
           ? movimentacao?.dataColeta || null
           : formData.dataColeta || null,
+        produtoId: produtoIdSelecionado || null,
       };
 
       // Enviar requisição PUT
@@ -150,12 +189,15 @@ export default function ModalEditarMovimentacao({
   };
 
   // Calcular valores automáticos (apenas para exibição)
-  const totalPosCalculado =
-    formData.totalPre && formData.abastecidas
-      ? parseInt(formData.totalPre) +
-        parseInt(formData.abastecidas) -
-        (parseInt(formData.sairam) || 0)
-      : null;
+  const possuiDadosQuantidade =
+    formData.totalPre !== "" ||
+    formData.abastecidas !== "" ||
+    formData.sairam !== "";
+
+  const totalPosCalculado = possuiDadosQuantidade
+    ? (parseInt(formData.totalPre, 10) || 0) +
+      (parseInt(formData.abastecidas, 10) || 0)
+    : null;
 
   const valorFaturadoCalculado =
     (parseInt(formData.fichas) || 0) * (movimentacao?.maquina?.valorFicha || 0);
@@ -300,6 +342,38 @@ export default function ModalEditarMovimentacao({
                   placeholder="Digital + Analógico"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* SELEÇÃO DE PRODUTO */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              📦 Produto Abastecido
+            </h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Qual produto está nesta máquina?
+              </label>
+              <select
+                value={produtoIdSelecionado || ""}
+                onChange={(e) =>
+                  setProdutoIdSelecionado(e.target.value || null)
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Selecione um produto...</option>
+                {produtos.map((produto) => (
+                  <option key={produto.id} value={produto.id}>
+                    {produto.nome}
+                  </option>
+                ))}
+              </select>
+              {produtoIdSelecionado && (
+                <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200 text-sm text-blue-800">
+                  ⚠️ Se trocar o produto, o sistema ajustará automaticamente os
+                  estoques.
+                </div>
+              )}
             </div>
           </div>
 

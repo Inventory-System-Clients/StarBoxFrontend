@@ -56,6 +56,7 @@ export default function DashboardGastosRoteirosTab() {
   const [resumo, setResumo] = useState({
     totalRegistros: 0,
     totalValor: 0,
+    saldoDisponivel: 0,
     gastos: [],
   });
   const [loading, setLoading] = useState(false);
@@ -176,13 +177,17 @@ export default function DashboardGastosRoteirosTab() {
       setResumo({
         totalRegistros: Number(data.totalRegistros || 0),
         totalValor: Number(data.totalValor || 0),
+        saldoDisponivel: Number(data.saldoDisponivel || 0),
         gastos: Array.isArray(data.gastos) ? data.gastos : [],
       });
     } catch (err) {
-      setError(err?.response?.data?.error || "Erro ao carregar gastos de roteiros.");
+      setError(
+        err?.response?.data?.error || "Erro ao carregar gastos de roteiros.",
+      );
       setResumo({
         totalRegistros: 0,
         totalValor: 0,
+        saldoDisponivel: 0,
         gastos: [],
       });
     } finally {
@@ -239,7 +244,8 @@ export default function DashboardGastosRoteirosTab() {
             Gastos de Roteiro
           </h2>
           <p className="text-gray-600 text-sm sm:text-base">
-            Acompanhe os lançamentos diários por roteiro, funcionário, categoria e período.
+            Acompanhe os lançamentos diários por roteiro, funcionário, categoria
+            e período.
           </p>
         </div>
 
@@ -251,7 +257,7 @@ export default function DashboardGastosRoteirosTab() {
             Total: {formatarMoedaBRL(resumo.totalValor)}
           </span>
           <span className="badge bg-emerald-100 text-emerald-700 border-emerald-300">
-            Sobra: {formatarMoedaBRL(resumoSobraRotasFiltradas.totalSobra)}
+            Disponível: {formatarMoedaBRL(resumo.saldoDisponivel)}
           </span>
         </div>
       </div>
@@ -421,7 +427,9 @@ export default function DashboardGastosRoteirosTab() {
                   <tr key={gasto.id} className="border-t border-gray-100">
                     <td className="px-3 py-2">{gasto.roteiro?.nome || "-"}</td>
                     <td className="px-3 py-2">{gasto.usuario?.nome || "-"}</td>
-                    <td className="px-3 py-2">{getCategoriaLabel(gasto.categoria)}</td>
+                    <td className="px-3 py-2">
+                      {getCategoriaLabel(gasto.categoria)}
+                    </td>
                     <td className="px-3 py-2 font-semibold text-gray-800">
                       {formatarMoedaBRL(gasto.valor)}
                     </td>
