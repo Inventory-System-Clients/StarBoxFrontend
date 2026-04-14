@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
@@ -94,12 +94,12 @@ export default function RoteiroExecucao() {
     aberto: false,
     justificativa: "",
     maquina: null,
-    movimentacao: null,
+    movimentacaoAnterior: null,
+    movimentacaoAtualizada: null,
   });
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [movimentacaoParaEditar, setMovimentacaoParaEditar] = useState(null);
   const [maquinasEditadasNaRota, setMaquinasEditadasNaRota] = useState([]);
-  const popupEdicaoMovimentacaoRef = useRef(null);
 
   const perfisPermitidosEditarMovimentacaoRota = new Set([
     "FUNCIONARIO",
@@ -403,6 +403,74 @@ export default function RoteiroExecucao() {
     });
   };
 
+  const formatarValorAlteracaoMovimentacao = (valor, tipo = "texto") => {
+    if (valor === null || valor === undefined || valor === "") {
+      return "vazio";
+    }
+
+    if (tipo === "data") {
+      const data = new Date(valor);
+      if (!Number.isNaN(data.getTime())) {
+        return data.toLocaleString("pt-BR");
+      }
+    }
+
+    return String(valor);
+  };
+
+  const obterProdutoPrincipalMovimentacao = (movimentacao) => {
+    const detalhePrincipal = Array.isArray(movimentacao?.detalhesProdutos)
+      ? movimentacao.detalhesProdutos[0]
+      : null;
+
+    return {
+      id: detalhePrincipal?.produtoId || null,
+      nome: detalhePrincipal?.produto?.nome || null,
+    };
+  };
+
+  const montarAlteracoesMovimentacao = (anterior, atualizada) => {
+    const alteracoes = [];
+    const camposComparaveis = [
+      ["totalPre", "Total pré"],
+      ["sairam", "Saíram"],
+      ["abastecidas", "Abastecidas"],
+      ["fichas", "Fichas"],
+      ["contadorIn", "Contador entrada"],
+      ["contadorOut", "Contador saída"],
+      ["contadorMaquina", "Contador máquina"],
+      ["tipoOcorrencia", "Tipo de ocorrência"],
+      ["observacoes", "Observações"],
+      ["dataColeta", "Data da coleta", "data"],
+    ];
+
+    camposComparaveis.forEach(([campo, rotulo, tipo]) => {
+      const valorAnterior = anterior?.[campo] ?? null;
+      const valorAtual = atualizada?.[campo] ?? null;
+
+      if (String(valorAnterior ?? "") === String(valorAtual ?? "")) {
+        return;
+      }
+
+      alteracoes.push(
+        `${rotulo}: ${formatarValorAlteracaoMovimentacao(valorAnterior, tipo)} -> ${formatarValorAlteracaoMovimentacao(valorAtual, tipo)}`,
+      );
+    });
+
+    const produtoAnterior = obterProdutoPrincipalMovimentacao(anterior);
+    const produtoAtual = obterProdutoPrincipalMovimentacao(atualizada);
+    const chaveProdutoAnterior = `${produtoAnterior.id || ""}:${produtoAnterior.nome || ""}`;
+    const chaveProdutoAtual = `${produtoAtual.id || ""}:${produtoAtual.nome || ""}`;
+
+    if (chaveProdutoAnterior !== chaveProdutoAtual) {
+      alteracoes.push(
+        `Produto: ${formatarValorAlteracaoMovimentacao(produtoAnterior.nome || produtoAnterior.id)} -> ${formatarValorAlteracaoMovimentacao(produtoAtual.nome || produtoAtual.id)}`,
+      );
+    }
+
+    return alteracoes;
+  };
+
   const abrirNovaLeituraMaquina = (maquina) => {
     if (!roteiro?.id || !lojaSelecionada?.id || !maquina?.id) return;
 
@@ -459,22 +527,19 @@ export default function RoteiroExecucao() {
       return;
     }
 
-    setModalJustificativaEdicao({
-      aberto: true,
-      justificativa: "",
-      maquina,
-      movimentacao: {
-        ...ultimaMov,
-        maquina: ultimaMov?.maquina || {
-          id: maquina?.id,
-          nome: obterNomeMaquinaExibicao(maquina),
-          codigo: maquina?.codigo,
-          tipo: obterTipoMaquinaExibicao(maquina),
-          modelo: maquina?.modelo,
-          valorFicha: maquina?.valorFicha,
-        },
+    setMovimentacaoParaEditar({
+      ...ultimaMov,
+      maquina: ultimaMov?.maquina || {
+        id: maquina?.id,
+        nome: obterNomeMaquinaExibicao(maquina),
+        codigo: maquina?.codigo,
+        tipo: obterTipoMaquinaExibicao(maquina),
+        modelo: maquina?.modelo,
+        valorFicha: maquina?.valorFicha,
+        loja: { nome: lojaSelecionada?.nome || maquina?.loja?.nome || "-" },
       },
     });
+    setModalEdicaoAberto(true);
   };
 
   const confirmarJustificativaEdicao = () => {
@@ -482,63 +547,77 @@ export default function RoteiroExecucao() {
       modalJustificativaEdicao?.justificativa || "",
     ).trim();
     if (!justificativa) {
-      setError("Informe a justificativa para editar a última movimentação.");
+      setError("Informe a justificativa da edição realizada.");
       return;
     }
 
     const maquina = modalJustificativaEdicao?.maquina;
-    const movimentacao = modalJustificativaEdicao?.movimentacao;
-
-    popupEdicaoMovimentacaoRef.current = window.open("about:blank", "_blank");
+    const movimentacaoAnterior = modalJustificativaEdicao?.movimentacaoAnterior;
+    const movimentacaoAtualizada =
+      modalJustificativaEdicao?.movimentacaoAtualizada;
+    const alteracoes = montarAlteracoesMovimentacao(
+      movimentacaoAnterior,
+      movimentacaoAtualizada,
+    );
 
     const mensagemWhatsApp = [
       "STAR BOX",
-      "*Solicitação de edição de movimentação na rota*",
+      "*Edição de movimentação na rota*",
       `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
       `Roteiro: ${roteiro?.nome || "-"}`,
       `Funcionário: ${usuario?.nome || "-"}`,
       `Loja: ${lojaSelecionada?.nome || maquina?.loja?.nome || "-"}`,
       `Máquina: ${obterNomeMaquinaExibicao(maquina)} | Tipo: ${obterTipoMaquinaExibicao(maquina)}`,
-      `Movimentação: ${movimentacao?.id || "-"}`,
+      `Movimentação: ${movimentacaoAtualizada?.id || movimentacaoAnterior?.id || "-"}`,
       "___________________________________",
+      `O que mudou: ${alteracoes.length > 0 ? "" : "Nenhuma alteração identificada automaticamente."}`,
+      ...alteracoes.map((item) => `- ${item}`),
       `Justificativa: ${justificativa}`,
     ].join("\n");
 
-    const abriuWhatsApp = abrirWhatsAppComMensagem(
-      mensagemWhatsApp,
-      popupEdicaoMovimentacaoRef.current,
-    );
-    popupEdicaoMovimentacaoRef.current = null;
+    const abriuWhatsApp = abrirWhatsAppComMensagem(mensagemWhatsApp);
 
     if (!abriuWhatsApp) {
       setSuccess(
-        "Justificativa registrada, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
+        "Edição salva, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
       );
+    } else {
+      setSuccess("Edição salva e justificativa enviada para o WhatsApp.");
     }
 
-    setMovimentacaoParaEditar(modalJustificativaEdicao.movimentacao);
-    setModalEdicaoAberto(true);
     setModalJustificativaEdicao({
       aberto: false,
       justificativa: "",
       maquina: null,
-      movimentacao: null,
+      movimentacaoAnterior: null,
+      movimentacaoAtualizada: null,
     });
   };
 
   const fecharModalJustificativaEdicao = () => {
-    if (
-      popupEdicaoMovimentacaoRef.current &&
-      !popupEdicaoMovimentacaoRef.current.closed
-    ) {
-      popupEdicaoMovimentacaoRef.current.close();
-    }
-    popupEdicaoMovimentacaoRef.current = null;
     setModalJustificativaEdicao({
       aberto: false,
       justificativa: "",
       maquina: null,
-      movimentacao: null,
+      movimentacaoAnterior: null,
+      movimentacaoAtualizada: null,
+    });
+  };
+
+  const concluirEdicaoMovimentacao = (movimentacaoAtualizada) => {
+    const maquinaBase =
+      movimentacaoAtualizada?.maquina ||
+      movimentacaoParaEditar?.maquina ||
+      null;
+
+    atualizarMovimentacaoEditadaNaRota(movimentacaoAtualizada);
+
+    setModalJustificativaEdicao({
+      aberto: true,
+      justificativa: "",
+      maquina: maquinaBase,
+      movimentacaoAnterior: movimentacaoParaEditar,
+      movimentacaoAtualizada,
     });
   };
 
@@ -2963,8 +3042,9 @@ export default function RoteiroExecucao() {
           <div className="space-y-4">
             <div className="p-3 bg-amber-50 border-l-4 border-amber-400 rounded">
               <p className="text-sm text-amber-900 font-semibold">
-                Antes de editar, informe obrigatoriamente o motivo. Esta
-                justificativa será enviada no WhatsApp.
+                Depois de salvar, informe obrigatoriamente o motivo da edição.
+                Esta justificativa será enviada no WhatsApp com o resumo do que
+                foi alterado.
               </p>
               {modalJustificativaEdicao?.maquina && (
                 <p className="text-xs text-amber-800 mt-2">
@@ -3003,7 +3083,7 @@ export default function RoteiroExecucao() {
                 className="btn-primary"
                 onClick={confirmarJustificativaEdicao}
               >
-                Continuar para edição
+                Enviar justificativa
               </button>
             </div>
           </div>
@@ -3017,7 +3097,7 @@ export default function RoteiroExecucao() {
               setModalEdicaoAberto(false);
               setMovimentacaoParaEditar(null);
             }}
-            onSucesso={atualizarMovimentacaoEditadaNaRota}
+            onSucesso={concluirEdicaoMovimentacao}
           />
         )}
 
