@@ -403,6 +403,14 @@ export default function RoteiroExecucao() {
     });
   };
 
+  const abrirNovaLeituraMaquina = (maquina) => {
+    if (!roteiro?.id || !lojaSelecionada?.id || !maquina?.id) return;
+
+    navigate(
+      `/roteiros/${roteiro.id}/lojas/${lojaSelecionada.id}/maquinas/${maquina.id}/movimentacao`,
+    );
+  };
+
   const buscarUltimaMovimentacaoDaMaquina = async (maquinaId) => {
     const resposta = await api.get("/movimentacoes", {
       params: {
@@ -2692,6 +2700,16 @@ export default function RoteiroExecucao() {
                             </span>
                           )}
                         </button>
+
+                        {maquinaConcluida && (
+                          <button
+                            className="px-3 py-2 rounded border border-blue-500 bg-blue-50 text-blue-800 text-xs font-semibold hover:bg-blue-100"
+                            onClick={() => abrirNovaLeituraMaquina(maquina)}
+                            title="Abrir a máquina novamente para lançar uma nova leitura"
+                          >
+                            Nova leitura
+                          </button>
+                        )}
 
                         {podeEditarUltimaMovimentacao && (
                           <button
