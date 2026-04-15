@@ -28,7 +28,7 @@ export function Roteiros() {
   const isGestorRoteiro =
     usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
-  const ORCAMENTO_DIARIO_PADRAO = 2000;
+  const ORCAMENTO_SEMANAL_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
     "finalizado",
     "finalizada",
@@ -200,8 +200,8 @@ export function Roteiros() {
     });
 
   const getOrcamentoNumericoRoteiro = (roteiro) => {
-    const valor = Number(roteiro?.orcamentoDiario);
-    return Number.isFinite(valor) ? valor : ORCAMENTO_DIARIO_PADRAO;
+    const valor = Number(roteiro?.orcamentoSemanal ?? roteiro?.orcamentoDiario);
+    return Number.isFinite(valor) ? valor : ORCAMENTO_SEMANAL_PADRAO;
   };
 
   const getOrcamentoRoteiro = (roteiro) => {
@@ -218,7 +218,7 @@ export function Roteiros() {
     }));
   };
 
-  const salvarOrcamentoDiario = async (roteiroId) => {
+  const salvarOrcamentoSemanal = async (roteiroId) => {
     const orcamentoDigitado = orcamentosPendentes[roteiroId];
     if (orcamentoDigitado === undefined) return;
 
@@ -227,11 +227,11 @@ export function Roteiros() {
       .replace(",", ".");
     const valorInformado =
       orcamentoNormalizado === ""
-        ? ORCAMENTO_DIARIO_PADRAO
+        ? ORCAMENTO_SEMANAL_PADRAO
         : Number(orcamentoNormalizado);
 
     if (!Number.isFinite(valorInformado) || valorInformado < 0) {
-      setError("Informe um orçamento diário válido.");
+      setError("Informe um orçamento semanal válido.");
       return;
     }
 
@@ -252,14 +252,18 @@ export function Roteiros() {
 
     try {
       setSalvandoOrcamento((prev) => ({ ...prev, [roteiroId]: true }));
-      await api.patch(`/roteiros/${roteiroId}/orcamento-diario`, {
-        orcamentoDiario: valorOrcamento,
+      await api.patch(`/roteiros/${roteiroId}/orcamento-semanal`, {
+        orcamentoSemanal: valorOrcamento,
       });
 
       setRoteiros((prev) =>
         prev.map((item) =>
           item.id === roteiroId
-            ? { ...item, orcamentoDiario: valorOrcamento }
+            ? {
+                ...item,
+                orcamentoSemanal: valorOrcamento,
+                orcamentoDiario: valorOrcamento,
+              }
             : item,
         ),
       );
@@ -269,9 +273,9 @@ export function Roteiros() {
         delete copia[roteiroId];
         return copia;
       });
-      setSuccess("Orçamento diário salvo com sucesso!");
+      setSuccess("Orçamento semanal salvo com sucesso!");
     } catch {
-      setError("Erro ao salvar orçamento diário do roteiro.");
+      setError("Erro ao salvar orçamento semanal do roteiro.");
     } finally {
       setSalvandoOrcamento((prev) => ({ ...prev, [roteiroId]: false }));
     }
@@ -503,7 +507,9 @@ export function Roteiros() {
           mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
         ).trim();
         const tipoMov = String(mov?.tipo || "").toLowerCase();
-        const veiculoId = String(mov?.veiculoId || mov?.veiculo?.id || "").trim();
+        const veiculoId = String(
+          mov?.veiculoId || mov?.veiculo?.id || "",
+        ).trim();
         const veiculo = veiculosLista.find((v) => String(v.id) === veiculoId);
 
         return (
@@ -550,7 +556,10 @@ export function Roteiros() {
     );
 
     if (roteiroTemVeiculoAssociado(roteiroAtual)) {
-      const podeProsseguir = await usuarioTemPilotagemAtiva(false, roteiroAtual);
+      const podeProsseguir = await usuarioTemPilotagemAtiva(
+        false,
+        roteiroAtual,
+      );
       if (!podeProsseguir) {
         const mensagemBloqueio =
           "Voce precisa iniciar a pilotagem de um veiculo antes de comecar o roteiro. Voce sera redirecionado para a aba de veiculos.";
@@ -698,7 +707,10 @@ export function Roteiros() {
       return true;
     }
 
-    const temPilotagemAtiva = await usuarioTemPilotagemAtiva(true, roteiroAtual);
+    const temPilotagemAtiva = await usuarioTemPilotagemAtiva(
+      true,
+      roteiroAtual,
+    );
     if (!temPilotagemAtiva) return true;
 
     const mensagemBloqueio =
@@ -1048,13 +1060,19 @@ export function Roteiros() {
       });
 
       if (snapshotManutencao) {
-        lojasComManutencao = Array.isArray(snapshotManutencao.lojasComManutencao)
+        lojasComManutencao = Array.isArray(
+          snapshotManutencao.lojasComManutencao,
+        )
           ? snapshotManutencao.lojasComManutencao
           : [];
-        lojasSemManutencao = Array.isArray(snapshotManutencao.lojasSemManutencao)
+        lojasSemManutencao = Array.isArray(
+          snapshotManutencao.lojasSemManutencao,
+        )
           ? snapshotManutencao.lojasSemManutencao
           : lojasSemManutencao;
-        totalManutencoesRealizadas = Number(snapshotManutencao.totalRealizadas || 0);
+        totalManutencoesRealizadas = Number(
+          snapshotManutencao.totalRealizadas || 0,
+        );
       }
 
       try {
@@ -1655,10 +1673,10 @@ export function Roteiros() {
                 )}
               </div>
 
-              {/* Seção Orçamento Diário */}
+              {/* Seção Orçamento Semanal */}
               <div className="mb-4">
                 <label className="text-xs font-bold text-gray-400 block mb-2">
-                  ORÇAMENTO DIÁRIO
+                  ORÇAMENTO SEMANAL
                 </label>
                 {isGestorRoteiro ? (
                   <>
@@ -1675,7 +1693,7 @@ export function Roteiros() {
                       />
                       {orcamentosPendentes[roteiro.id] !== undefined && (
                         <button
-                          onClick={() => salvarOrcamentoDiario(roteiro.id)}
+                          onClick={() => salvarOrcamentoSemanal(roteiro.id)}
                           disabled={salvandoOrcamento[roteiro.id]}
                           className="whitespace-nowrap py-2 px-3 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
                         >
@@ -1686,7 +1704,7 @@ export function Roteiros() {
                       )}
                     </div>
                     <p className="text-[11px] text-gray-500 mt-1">
-                      Valor padrão: {formatarMoedaBRL(ORCAMENTO_DIARIO_PADRAO)}
+                      Valor padrão: {formatarMoedaBRL(ORCAMENTO_SEMANAL_PADRAO)}
                     </p>
                   </>
                 ) : (
