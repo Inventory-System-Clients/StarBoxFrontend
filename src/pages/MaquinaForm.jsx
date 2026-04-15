@@ -345,6 +345,7 @@ export function MaquinaForm() {
 
           const contadorInInicial = parseInt(formData.contadorInInicial, 10);
           const contadorOutInicial = parseInt(formData.contadorOutInicial, 10);
+          const dataColetaInicial = new Date(Date.now() - 5000).toISOString();
 
           const payloadMovimentacaoInicial = {
             maquinaId: novaMaquinaId,
@@ -353,6 +354,7 @@ export function MaquinaForm() {
             abastecidas: 0,
             totalPos: 0,
             fichas: 0,
+            dataColeta: dataColetaInicial,
             contadorInAnterior: contadorInInicial,
             contadorOutAnterior: contadorOutInicial,
             contadorIn: contadorInInicial,

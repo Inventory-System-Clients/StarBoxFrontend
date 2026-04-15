@@ -355,6 +355,90 @@ export const removerMovimentacoesWhatsAppPendentesLoja = ({
   }
 };
 
+const parseNumeroPtBr = (valor) => {
+  const texto = String(valor || "")
+    .trim()
+    .replace(/\s+/g, "");
+  if (!texto) return null;
+
+  const apenasNumeros = texto.replace(/[^\d,.-]/g, "");
+  if (!apenasNumeros) return null;
+
+  const normalizado = apenasNumeros.includes(",")
+    ? apenasNumeros.replace(/\./g, "").replace(",", ".")
+    : apenasNumeros;
+
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) ? numero : null;
+};
+
+const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
+  const linhas = String(mensagem || "")
+    .split("\n")
+    .map((linha) => linha.trim());
+
+  const extrairLinha = (prefixoRegex) =>
+    linhas.find((linha) => prefixoRegex.test(linha)) || "";
+
+  const lojaMatch = linhas.find((linha) => /^\*.+\*$/.test(linha));
+  const lojaNome = lojaMatch
+    ? lojaMatch.replace(/^\*|\*$/g, "").trim()
+    : "";
+
+  const dataLinha = extrairLinha(/^Data:/i);
+  const usuarioLinha = extrairLinha(/^Lançado por:/i);
+  const maquinaLinha =
+    linhas.find((linha) => /\|/.test(linha) && !/^\*/.test(linha)) || "";
+  const linhaE = extrairLinha(/^E\s+/i);
+  const linhaS = extrairLinha(/^S\s+/i);
+  const saldoLinha = extrairLinha(/^Saldo:/i);
+  const mediaLinha = extrairLinha(/^(Jogadas medias por pelucia:|Media Bicho:)/i);
+  const cobrancaLinha = extrairLinha(/^Cobrado com\s+/i);
+
+  const maquinaPartes = maquinaLinha
+    .split("|")
+    .map((parte) => parte.trim())
+    .filter(Boolean);
+  const codigoMaquina = normalizarTexto(maquinaPartes[0] || item?.maquinaNome || "-");
+  const tipoMaquina = normalizarTexto(maquinaPartes[1] || "Máquina");
+
+  const numerosE = linhaE.match(/[\d.,]+/g) || [];
+  const numerosS = linhaS.match(/[\d.,]+/g) || [];
+
+  const inAnterior = parseNumeroPtBr(numerosE[0]) ?? 0;
+  const inAtual = parseNumeroPtBr(numerosE[1]) ?? 0;
+  const diferencaIn =
+    parseNumeroPtBr(numerosE[numerosE.length - 1]) ?? Math.max(0, inAtual - inAnterior);
+
+  const outAnterior = parseNumeroPtBr(numerosS[0]) ?? 0;
+  const outAtual = parseNumeroPtBr(numerosS[1]) ?? 0;
+  const quantidadeSaiu =
+    parseNumeroPtBr(numerosS[numerosS.length - 1]) ?? Math.max(0, outAtual - outAnterior);
+
+  const saldo = parseNumeroPtBr(saldoLinha.replace(/^Saldo:\s*/i, "")) ?? diferencaIn;
+  const mediaBicho = parseNumeroPtBr(mediaLinha) ?? 0;
+
+  const diasMatch = cobrancaLinha.match(/(\d+)/);
+  const diasDesdeUltimaMovimentacao = diasMatch ? Number(diasMatch[1]) : null;
+
+  return {
+    lojaNome: normalizarTexto(lojaNome || "LOJA"),
+    dataMovimentacao: item?.createdAt || new Date().toISOString(),
+    nomeUsuario: normalizarTexto(usuarioLinha.replace(/^Lançado por:\s*/i, "")),
+    codigoMaquina,
+    tipoMaquina,
+    inAnterior,
+    inAtual,
+    outAnterior,
+    outAtual,
+    diferencaIn: Number.isFinite(saldo) ? saldo : diferencaIn,
+    quantidadeSaiu,
+    jogado: Number.isFinite(diferencaIn) ? diferencaIn : 0,
+    jogadasMediasPorPelucia: Number.isFinite(mediaBicho) ? mediaBicho : 0,
+    diasDesdeUltimaMovimentacao,
+  };
+};
+
 export const montarMensagemMovimentacoesWhatsAppLoja = ({
   roteiroId,
   usuarioId,
@@ -374,19 +458,16 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     return dataA - dataB;
   });
 
-  const possuiResumoEstruturado = itensOrdenados.every(
-    (item) => item?.resumo && typeof item.resumo === "object",
-  );
+  const itensNormalizados = itensOrdenados.map((item) => ({
+    ...item,
+    resumo:
+      item?.resumo && typeof item.resumo === "object"
+        ? item.resumo
+        : extrairResumoLegadoDaMensagem(item?.mensagem, item),
+  }));
 
-  if (!possuiResumoEstruturado) {
-    if (itensOrdenados.length === 1) return itensOrdenados[0].mensagem;
-    return itensOrdenados
-      .map((item) => item.mensagem)
-      .join("\n\n====================\n\n");
-  }
-
-  const primeiroResumo = itensOrdenados[0].resumo;
-  const ultimoResumo = itensOrdenados[itensOrdenados.length - 1].resumo;
+  const primeiroResumo = itensNormalizados[0].resumo;
+  const ultimoResumo = itensNormalizados[itensNormalizados.length - 1].resumo;
 
   const formatarDataCurta = (valor) => {
     const data = new Date(valor || Date.now());
@@ -412,7 +493,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
       maximumFractionDigits: 0,
     });
 
-  const blocosMaquinas = itensOrdenados.map((item) => {
+  const blocosMaquinas = itensNormalizados.map((item) => {
     const r = item.resumo;
     const codigo = normalizarTexto(r?.codigoMaquina || item?.maquinaNome || "-");
     const tipo = normalizarTexto(r?.tipoMaquina || "Máquina");
@@ -431,15 +512,15 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     ].join("\n");
   });
 
-  const totalEntradas = itensOrdenados.reduce(
+  const totalEntradas = itensNormalizados.reduce(
     (acc, item) => acc + Number(item?.resumo?.diferencaIn || 0),
     0,
   );
-  const totalSaidasQtd = itensOrdenados.reduce(
+  const totalSaidasQtd = itensNormalizados.reduce(
     (acc, item) => acc + Number(item?.resumo?.quantidadeSaiu || 0),
     0,
   );
-  const totalJogado = itensOrdenados.reduce(
+  const totalJogado = itensNormalizados.reduce(
     (acc, item) => acc + Number(item?.resumo?.jogado || 0),
     0,
   );
@@ -451,7 +532,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     `Lançado por: ${normalizarTexto(ultimoResumo?.nomeUsuario) || "-"}`,
     "___________________________________",
     ...blocosMaquinas,
-    `Qtde Maqs....: ${formatarInteiro(itensOrdenados.length)}`,
+    `Qtde Maqs....: ${formatarInteiro(itensNormalizados.length)}`,
     `Entradas.....: ${formatarMoeda(totalEntradas)}`,
     `Saidas.......: ${formatarInteiro(totalSaidasQtd)}`,
     `Jogado.......: ${formatarMoeda(totalJogado)}`,

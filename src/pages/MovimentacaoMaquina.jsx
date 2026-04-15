@@ -191,6 +191,31 @@ export default function MovimentacaoMaquina() {
     );
   };
 
+  const ehMovimentacaoInicialAutomaticaZerada = (movimentacao) => {
+    if (!movimentacao || typeof movimentacao !== "object") return false;
+
+    const observacoes = String(movimentacao?.observacoes || "")
+      .trim()
+      .toLowerCase();
+
+    const temMarcacaoInicialAutomatica = observacoes.includes(
+      "movimentação inicial automática no cadastro da máquina",
+    );
+
+    const totalPre = toNumero(movimentacao?.totalPre) ?? 0;
+    const totalPos = toNumero(movimentacao?.totalPos) ?? 0;
+    const abastecidas = toNumero(movimentacao?.abastecidas) ?? 0;
+    const sairam = toNumero(movimentacao?.sairam) ?? 0;
+
+    return (
+      temMarcacaoInicialAutomatica &&
+      totalPre <= 0 &&
+      totalPos <= 0 &&
+      abastecidas <= 0 &&
+      sairam <= 0
+    );
+  };
+
   const calcularQuantidadeAtualPelaSaida = ({
     dadosForm,
     resumo,
@@ -248,7 +273,7 @@ export default function MovimentacaoMaquina() {
               .get(`/maquinas/${maquinaId}/ultimo-produto`)
               .catch(() => ({ data: { produtoId: null } })),
             api
-              .get(`/movimentacoes?maquinaId=${maquinaId}&limite=1`)
+              .get(`/movimentacoes?maquinaId=${maquinaId}&limite=10`)
               .catch(() => ({ data: [] })),
             isPerfilFuncionario
               ? api
@@ -300,7 +325,46 @@ export default function MovimentacaoMaquina() {
         const movimentacoesMaquina = Array.isArray(movRes.data)
           ? movRes.data
           : [];
-        const ultimaMovimentacao = movimentacoesMaquina[0] || null;
+        const movimentacoesOrdenadas = [...movimentacoesMaquina].sort(
+          (a, b) => {
+            const tsA = new Date(
+              a?.dataColeta || a?.createdAt || a?.dataMovimentacao || a?.data || 0,
+            ).getTime();
+            const tsB = new Date(
+              b?.dataColeta || b?.createdAt || b?.dataMovimentacao || b?.data || 0,
+            ).getTime();
+
+            if (tsA !== tsB) return tsB - tsA;
+
+            const idA = Number(a?.id || 0);
+            const idB = Number(b?.id || 0);
+            if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) {
+              return idB - idA;
+            }
+
+            return String(b?.id || "").localeCompare(String(a?.id || ""), "pt-BR", {
+              numeric: true,
+              sensitivity: "base",
+            });
+          },
+        );
+
+        const existeMovimentacaoReal = movimentacoesOrdenadas.some((mov) => {
+          const totalPre = toNumero(mov?.totalPre) ?? 0;
+          const totalPos = toNumero(mov?.totalPos) ?? 0;
+          const abastecidas = toNumero(mov?.abastecidas) ?? 0;
+          const sairam = toNumero(mov?.sairam) ?? 0;
+          return totalPre > 0 || totalPos > 0 || abastecidas > 0 || sairam > 0;
+        });
+
+        const movimentacoesFiltradas = existeMovimentacaoReal
+          ? movimentacoesOrdenadas.filter(
+              (mov) => !ehMovimentacaoInicialAutomaticaZerada(mov),
+            )
+          : movimentacoesOrdenadas;
+
+        const ultimaMovimentacao =
+          movimentacoesFiltradas[0] || movimentacoesOrdenadas[0] || null;
         setUltimaMovimentacao(ultimaMovimentacao);
         const dataUltimaMovimentacao =
           ultimaMovimentacao?.dataColeta ||
