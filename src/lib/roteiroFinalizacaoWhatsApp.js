@@ -275,6 +275,8 @@ export const obterMovimentacoesWhatsAppPendentesLoja = ({
         maquinaId: normalizarTexto(item?.maquinaId),
         maquinaNome: normalizarTexto(item?.maquinaNome),
         mensagem: String(item?.mensagem || "").trim(),
+        resumo:
+          item?.resumo && typeof item.resumo === "object" ? item.resumo : null,
         createdAt: item?.createdAt || null,
       }))
       .filter((item) => item.mensagem);
@@ -290,6 +292,7 @@ export const salvarMovimentacaoWhatsAppPendenteLoja = ({
   maquinaId,
   maquinaNome,
   mensagem,
+  resumo,
 }) => {
   const chave = montarChaveMovimentacoesWhatsAppLoja({
     roteiroId,
@@ -311,6 +314,7 @@ export const salvarMovimentacaoWhatsAppPendenteLoja = ({
       maquinaId: normalizarTexto(maquinaId),
       maquinaNome: normalizarTexto(maquinaNome),
       mensagem: mensagemNormalizada,
+      resumo: resumo && typeof resumo === "object" ? resumo : null,
       createdAt: new Date().toISOString(),
     });
 
@@ -363,11 +367,99 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
   });
 
   if (itens.length === 0) return "";
-  if (itens.length === 1) return itens[0].mensagem;
 
-  return itens
-    .map((item) => item.mensagem)
-    .join("\n\n====================\n\n");
+  const itensOrdenados = [...itens].sort((a, b) => {
+    const dataA = new Date(a?.createdAt || 0).getTime();
+    const dataB = new Date(b?.createdAt || 0).getTime();
+    return dataA - dataB;
+  });
+
+  const possuiResumoEstruturado = itensOrdenados.every(
+    (item) => item?.resumo && typeof item.resumo === "object",
+  );
+
+  if (!possuiResumoEstruturado) {
+    if (itensOrdenados.length === 1) return itensOrdenados[0].mensagem;
+    return itensOrdenados
+      .map((item) => item.mensagem)
+      .join("\n\n====================\n\n");
+  }
+
+  const primeiroResumo = itensOrdenados[0].resumo;
+  const ultimoResumo = itensOrdenados[itensOrdenados.length - 1].resumo;
+
+  const formatarDataCurta = (valor) => {
+    const data = new Date(valor || Date.now());
+    if (Number.isNaN(data.getTime())) return "-";
+    return data.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  const formatarMoeda = (valor) =>
+    Number(valor || 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const formatarInteiro = (valor) =>
+    Number(valor || 0).toLocaleString("pt-BR", {
+      maximumFractionDigits: 0,
+    });
+
+  const blocosMaquinas = itensOrdenados.map((item) => {
+    const r = item.resumo;
+    const codigo = normalizarTexto(r?.codigoMaquina || item?.maquinaNome || "-");
+    const tipo = normalizarTexto(r?.tipoMaquina || "Máquina");
+    const saldo = Number(r?.diferencaIn || 0);
+    const mediaBicho = Number(r?.jogadasMediasPorPelucia || 0);
+    const dias = r?.diasDesdeUltimaMovimentacao;
+
+    return [
+      `${codigo} - ${tipo}`,
+      `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(saldo)}`,
+      `S  ${formatarInteiro(r?.outAnterior)}  ${formatarInteiro(r?.outAtual)}________${formatarInteiro(r?.quantidadeSaiu)}`,
+      `Saldo: ${formatarMoeda(saldo)}`,
+      `Media Bicho: ${formatarMoeda(mediaBicho)}`,
+      ...(Number.isFinite(Number(dias)) ? [`Cobrado com ${formatarInteiro(dias)} dia(s)`] : []),
+      "___________________________________",
+    ].join("\n");
+  });
+
+  const totalEntradas = itensOrdenados.reduce(
+    (acc, item) => acc + Number(item?.resumo?.diferencaIn || 0),
+    0,
+  );
+  const totalSaidasQtd = itensOrdenados.reduce(
+    (acc, item) => acc + Number(item?.resumo?.quantidadeSaiu || 0),
+    0,
+  );
+  const totalJogado = itensOrdenados.reduce(
+    (acc, item) => acc + Number(item?.resumo?.jogado || 0),
+    0,
+  );
+
+  return [
+    "STAR BOX",
+    `*${normalizarTexto(primeiroResumo?.lojaNome) || "LOJA"}*`,
+    `Data: ${formatarDataCurta(ultimoResumo?.dataMovimentacao)}`,
+    `Lançado por: ${normalizarTexto(ultimoResumo?.nomeUsuario) || "-"}`,
+    "___________________________________",
+    ...blocosMaquinas,
+    `Qtde Maqs....: ${formatarInteiro(itensOrdenados.length)}`,
+    `Entradas.....: ${formatarMoeda(totalEntradas)}`,
+    `Saidas.......: ${formatarInteiro(totalSaidasQtd)}`,
+    `Jogado.......: ${formatarMoeda(totalJogado)}`,
+    "Cliente....: 0,00",
+    `Liquido.....: ${formatarMoeda(totalEntradas)}`,
+    "Cartao......: 0,00",
+    `Especie.....: ${formatarMoeda(totalEntradas)}`,
+  ].join("\n");
 };
 
 export const obterManutencaoResumoSnapshotRoteiro = ({

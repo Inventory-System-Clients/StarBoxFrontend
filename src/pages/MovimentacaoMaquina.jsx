@@ -921,8 +921,6 @@ export default function MovimentacaoMaquina() {
       (p) => String(p.id) === String(formData.produto_id),
     );
     const precoProduto = Number(produtoSelecionado?.preco || 0);
-    const valorMedioSaidaPorPelucia =
-      quantidadeSaiu > 0 ? diferencaIn / quantidadeSaiu - precoProduto : 0;
     const valorJogadaMedia = 2;
     const jogadasMediasPorPelucia =
       quantidadeSaiu > 0 ? diferencaIn / valorJogadaMedia / quantidadeSaiu : 0;
@@ -975,7 +973,7 @@ export default function MovimentacaoMaquina() {
           `Especie.....: ${formatarInteiro(saldo)}`,
         ];
 
-    return [
+    const mensagem = [
       "STAR BOX",
       `*${lojaNome}*`,
       `Data: ${dataMovimentacao}`,
@@ -996,6 +994,33 @@ export default function MovimentacaoMaquina() {
       ...(linhaComissao ? [linhaComissao] : []),
       ...blocoFinanceiro,
     ].join("\n");
+
+    const resumoEstruturado = {
+      lojaNome,
+      dataMovimentacao: new Date().toISOString(),
+      nomeUsuario,
+      codigoMaquina,
+      tipoMaquina,
+      modeloMaquina,
+      inAnterior,
+      inAtual,
+      outAnterior,
+      outAtual,
+      diferencaIn,
+      quantidadeSaiu,
+      jogado,
+      saldo,
+      jogadasMediasPorPelucia,
+      diasDesdeUltimaMovimentacao,
+      quantidadeAbastecidaInformada,
+      nomeProdutoAbastecido,
+      percentualComissao,
+    };
+
+    return {
+      mensagem,
+      resumoEstruturado,
+    };
   };
 
   const handleChange = (e) => {
@@ -1221,7 +1246,8 @@ export default function MovimentacaoMaquina() {
       if (popupReservado && !popupReservado.closed) {
         popupReservado.close();
       }
-      const mensagemWhatsApp = montarResumoWhatsApp();
+      const { mensagem: mensagemWhatsApp, resumoEstruturado } =
+        montarResumoWhatsApp();
       salvarMovimentacaoWhatsAppPendenteLoja({
         roteiroId,
         usuarioId: usuario?.id,
@@ -1229,6 +1255,7 @@ export default function MovimentacaoMaquina() {
         maquinaId,
         maquinaNome: maquina?.nome || maquina?.codigo || maquinaId,
         mensagem: mensagemWhatsApp,
+        resumo: resumoEstruturado,
       });
       const abriuWhatsApp = true;
 
