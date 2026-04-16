@@ -1608,10 +1608,12 @@ export default function RoteiroExecucao() {
       litrosNumericos = litrosDigitados;
     }
 
-    const saldoAtual = Number(roteiro?.saldoGastoHoje ?? 0);
+    const saldoAtual = Number(
+      roteiro?.saldoGastoSemana ?? roteiro?.saldoGastoHoje ?? 0,
+    );
     if (Number.isFinite(saldoAtual) && valorNumerico > saldoAtual) {
       setError(
-        `Saldo diário insuficiente para este lançamento. Saldo disponível: ${formatarMoedaBRL(saldoAtual)}.`,
+        `Saldo semanal insuficiente para este lançamento. Saldo disponível: ${formatarMoedaBRL(saldoAtual)}.`,
       );
       return;
     }
@@ -1635,7 +1637,7 @@ export default function RoteiroExecucao() {
 
       const res = await api.post(`/roteiros/${id}/gastos`, payload);
 
-      setSuccess(res?.data?.message || "Gasto diário registrado com sucesso.");
+      setSuccess(res?.data?.message || "Gasto semanal registrado com sucesso.");
       setGastoForm((prev) => ({
         ...prev,
         valor: "",
@@ -1646,7 +1648,7 @@ export default function RoteiroExecucao() {
       await carregarRoteiro();
     } catch (err) {
       const mensagemErro =
-        err?.response?.data?.error || "Erro ao registrar gasto diário.";
+        err?.response?.data?.error || "Erro ao registrar gasto semanal.";
       const saldoDisponivelErro = err?.response?.data?.saldoDisponivel;
       if (typeof saldoDisponivelErro === "number") {
         setError(
@@ -2438,27 +2440,39 @@ export default function RoteiroExecucao() {
   const veiculoResumo = roteiro?.veiculo
     ? [roteiro.veiculo.nome, roteiro.veiculo.modelo].filter(Boolean).join(" - ")
     : "Sem veículo associado";
-  const orcamentoConvertido = Number(roteiro.orcamentoDiario);
-  const totalGastoConvertido = Number(roteiro.totalGastoHoje);
-  const saldoConvertido = Number(roteiro.saldoGastoHoje);
+  const orcamentoConvertido = Number(
+    roteiro.orcamentoSemanal ?? roteiro.orcamentoDiario,
+  );
+  const totalGastoConvertido = Number(
+    roteiro.totalGastoSemana ?? roteiro.totalGastoHoje,
+  );
+  const saldoConvertido = Number(
+    roteiro.saldoGastoSemana ?? roteiro.saldoGastoHoje,
+  );
+  const inicioSemanaGastos = String(
+    roteiro?.periodoGastos?.inicioSemana || "",
+  ).trim();
+  const fimSemanaGastos = String(
+    roteiro?.periodoGastos?.fimSemana || "",
+  ).trim();
 
-  const orcamentoDiario = Number.isFinite(orcamentoConvertido)
+  const orcamentoSemanal = Number.isFinite(orcamentoConvertido)
     ? orcamentoConvertido
     : 2000;
-  const totalGastoHoje = Number.isFinite(totalGastoConvertido)
+  const totalGastoSemana = Number.isFinite(totalGastoConvertido)
     ? totalGastoConvertido
     : 0;
-  const saldoGastoHoje = Number.isFinite(saldoConvertido)
+  const saldoGastoSemana = Number.isFinite(saldoConvertido)
     ? saldoConvertido
-    : orcamentoDiario - totalGastoHoje;
+    : orcamentoSemanal - totalGastoSemana;
   const percentualSaldo =
-    orcamentoDiario > 0 ? saldoGastoHoje / orcamentoDiario : 0;
+    orcamentoSemanal > 0 ? saldoGastoSemana / orcamentoSemanal : 0;
   const percentualSaldoBarra = Math.max(
     0,
     Math.min(100, percentualSaldo * 100),
   );
   const saldoClassName =
-    saldoGastoHoje <= 0
+    saldoGastoSemana <= 0
       ? "text-red-600"
       : percentualSaldo < 0.25
         ? "text-yellow-600"
@@ -2472,9 +2486,9 @@ export default function RoteiroExecucao() {
   const observacaoObrigatoriaPendente =
     gastoForm.categoria === "outros" &&
     String(gastoForm.observacao || "").trim() === "";
-  const gastosHojeOrdenados = [...(roteiro.gastosHoje || [])].sort(
-    (a, b) => new Date(b.dataHora) - new Date(a.dataHora),
-  );
+  const gastosSemanaOrdenados = [
+    ...(roteiro.gastosSemana || roteiro.gastosHoje || []),
+  ].sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora));
 
   return (
     <div className="min-h-screen bg-gray-100 text-[#24094E]">
@@ -2556,27 +2570,32 @@ export default function RoteiroExecucao() {
 
         <section className="mb-8 bg-white rounded-xl shadow p-5 border border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-            <h2 className="text-lg font-bold">💸 Gastos Diários do Roteiro</h2>
+            <h2 className="text-lg font-bold">💸 Gastos Semanais do Roteiro</h2>
             <span className="text-xs bg-gray-100 px-3 py-1 rounded-full font-semibold text-gray-600">
               Lançamento de gastos disponível
             </span>
           </div>
+          {inicioSemanaGastos && fimSemanaGastos && (
+            <p className="text-xs text-gray-500 mb-3">
+              Período da semana: {inicioSemanaGastos} até {fimSemanaGastos}
+            </p>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
               <p className="text-xs font-bold text-blue-700">
-                Orçamento Diário
+                Orçamento Semanal
               </p>
               <p className="text-xl font-extrabold text-blue-800">
-                {formatarMoedaBRL(orcamentoDiario)}
+                {formatarMoedaBRL(orcamentoSemanal)}
               </p>
             </div>
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
               <p className="text-xs font-bold text-orange-700">
-                Total Gasto Hoje
+                Total Gasto na Semana
               </p>
               <p className="text-xl font-extrabold text-orange-800">
-                {formatarMoedaBRL(totalGastoHoje)}
+                {formatarMoedaBRL(totalGastoSemana)}
               </p>
             </div>
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -2584,7 +2603,7 @@ export default function RoteiroExecucao() {
                 Saldo Disponível
               </p>
               <p className={`text-xl font-extrabold ${saldoClassName}`}>
-                {formatarMoedaBRL(saldoGastoHoje)}
+                {formatarMoedaBRL(saldoGastoSemana)}
               </p>
             </div>
           </div>
@@ -2592,7 +2611,7 @@ export default function RoteiroExecucao() {
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
             <div
               className={`h-full transition-all ${
-                saldoGastoHoje <= 0
+                saldoGastoSemana <= 0
                   ? "bg-red-500"
                   : percentualSaldo < 0.25
                     ? "bg-yellow-500"
@@ -2791,8 +2810,8 @@ export default function RoteiroExecucao() {
                 </tr>
               </thead>
               <tbody>
-                {gastosHojeOrdenados.length > 0 ? (
-                  gastosHojeOrdenados.map((gasto) => {
+                {gastosSemanaOrdenados.length > 0 ? (
+                  gastosSemanaOrdenados.map((gasto) => {
                     const dataHoraFormatada = formatarDataHora(gasto.dataHora);
                     return (
                       <tr key={gasto.id} className="border-t border-gray-100">
@@ -2826,7 +2845,7 @@ export default function RoteiroExecucao() {
                       colSpan={7}
                       className="px-3 py-4 text-center text-gray-500 italic"
                     >
-                      Nenhum gasto lançado hoje para este roteiro.
+                      Nenhum gasto lançado nesta semana para este roteiro.
                     </td>
                   </tr>
                 )}
