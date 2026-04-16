@@ -1048,31 +1048,6 @@ export default function RoteiroExecucao() {
   }, [roteiro, location.state]);
 
   useEffect(() => {
-    if (!roteiro || !roteiroEstaFinalizado(roteiro.status)) return;
-    if (!roteiroTemVeiculoAssociado(roteiro)) return;
-    if (!location.state?.origemMovimentacao) return;
-    if (location.state?.pilotagemFinalizada) return;
-
-    const mensagemBloqueio =
-      "Roteiro concluído automaticamente. Finalize primeiro a pilotagem do veículo para concluir o fechamento da rota.";
-
-    setSuccess(
-      "Roteiro concluído automaticamente. Você será redirecionado para finalizar o veículo.",
-    );
-
-    navigate("/veiculos", {
-      state: {
-        origem: "roteiros-finalizacao",
-        retornarPara: `/roteiros/${id}/executar`,
-        roteiroIdParaFinalizar: id,
-        alertaFinalizarVeiculo: mensagemBloqueio,
-        alertaFinalizarVeiculoToken: `${Date.now()}-${id}`,
-        fluxoFinalizacaoAutomatica: true,
-      },
-    });
-  }, [id, location.state, navigate, roteiro]);
-
-  useEffect(() => {
     if (!location.state?.origemMovimentacao) return;
     carregarRoteiro();
   }, [location.state?.origemMovimentacao]);
