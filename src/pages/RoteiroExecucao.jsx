@@ -621,6 +621,27 @@ export default function RoteiroExecucao() {
         maquinaId: maquina?.id,
         maquinaNome: nomeMaquina,
         mensagem: mensagemWhatsApp,
+        resumo: {
+          lojaNome: lojaSelecionada?.nome || "LOJA",
+          dataMovimentacao: new Date().toISOString(),
+          nomeUsuario: usuario?.nome || "-",
+          codigoMaquina: nomeMaquina,
+          tipoMaquina,
+          inAnterior: Number(movimentacaoAtualizada?.contadorInAnterior || 0),
+          inAtual: Number(movimentacaoAtualizada?.contadorInAtual || 0),
+          outAnterior: Number(movimentacaoAtualizada?.contadorOutAnterior || 0),
+          outAtual: Number(movimentacaoAtualizada?.contadorOutAtual || 0),
+          diferencaIn: Number(movimentacaoAtualizada?.diferencaIn || 0),
+          quantidadeSaiu: Number(movimentacaoAtualizada?.quantidadeSaiu || 0),
+          jogado: Number(movimentacaoAtualizada?.jogado || 0),
+          jogadasMediasPorPelucia: Number(
+            movimentacaoAtualizada?.jogadasMediasPorPelucia || 0,
+          ),
+          diasDesdeUltimaMovimentacao:
+            movimentacaoAtualizada?.diasDesdeUltimaMovimentacao,
+          quantidadeAbastecimentoExtra: quantidadeNumero,
+          nomeProdutoAbastecimentoExtra: nomeProduto,
+        },
       });
 
       enviarWhatsAppLoja(lojaSelecionada);
@@ -2917,9 +2938,12 @@ export default function RoteiroExecucao() {
                     const podeEditarUltimaMovimentacao =
                       podeEditarUltimaMovimentacaoDaMaquina(maquina);
                     return (
-                      <div key={maquina.id} className="flex items-center gap-2">
+                      <div
+                        key={maquina.id}
+                        className="flex flex-col sm:flex-row sm:items-center gap-2"
+                      >
                         <button
-                          className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 
+                          className={`p-3 rounded border font-medium w-full text-left transition-all flex items-center gap-2 flex-wrap whitespace-normal sm:flex-1 
                       ${maquinaConcluida ? "bg-green-100 border-green-600 text-green-700" : "bg-gray-50 hover:border-blue-600"}
                       ${maquinaConcluida ? "opacity-70 cursor-not-allowed" : ""}`}
                           onClick={() => {
@@ -2943,7 +2967,7 @@ export default function RoteiroExecucao() {
 
                         {maquinaConcluida && (
                           <button
-                            className="px-3 py-2 rounded border border-blue-500 bg-blue-50 text-blue-800 text-xs font-semibold hover:bg-blue-100"
+                            className="w-full sm:w-auto px-3 py-2 rounded border border-blue-500 bg-blue-50 text-blue-800 text-xs font-semibold hover:bg-blue-100 whitespace-normal"
                             onClick={() =>
                               abrirModalAbastecimentoExtra(maquina)
                             }
@@ -2955,7 +2979,7 @@ export default function RoteiroExecucao() {
 
                         {podeEditarUltimaMovimentacao && (
                           <button
-                            className="px-3 py-2 rounded border border-amber-500 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100"
+                            className="w-full sm:w-auto px-3 py-2 rounded border border-amber-500 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 whitespace-normal"
                             onClick={() =>
                               abrirFluxoJustificativaEdicao(maquina)
                             }
@@ -2976,18 +3000,18 @@ export default function RoteiroExecucao() {
             </div>
           </div>
         )}
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           {(!roteiroEstaFinalizado(roteiro.status) ||
             roteiroTemPendencias(roteiro)) && (
             <button
-              className="bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
+              className="w-full sm:w-auto bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
               onClick={abrirModalFinalizacao}
             >
               Finalizar Rota
             </button>
           )}
           <button
-            className={`py-2 px-6 rounded-lg font-bold text-white ${
+            className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
               roteiroEstaFinalizado(roteiro.status)
                 ? "bg-emerald-600 hover:bg-emerald-700"
                 : "bg-emerald-300 cursor-not-allowed"
@@ -3003,7 +3027,7 @@ export default function RoteiroExecucao() {
             Enviar resumo Whats
           </button>
           <button
-            className="bg-gray-200 text-gray-700 py-2 px-6 rounded-lg font-bold"
+            className="w-full sm:w-auto bg-gray-200 text-gray-700 py-2 px-6 rounded-lg font-bold"
             onClick={() => navigate("/roteiros", { replace: true })}
           >
             Voltar

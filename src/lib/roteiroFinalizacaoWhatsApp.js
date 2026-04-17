@@ -372,6 +372,27 @@ const parseNumeroPtBr = (valor) => {
   return Number.isFinite(numero) ? numero : null;
 };
 
+const parseDataHoraPtBr = (valor) => {
+  const texto = String(valor || "").trim();
+  if (!texto) return null;
+
+  const match = texto.match(
+    /^(\d{2})\/(\d{2})\/(\d{2,4})\s*,?\s*(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (!match) return null;
+
+  const dia = Number(match[1]);
+  const mes = Number(match[2]);
+  const anoBruto = Number(match[3]);
+  const horas = Number(match[4]);
+  const minutos = Number(match[5]);
+  const segundos = Number(match[6] || 0);
+  const ano = anoBruto < 100 ? 2000 + anoBruto : anoBruto;
+
+  const data = new Date(ano, mes - 1, dia, horas, minutos, segundos);
+  return Number.isNaN(data.getTime()) ? null : data.toISOString();
+};
+
 const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
   const linhas = String(mensagem || "")
     .split("\n")
@@ -385,10 +406,14 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     ? lojaMatch.replace(/^\*|\*$/g, "").trim()
     : "";
 
-  const dataLinha = extrairLinha(/^Data:/i);
-  const usuarioLinha = extrairLinha(/^Lançado por:/i);
+  const dataLinha = extrairLinha(/^Data(?:\/Hora)?:/i);
+  const usuarioLinha = extrairLinha(
+    /^(Lançado por:|Lancado por:|Funcionário:|Funcionario:)/i,
+  );
   const maquinaLinha =
     linhas.find((linha) => /\|/.test(linha) && !/^\*/.test(linha)) || "";
+  const produtoAbastecidoLinha = extrairLinha(/^Produto abastecido:/i);
+  const quantidadeAbastecidaLinha = extrairLinha(/^Quantidade abastecida:/i);
   const linhaE = extrairLinha(/^E\s+/i);
   const linhaS = extrairLinha(/^S\s+/i);
   const saldoLinha = extrairLinha(/^Saldo:/i);
@@ -399,8 +424,12 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     .split("|")
     .map((parte) => parte.trim())
     .filter(Boolean);
-  const codigoMaquina = normalizarTexto(maquinaPartes[0] || item?.maquinaNome || "-");
-  const tipoMaquina = normalizarTexto(maquinaPartes[1] || "Máquina");
+  const codigoMaquina = normalizarTexto(
+    (maquinaPartes[0] || item?.maquinaNome || "-").replace(/^Máquina:\s*/i, ""),
+  );
+  const tipoMaquina = normalizarTexto(
+    (maquinaPartes[1] || "Máquina").replace(/^Tipo:\s*/i, ""),
+  );
 
   const numerosE = linhaE.match(/[\d.,]+/g) || [];
   const numerosS = linhaS.match(/[\d.,]+/g) || [];
@@ -417,14 +446,32 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
 
   const saldo = parseNumeroPtBr(saldoLinha.replace(/^Saldo:\s*/i, "")) ?? diferencaIn;
   const mediaBicho = parseNumeroPtBr(mediaLinha) ?? 0;
+  const quantidadeAbastecimentoExtra =
+    parseNumeroPtBr(
+      quantidadeAbastecidaLinha.replace(/^Quantidade abastecida:\s*/i, ""),
+    ) ?? 0;
+  const nomeProdutoAbastecimentoExtra = normalizarTexto(
+    produtoAbastecidoLinha.replace(/^Produto abastecido:\s*/i, ""),
+  );
+  const dataMovimentacaoTexto = normalizarTexto(
+    dataLinha.replace(/^Data(?:\/Hora)?:\s*/i, ""),
+  );
 
   const diasMatch = cobrancaLinha.match(/(\d+)/);
   const diasDesdeUltimaMovimentacao = diasMatch ? Number(diasMatch[1]) : null;
 
   return {
     lojaNome: normalizarTexto(lojaNome || "LOJA"),
-    dataMovimentacao: item?.createdAt || new Date().toISOString(),
-    nomeUsuario: normalizarTexto(usuarioLinha.replace(/^Lançado por:\s*/i, "")),
+    dataMovimentacao:
+      parseDataHoraPtBr(dataMovimentacaoTexto) ||
+      item?.createdAt ||
+      new Date().toISOString(),
+    nomeUsuario: normalizarTexto(
+      usuarioLinha.replace(
+        /^(Lançado por:|Lancado por:|Funcionário:|Funcionario:)\s*/i,
+        "",
+      ),
+    ),
     codigoMaquina,
     tipoMaquina,
     inAnterior,
@@ -436,6 +483,10 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     jogado: Number.isFinite(diferencaIn) ? diferencaIn : 0,
     jogadasMediasPorPelucia: Number.isFinite(mediaBicho) ? mediaBicho : 0,
     diasDesdeUltimaMovimentacao,
+    quantidadeAbastecimentoExtra: Number.isFinite(quantidadeAbastecimentoExtra)
+      ? quantidadeAbastecimentoExtra
+      : 0,
+    nomeProdutoAbastecimentoExtra,
   };
 };
 
@@ -500,11 +551,22 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     const saldo = Number(r?.diferencaIn || 0);
     const mediaBicho = Number(r?.jogadasMediasPorPelucia || 0);
     const dias = r?.diasDesdeUltimaMovimentacao;
+    const quantidadeAbastecimentoExtra = Number(
+      r?.quantidadeAbastecimentoExtra || 0,
+    );
+    const nomeProdutoAbastecimentoExtra = normalizarTexto(
+      r?.nomeProdutoAbastecimentoExtra,
+    );
 
     return [
       `${codigo} - ${tipo}`,
       `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(saldo)}`,
       `S  ${formatarInteiro(r?.outAnterior)}  ${formatarInteiro(r?.outAtual)}________${formatarInteiro(r?.quantidadeSaiu)}`,
+      ...(quantidadeAbastecimentoExtra > 0
+        ? [
+            `Abastecimento extra: +${formatarInteiro(quantidadeAbastecimentoExtra)}${nomeProdutoAbastecimentoExtra ? ` (${nomeProdutoAbastecimentoExtra})` : ""}`,
+          ]
+        : []),
       `Saldo: ${formatarMoeda(saldo)}`,
       `Media Bicho: ${formatarMoeda(mediaBicho)}`,
       ...(Number.isFinite(Number(dias)) ? [`Cobrado com ${formatarInteiro(dias)} dia(s)`] : []),
@@ -524,17 +586,31 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     (acc, item) => acc + Number(item?.resumo?.jogado || 0),
     0,
   );
+  const totalAbastecimentoExtra = itensNormalizados.reduce(
+    (acc, item) => acc + Number(item?.resumo?.quantidadeAbastecimentoExtra || 0),
+    0,
+  );
+  const nomeUsuarioLancamento =
+    normalizarTexto(ultimoResumo?.nomeUsuario) ||
+    normalizarTexto(
+      itensNormalizados.find((item) => normalizarTexto(item?.resumo?.nomeUsuario))
+        ?.resumo?.nomeUsuario,
+    ) ||
+    "-";
 
   return [
     "STAR BOX",
     `*${normalizarTexto(primeiroResumo?.lojaNome) || "LOJA"}*`,
     `Data: ${formatarDataCurta(ultimoResumo?.dataMovimentacao)}`,
-    `Lançado por: ${normalizarTexto(ultimoResumo?.nomeUsuario) || "-"}`,
+    `Lançado por: ${nomeUsuarioLancamento}`,
     "___________________________________",
     ...blocosMaquinas,
     `Qtde Maqs....: ${formatarInteiro(itensNormalizados.length)}`,
     `Entradas.....: ${formatarMoeda(totalEntradas)}`,
     `Saidas.......: ${formatarInteiro(totalSaidasQtd)}`,
+    ...(totalAbastecimentoExtra > 0
+      ? [`Abast. extra.: ${formatarInteiro(totalAbastecimentoExtra)}`]
+      : []),
     `Jogado.......: ${formatarMoeda(totalJogado)}`,
     "Cliente....: 0,00",
     `Liquido.....: ${formatarMoeda(totalEntradas)}`,
