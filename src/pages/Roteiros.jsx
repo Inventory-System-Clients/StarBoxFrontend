@@ -121,6 +121,8 @@ export function Roteiros() {
   const [orcamentosPendentes, setOrcamentosPendentes] = useState({});
   const [salvandoOrcamento, setSalvandoOrcamento] = useState({});
   const [apagandoRoteiros, setApagandoRoteiros] = useState({});
+  const [lojasExpandidasPorRoteiro, setLojasExpandidasPorRoteiro] =
+    useState({});
   const [modalFinalizar, setModalFinalizar] = useState({
     aberto: false,
     etapa: 1,
@@ -152,6 +154,18 @@ export function Roteiros() {
 
   const getRoteiroById = (roteiroId) =>
     roteiros.find((item) => String(item.id) === String(roteiroId));
+
+  const LIMITE_LOJAS_VISIVEIS_CARD = 4;
+
+  const listaLojasExpandida = (roteiroId) =>
+    Boolean(lojasExpandidasPorRoteiro[roteiroId]);
+
+  const toggleExpandirLojasDoRoteiro = (roteiroId) => {
+    setLojasExpandidasPorRoteiro((prev) => ({
+      ...prev,
+      [roteiroId]: !prev[roteiroId],
+    }));
+  };
 
   const roteiroTemVeiculoAssociado = (roteiroAtual) =>
     Boolean(
@@ -1781,30 +1795,58 @@ export function Roteiros() {
                 </div>
                 <div className="min-h-30 bg-gray-50 rounded-lg p-3 border border-gray-100">
                   {roteiro.lojas?.length > 0 ? (
-                    roteiro.lojas
-                      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
-                      .map((loja, index) => (
-                        <div
-                          key={loja.id}
-                          draggable={
-                            isGestorRoteiro && !isRoteiroFinalizado(roteiro)
-                          }
-                          onDragStart={() => onDragStart(loja, roteiro.id)}
-                          onDragOver={(e) => onDragOver(e, index, roteiro.id)}
-                          onDragLeave={onDragLeave}
-                          onDrop={(e) => onDrop(e, roteiro.id, index)}
-                          className={`bg-white p-3 rounded-md border shadow-sm mb-2 text-sm flex items-center gap-2 transition-colors
-                            ${isGestorRoteiro && !isRoteiroFinalizado(roteiro) ? "cursor-move hover:border-blue-300" : ""}
-                            ${draggedOverIndex === index && draggedFromRoteiro === roteiro.id ? "border-blue-500 border-2 bg-blue-50" : "border-gray-200"}
-                          `}
-                        >
-                          <span className="text-gray-400">☰</span>
-                          <span className="bg-[#24094E] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                            {index + 1}
-                          </span>
-                          🏪 {loja.nome}
-                        </div>
-                      ))
+                    (() => {
+                      const lojasOrdenadas = [...roteiro.lojas].sort(
+                        (a, b) => (a.ordem || 0) - (b.ordem || 0),
+                      );
+                      const expandida = listaLojasExpandida(roteiro.id);
+                      const lojasVisiveis = expandida
+                        ? lojasOrdenadas
+                        : lojasOrdenadas.slice(0, LIMITE_LOJAS_VISIVEIS_CARD);
+
+                      return (
+                        <>
+                          {lojasVisiveis.map((loja, index) => (
+                            <div
+                              key={loja.id}
+                              draggable={
+                                isGestorRoteiro && !isRoteiroFinalizado(roteiro)
+                              }
+                              onDragStart={() => onDragStart(loja, roteiro.id)}
+                              onDragOver={(e) =>
+                                onDragOver(e, index, roteiro.id)
+                              }
+                              onDragLeave={onDragLeave}
+                              onDrop={(e) => onDrop(e, roteiro.id, index)}
+                              className={`bg-white p-3 rounded-md border shadow-sm mb-2 text-sm flex items-center gap-2 transition-colors
+                                ${isGestorRoteiro && !isRoteiroFinalizado(roteiro) ? "cursor-move hover:border-blue-300" : ""}
+                                ${draggedOverIndex === index && draggedFromRoteiro === roteiro.id ? "border-blue-500 border-2 bg-blue-50" : "border-gray-200"}
+                              `}
+                            >
+                              <span className="text-gray-400">☰</span>
+                              <span className="bg-[#24094E] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                                {index + 1}
+                              </span>
+                              🏪 {loja.nome}
+                            </div>
+                          ))}
+
+                          {lojasOrdenadas.length > LIMITE_LOJAS_VISIVEIS_CARD && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleExpandirLojasDoRoteiro(roteiro.id)
+                              }
+                              className="w-full mt-1 py-2 rounded-md border border-blue-200 text-blue-700 text-xs font-bold hover:bg-blue-50 transition-colors"
+                            >
+                              {expandida
+                                ? "Ver menos"
+                                : `Ver mais ${lojasOrdenadas.length - LIMITE_LOJAS_VISIVEIS_CARD} ponto(s)`}
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8 opacity-30">
                       <span className="text-2xl">📦</span>

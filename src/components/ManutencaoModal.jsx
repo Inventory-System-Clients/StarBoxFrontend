@@ -44,7 +44,15 @@ export default function ManutencaoModal({
   const [explicacaoNaoFazer, setExplicacaoNaoFazer] = useState("");
 
   const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
-    const textoCodificado = encodeURIComponent(mensagem || "");
+    const mensagemNormalizada = String(mensagem || "");
+    if (!mensagemNormalizada) {
+      if (popupReservado && !popupReservado.closed) {
+        popupReservado.close();
+      }
+      return false;
+    }
+
+    const textoCodificado = encodeURIComponent(mensagemNormalizada);
     const isMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     );
@@ -56,17 +64,18 @@ export default function ManutencaoModal({
     if (popupReservado && !popupReservado.closed) {
       popupReservado.location.href = whatsappUrl;
       popupReservado.focus?.();
-      return;
+      return true;
     }
 
     const novaAba = window.open(whatsappUrl, "_blank");
     if (novaAba && !novaAba.closed) {
       novaAba.focus?.();
-      return;
+      return true;
     }
 
     // Fallback para garantir redirecionamento ao WhatsApp mesmo com bloqueio de popup.
     window.location.href = whatsappUrl;
+    return true;
   };
 
   const obterNomePecaSelecionada = () => {
@@ -234,12 +243,16 @@ export default function ManutencaoModal({
             : obterNomePecaSelecionada(),
       });
 
-      abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
+      const abriuWhatsApp = abrirWhatsAppComMensagem(
+        mensagemWhatsApp,
+        popupReservado,
+      );
 
       onManutencaoConcluida?.({
         acao: "feito",
         manutencao,
         lojaNome: manutencao?.loja?.nome || null,
+        whatsappAberto: abriuWhatsApp,
       });
       resetarModal();
       onClose();
@@ -287,12 +300,16 @@ export default function ManutencaoModal({
         pecaUsada: "Não aplicável",
       });
 
-      abrirWhatsAppComMensagem(mensagemWhatsApp, popupReservado);
+      const abriuWhatsApp = abrirWhatsAppComMensagem(
+        mensagemWhatsApp,
+        popupReservado,
+      );
 
       onManutencaoConcluida?.({
         acao: "nao-fazer",
         manutencao,
         lojaNome: manutencao?.loja?.nome || null,
+        whatsappAberto: abriuWhatsApp,
       });
       resetarModal();
       onClose();

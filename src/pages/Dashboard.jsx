@@ -281,6 +281,14 @@ export function Dashboard() {
     usuario?.role === "ADMIN" ||
     usuario?.role === "GERENCIADOR" ||
     usuario?.role === "GERENTE";
+  const roleUsuarioNormalizado = String(usuario?.role || "").toUpperCase();
+  const ocultarAbaRevisaoVeiculos =
+    roleUsuarioNormalizado === "FUNCIONARIO" ||
+    roleUsuarioNormalizado === "FUNCIONARIO_TODAS_LOJAS" ||
+    roleUsuarioNormalizado.includes("ABASTECEDOR");
+  const podeVerAbaRevisaoVeiculos =
+    !ocultarAbaRevisaoVeiculos &&
+    roleUsuarioNormalizado !== "CONTROLADOR_ESTOQUE";
   const podeVerDefeituosasNoDashboard =
     usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
   const resumoCardsGridClass = "grid gap-4 md:gap-6 mb-8";
@@ -1140,7 +1148,7 @@ export function Dashboard() {
 
   // Carregar revisões pendentes
   useEffect(() => {
-    if (usuario?.role === "FUNCIONARIO") {
+    if (!podeVerAbaRevisaoVeiculos) {
       setRevisoesPendentes([]);
       return;
     }
@@ -1156,7 +1164,7 @@ export function Dashboard() {
     const interval = setInterval(carregarRevisoes, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [usuario?.role]);
+  }, [podeVerAbaRevisaoVeiculos]);
 
   useEffect(() => {
     carregarBasesSecundarias();
@@ -3081,7 +3089,7 @@ export function Dashboard() {
           </div>
         )}
 
-        {!isFuncionario && usuario?.role !== "CONTROLADOR_ESTOQUE" && (
+        {podeVerAbaRevisaoVeiculos && (
           <div className="card-gradient mb-8 border-l-4 border-gray-700 p-4 sm:p-8 rounded-xl shadow-md  sm:flex-row items-center justify-between gap-6">
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
@@ -3107,9 +3115,7 @@ export function Dashboard() {
         )}
 
         {/* Card de Revisões Pendentes */}
-        {!isFuncionario &&
-          usuario?.role !== "CONTROLADOR_ESTOQUE" &&
-          revisoesPendentes.length > 0 && (
+        {podeVerAbaRevisaoVeiculos && revisoesPendentes.length > 0 && (
             <div className="card-gradient mb-8 border-l-4 border-red-500 p-4 sm:p-8 rounded-xl shadow-md">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                 <div className="flex-1 min-w-0">
