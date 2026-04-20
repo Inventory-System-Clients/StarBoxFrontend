@@ -13,11 +13,13 @@ import {
   extrairResumoExecucaoRoteiro,
   montarMensagemFinalizacaoRoteiro,
   montarMensagemMovimentacoesWhatsAppLoja,
+  obterUltimaMensagemMovimentacoesWhatsAppLoja,
   obterManutencaoResumoSnapshotRoteiro,
   obterKmInicialPilotagemAtiva,
   obterEstoqueInicialSnapshotRoteiro,
   obterKmInicialPilotagemSnapshotRoteiro,
   removerMovimentacoesWhatsAppPendentesLoja,
+  salvarUltimaMensagemMovimentacoesWhatsAppLoja,
   salvarMovimentacaoWhatsAppPendenteLoja,
   salvarManutencaoResumoSnapshotRoteiro,
   removerEstoqueInicialSnapshotRoteiro,
@@ -140,20 +142,56 @@ export default function RoteiroExecucao() {
       String(status || "").toLowerCase(),
     );
 
+  const lojaComMaquinasFinalizadas = (loja) => {
+    const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
+    if (!lojaEstaConcluida(loja?.status) || maquinas.length === 0) {
+      return false;
+    }
+
+    return maquinas.every((maquina) => maquinaEstaConcluida(maquina?.status));
+  };
+
   const enviarWhatsAppLoja = (loja) => {
     if (!loja?.id) return;
-    const mensagem = montarMensagemMovimentacoesWhatsAppLoja({
+    const mensagemPendente = montarMensagemMovimentacoesWhatsAppLoja({
       roteiroId: id,
       usuarioId: usuario?.id,
       lojaId: loja.id,
     });
-    if (!mensagem) return;
-    abrirWhatsAppComMensagem(mensagem);
-    removerMovimentacoesWhatsAppPendentesLoja({
+    const mensagem =
+      mensagemPendente ||
+      obterUltimaMensagemMovimentacoesWhatsAppLoja({
+        roteiroId: id,
+        usuarioId: usuario?.id,
+        lojaId: loja.id,
+      });
+
+    if (!mensagem) {
+      setError(
+        "Nao ha leituras salvas para este ponto ainda. Finalize ao menos uma maquina para gerar a mensagem.",
+      );
+      return;
+    }
+
+    const abriuWhatsApp = abrirWhatsAppComMensagem(mensagem);
+    if (abriuWhatsApp) {
+      setSuccess("Mensagem de leituras enviada para o WhatsApp.");
+    }
+
+    salvarUltimaMensagemMovimentacoesWhatsAppLoja({
       roteiroId: id,
       usuarioId: usuario?.id,
       lojaId: loja.id,
+      mensagem,
     });
+
+    if (mensagemPendente) {
+      removerMovimentacoesWhatsAppPendentesLoja({
+        roteiroId: id,
+        usuarioId: usuario?.id,
+        lojaId: loja.id,
+      });
+    }
   };
 
   const roteiroTemPendencias = (roteiroAtual) => {
@@ -2921,8 +2959,11 @@ export default function RoteiroExecucao() {
             {roteiro.lojas && roteiro.lojas.length > 0 ? (
               [...roteiro.lojas]
                 .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
-                .map((loja, index) => (
-                  <div key={loja.id} className="space-y-3">
+                .map((loja, index) => {
+                  const pontoFinalizado = lojaComMaquinasFinalizadas(loja);
+
+                  return (
+                    <div key={loja.id} className="space-y-3">
                     <button
                       onClick={() => handleSelecionarLoja(loja)}
                       className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start w-full 
@@ -2944,6 +2985,15 @@ export default function RoteiroExecucao() {
                         </span>
                       )}
                     </button>
+
+                    {pontoFinalizado && (
+                      <button
+                        className="ml-9 text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg"
+                        onClick={() => enviarWhatsAppLoja(loja)}
+                      >
+                        Enviar leituras do ponto no WhatsApp
+                      </button>
+                    )}
 
                     {lojaSelecionada?.id === loja.id && (
                       <div className="bg-white rounded-xl shadow p-4 border border-blue-100">
@@ -3035,8 +3085,9 @@ export default function RoteiroExecucao() {
                         </div>
                       </div>
                     )}
-                  </div>
-                ))
+                    </div>
+                  );
+                })
             ) : (
               <div className="col-span-2 text-center text-gray-400">
                 Nenhuma loja disponível neste roteiro.

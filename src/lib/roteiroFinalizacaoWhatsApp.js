@@ -16,6 +16,8 @@ const MANUTENCAO_RESUMO_ROTEIRO_STORAGE_PREFIX =
   "starbox:roteiro:manutencao-resumo:";
 const MOVIMENTACOES_WHATSAPP_LOJA_STORAGE_PREFIX =
   "starbox:roteiro:movimentacoes-whatsapp-loja:";
+const MOVIMENTACOES_WHATSAPP_ULTIMA_MENSAGEM_LOJA_STORAGE_PREFIX =
+  "starbox:roteiro:movimentacoes-whatsapp-ultima-mensagem-loja:";
 
 const normalizarTexto = (valor) => String(valor || "").trim();
 
@@ -251,6 +253,19 @@ const montarChaveMovimentacoesWhatsAppLoja = ({
   return `${MOVIMENTACOES_WHATSAPP_LOJA_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}:${lojaNormalizada}`;
 };
 
+const montarChaveUltimaMensagemMovimentacoesWhatsAppLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+}) => {
+  const roteiroNormalizado = normalizarTexto(roteiroId);
+  const usuarioNormalizado = normalizarTexto(usuarioId);
+  const lojaNormalizada = normalizarTexto(lojaId);
+
+  if (!roteiroNormalizado || !usuarioNormalizado || !lojaNormalizada) return "";
+  return `${MOVIMENTACOES_WHATSAPP_ULTIMA_MENSAGEM_LOJA_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}:${lojaNormalizada}`;
+};
+
 export const obterMovimentacoesWhatsAppPendentesLoja = ({
   roteiroId,
   usuarioId,
@@ -349,6 +364,48 @@ export const removerMovimentacoesWhatsAppPendentesLoja = ({
 
   try {
     window.localStorage.removeItem(chave);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const obterUltimaMensagemMovimentacoesWhatsAppLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+}) => {
+  const chave = montarChaveUltimaMensagemMovimentacoesWhatsAppLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+  if (!chave) return "";
+
+  try {
+    return String(window.localStorage.getItem(chave) || "").trim();
+  } catch {
+    return "";
+  }
+};
+
+export const salvarUltimaMensagemMovimentacoesWhatsAppLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+  mensagem,
+}) => {
+  const chave = montarChaveUltimaMensagemMovimentacoesWhatsAppLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+  const mensagemNormalizada = String(mensagem || "").trim();
+
+  if (!chave || !mensagemNormalizada) return false;
+
+  try {
+    window.localStorage.setItem(chave, mensagemNormalizada);
     return true;
   } catch {
     return false;
@@ -1192,14 +1249,7 @@ export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
     return true;
   }
 
-  const novaAba = window.open(whatsappAppUrl, "_blank");
-  if (novaAba && !novaAba.closed) {
-    novaAba.focus?.();
-    redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
-    return true;
-  }
-
   window.location.href = whatsappAppUrl;
   redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
-  return false;
+  return true;
 };
