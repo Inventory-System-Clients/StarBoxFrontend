@@ -1147,6 +1147,8 @@ export const montarMensagemFinalizacaoRoteiro = ({
 
 export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
   const textoCodificado = encodeURIComponent(String(mensagem || ""));
+  const whatsappAppUrl = `whatsapp://send?text=${textoCodificado}`;
+  const whatsappFallbackUrl = `https://wa.me/?text=${textoCodificado}`;
   const userAgent = String(
     navigator.userAgent || navigator.vendor || window?.opera || "",
   );
@@ -1175,31 +1177,29 @@ export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
         `intent://send?text=${textoCodificado}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`,
         700,
       );
-      redirecionarSeAindaVisivel(
-        `https://wa.me/?text=${textoCodificado}`,
-        1800,
-      );
+      redirecionarSeAindaVisivel(whatsappFallbackUrl, 1800);
       return true;
     }
-    window.location.href = `whatsapp://send?text=${textoCodificado}`;
-    redirecionarSeAindaVisivel(`https://wa.me/?text=${textoCodificado}`, 1200);
+    window.location.href = whatsappAppUrl;
+    redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
     return true;
   }
 
   if (popupReservado && !popupReservado.closed) {
-    popupReservado.location.href = `https://web.whatsapp.com/send?text=${textoCodificado}`;
+    popupReservado.location.href = whatsappAppUrl;
     popupReservado.focus?.();
+    redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
     return true;
   }
 
-  const novaAba = window.open(
-    `https://web.whatsapp.com/send?text=${textoCodificado}`,
-    "_blank",
-  );
+  const novaAba = window.open(whatsappAppUrl, "_blank");
   if (novaAba && !novaAba.closed) {
     novaAba.focus?.();
+    redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
     return true;
   }
 
+  window.location.href = whatsappAppUrl;
+  redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
   return false;
 };
