@@ -58,7 +58,7 @@ export default function ManutencaoModal({
     );
 
     const whatsappUrl = isMobile
-      ? `https://wa.me/?text=${textoCodificado}`
+      ? `whatsapp://send?text=${textoCodificado}`
       : `https://web.whatsapp.com/send?text=${textoCodificado}`;
 
     if (popupReservado && !popupReservado.closed) {

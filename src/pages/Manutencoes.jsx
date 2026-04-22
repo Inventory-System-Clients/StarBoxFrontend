@@ -44,7 +44,7 @@ const montarWhatsAppUrl = (mensagem) => {
   );
 
   return isMobile
-    ? `https://wa.me/?text=${textoCodificado}`
+    ? `whatsapp://send?text=${textoCodificado}`
     : `https://web.whatsapp.com/send?text=${textoCodificado}`;
 };
 
@@ -771,7 +771,8 @@ function Manutencoes() {
     // Reserva a aba durante o clique para evitar bloqueio e nao trocar a aba atual.
     const popupReservado = window.open("about:blank", "_blank");
     const maquinaSelecionada = maquinas.find(
-      (maquina) => String(maquina?.id || "") === String(novaManutencao.maquinaId || ""),
+      (maquina) =>
+        String(maquina?.id || "") === String(novaManutencao.maquinaId || ""),
     );
 
     try {
@@ -951,7 +952,9 @@ function Manutencoes() {
       return String(id) === String(pecaSelecionada);
     });
 
-    return peca?.nome || peca?.Peca?.nome || peca?.peca?.nome || pecaSelecionada;
+    return (
+      peca?.nome || peca?.Peca?.nome || peca?.peca?.nome || pecaSelecionada
+    );
   };
 
   const concluirManutencao = async (manutencao) => {
@@ -1021,9 +1024,7 @@ function Manutencoes() {
         usuarioNome: usuario?.nome,
         acao: "Concluiu manutenção",
         observacao:
-          pecaSelecionada === "nao-usar"
-            ? observacaoLimpa || "-"
-            : "-",
+          pecaSelecionada === "nao-usar" ? observacaoLimpa || "-" : "-",
         pecaUsada:
           pecaSelecionada !== "nao-usar"
             ? `${obterNomePecaSelecionada()} (x${quantidadeSelecionada})`
@@ -1044,7 +1045,9 @@ function Manutencoes() {
           "Manutenção marcada como feita, mas o navegador bloqueou a abertura do WhatsApp.",
         );
       } else {
-        setSuccess("Manutenção marcada como feita e mensagem preparada no WhatsApp!");
+        setSuccess(
+          "Manutenção marcada como feita e mensagem preparada no WhatsApp!",
+        );
       }
       await carregarManutencoes();
     } catch (err) {
@@ -1379,8 +1382,10 @@ function Manutencoes() {
                       {formatarDataHora(m.concluidoEm)}
                     </td>
                     <td className="px-4 py-2">
-                      {(m.status !== "feito" && m.status !== "concluida") &&
-                      (isAdmin || manutencaoAtribuidaAoUsuario(m, usuario?.id)) ? (
+                      {m.status !== "feito" &&
+                      m.status !== "concluida" &&
+                      (isAdmin ||
+                        manutencaoAtribuidaAoUsuario(m, usuario?.id)) ? (
                         <button
                           className="btn-success text-xs px-3 py-1"
                           onClick={(event) => {
