@@ -542,6 +542,12 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     jogado: Number.isFinite(diferencaIn) ? diferencaIn : 0,
     jogadasMediasPorPelucia: Number.isFinite(mediaBicho) ? mediaBicho : 0,
     diasDesdeUltimaMovimentacao,
+    nomeProdutoAbastecido: nomeProdutoAbastecimentoExtra,
+    quantidadeAbastecidaInformada: Number.isFinite(
+      quantidadeAbastecimentoExtra,
+    )
+      ? quantidadeAbastecimentoExtra
+      : 0,
     quantidadeAbastecimentoExtra: Number.isFinite(quantidadeAbastecimentoExtra)
       ? quantidadeAbastecimentoExtra
       : 0,
@@ -607,6 +613,12 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     const r = item.resumo;
     const codigo = normalizarTexto(r?.codigoMaquina || item?.maquinaNome || "-");
     const tipo = normalizarTexto(r?.tipoMaquina || "Máquina");
+    const nomeProdutoAbastecido = normalizarTexto(
+      r?.nomeProdutoAbastecido || r?.nomeProdutoAbastecimentoExtra,
+    );
+    const quantidadeAbastecidaInformada = Number(
+      r?.quantidadeAbastecidaInformada,
+    );
     const saldo = Number(r?.diferencaIn || 0);
     const mediaBicho = Number(r?.jogadasMediasPorPelucia || 0);
     const dias = r?.diasDesdeUltimaMovimentacao;
@@ -619,6 +631,11 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
 
     return [
       `${codigo} - ${tipo}`,
+      ...(nomeProdutoAbastecido
+        ? [
+            `Produto abastecido: ${nomeProdutoAbastecido}${Number.isFinite(quantidadeAbastecidaInformada) && quantidadeAbastecidaInformada > 0 ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})` : ""}`,
+          ]
+        : []),
       `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(saldo)}`,
       `S  ${formatarInteiro(r?.outAnterior)}  ${formatarInteiro(r?.outAtual)}________${formatarInteiro(r?.quantidadeSaiu)}`,
       ...(quantidadeAbastecimentoExtra > 0
