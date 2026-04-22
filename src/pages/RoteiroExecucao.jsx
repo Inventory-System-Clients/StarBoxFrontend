@@ -9,25 +9,12 @@ import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 import { useAuth } from "../contexts/AuthContext";
 import {
   abrirWhatsAppComMensagem,
-  extrairKmMovimentacoesRoteiro,
-  extrairResumoExecucaoRoteiro,
-  montarMensagemFinalizacaoRoteiro,
   montarMensagemMovimentacoesWhatsAppLoja,
   obterUltimaMensagemMovimentacoesWhatsAppLoja,
-  obterManutencaoResumoSnapshotRoteiro,
   obterKmInicialPilotagemAtiva,
-  obterEstoqueInicialSnapshotRoteiro,
-  obterKmInicialPilotagemSnapshotRoteiro,
   removerMovimentacoesWhatsAppPendentesLoja,
   salvarUltimaMensagemMovimentacoesWhatsAppLoja,
   salvarMovimentacaoWhatsAppPendenteLoja,
-  salvarManutencaoResumoSnapshotRoteiro,
-  removerEstoqueInicialSnapshotRoteiro,
-  removerKmInicialPilotagemSnapshotRoteiro,
-  salvarEstoqueInicialSnapshotRoteiro,
-  salvarKmInicialPilotagemSnapshotRoteiro,
-  somarPeluciasUsadasMovimentacoes,
-  somarSaldoEstoqueUsuario,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
 export default function RoteiroExecucao() {
@@ -90,6 +77,7 @@ export default function RoteiroExecucao() {
     lojasComManutencao: [],
     lojasSemManutencao: [],
   });
+  const [resumoExecucaoBackend, setResumoExecucaoBackend] = useState(null);
   const [tiposMaquinaPorId, setTiposMaquinaPorId] = useState({});
   const [ultimasMovimentacoesPorMaquina, setUltimasMovimentacoesPorMaquina] =
     useState({});
@@ -312,35 +300,6 @@ export default function RoteiroExecucao() {
     };
   };
 
-  const sincronizarResumoManutencaoRota = ({
-    roteiroAtual,
-    resumoBase,
-    sobrescrever = true,
-  }) => {
-    const usuarioReferenciaId = String(
-      roteiroAtual?.funcionarioId || usuario?.id || "",
-    ).trim();
-
-    if (!usuarioReferenciaId || !roteiroAtual?.id) return;
-
-    salvarManutencaoResumoSnapshotRoteiro({
-      roteiroId: roteiroAtual.id,
-      usuarioId: usuarioReferenciaId,
-      resumo: resumoBase,
-      sobrescrever,
-    });
-
-    setResumoManutencaoRota({
-      totalRealizadas: Number(resumoBase?.totalRealizadas || 0),
-      lojasComManutencao: Array.isArray(resumoBase?.lojasComManutencao)
-        ? resumoBase.lojasComManutencao
-        : [],
-      lojasSemManutencao: Array.isArray(resumoBase?.lojasSemManutencao)
-        ? resumoBase.lojasSemManutencao
-        : [],
-    });
-  };
-
   const formatarMoedaBRL = (valor) =>
     Number(valor || 0).toLocaleString("pt-BR", {
       style: "currency",
@@ -358,6 +317,107 @@ export default function RoteiroExecucao() {
         hour: "2-digit",
         minute: "2-digit",
       }),
+    };
+  };
+
+  const obterDataHojeIso = () => new Date().toISOString().slice(0, 10);
+
+  const normalizarListaResumoBackend = (lista) => {
+    if (!Array.isArray(lista)) return [];
+
+    const valores = lista
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (!item || typeof item !== "object") return "";
+        return String(
+          item.nome ||
+            item.descricao ||
+            item.lojaNome ||
+            item.maquinaNome ||
+            item.pontoNome ||
+            "",
+        ).trim();
+      })
+      .filter(Boolean);
+
+    return Array.from(new Set(valores));
+  };
+
+  const normalizarResumoExecucaoBackend = (payloadResumo, roteiroAtual = null) => {
+    if (!payloadResumo || typeof payloadResumo !== "object") return null;
+
+    const resumo = payloadResumo?.resumoExecucao || payloadResumo;
+
+    const extrairNumero = (...valores) => {
+      for (const valor of valores) {
+        const numero = Number(valor);
+        if (Number.isFinite(numero)) return numero;
+      }
+      return null;
+    };
+
+    return {
+      roteiro:
+        String(
+          resumo?.roteiroNome ||
+            resumo?.roteiro?.nome ||
+            payloadResumo?.roteiro?.nome ||
+            roteiroAtual?.nome ||
+            "",
+        ).trim() || "-",
+      pontosFeitos: normalizarListaResumoBackend(
+        resumo?.pontosFeitos || resumo?.lojasFeitas || [],
+      ),
+      pontosNaoFeitos: normalizarListaResumoBackend(
+        resumo?.pontosNaoFeitos || resumo?.lojasNaoFeitas || [],
+      ),
+      maquinasFeitas: normalizarListaResumoBackend(
+        resumo?.maquinasFeitas || [],
+      ),
+      maquinasNaoFeitas: normalizarListaResumoBackend(
+        resumo?.maquinasNaoFeitas || [],
+      ),
+      estoqueInicial: extrairNumero(
+        resumo?.estoqueInicial,
+        resumo?.resumoConsumoProdutos?.estoqueInicialTotal,
+      ),
+      estoqueFinal: extrairNumero(
+        resumo?.estoqueFinal,
+        resumo?.resumoConsumoProdutos?.estoqueFinalTotal,
+      ),
+      totalGastoRota: extrairNumero(
+        resumo?.totalGastoRota,
+        resumo?.resumoConsumoProdutos?.consumoTotalProdutos,
+      ),
+      despesaTotal: extrairNumero(resumo?.despesaTotal),
+      sobraValorDespesa: extrairNumero(resumo?.sobraValorDespesa),
+      totalManutencoesRealizadas: extrairNumero(
+        resumo?.totalManutencoesRealizadas,
+        resumo?.totalDeManutencoesRealizadas,
+      ),
+      lojasComManutencaoRealizada: normalizarListaResumoBackend(
+        resumo?.lojasComManutencaoRealizada || resumo?.lojasComManutencao || [],
+      ),
+      lojasSemManutencaoRealizada: normalizarListaResumoBackend(
+        resumo?.lojasSemManutencaoRealizada || resumo?.lojasSemManutencao || [],
+      ),
+      manutencoesRealizadas: normalizarListaResumoBackend(
+        resumo?.manutencoesRealizadas || [],
+      ),
+      manutencoesNaoRealizadas: normalizarListaResumoBackend(
+        resumo?.manutencoesNaoRealizadas || [],
+      ),
+      manutencoesNaoRealizadasPorPonto: normalizarListaResumoBackend(
+        resumo?.manutencoesNaoRealizadasPorPonto || [],
+      ),
+      mensagemResumoWhatsapp: String(
+        resumo?.mensagemResumoWhatsapp || payloadResumo?.mensagemResumoWhatsapp || "",
+      ).trim(),
+      finalizado:
+        Boolean(resumo?.finalizado) ||
+        roteiroEstaFinalizado(
+          resumo?.status || payloadResumo?.status || roteiroAtual?.status,
+        ),
     };
   };
 
@@ -1022,6 +1082,47 @@ export default function RoteiroExecucao() {
     throw ultimoErro404 || new Error("Roteiro não encontrado.");
   };
 
+  const carregarResumoExecucaoPersistido = async (
+    roteiroId,
+    roteiroAtual = null,
+  ) => {
+    if (!roteiroId) return null;
+
+    try {
+      const resResumo = await api.get(`/roteiros/${roteiroId}/resumo-execucao`, {
+        params: { data: obterDataHojeIso() },
+      });
+
+      const normalizado = normalizarResumoExecucaoBackend(
+        resResumo?.data,
+        roteiroAtual,
+      );
+
+      setResumoExecucaoBackend(normalizado);
+
+      if (normalizado) {
+        setResumoManutencaoRota({
+          totalRealizadas: Number(normalizado.totalManutencoesRealizadas || 0),
+          lojasComManutencao: Array.isArray(
+            normalizado.lojasComManutencaoRealizada,
+          )
+            ? normalizado.lojasComManutencaoRealizada
+            : [],
+          lojasSemManutencao: Array.isArray(
+            normalizado.lojasSemManutencaoRealizada,
+          )
+            ? normalizado.lojasSemManutencaoRealizada
+            : [],
+        });
+      }
+
+      return normalizado;
+    } catch {
+      setResumoExecucaoBackend(null);
+      return null;
+    }
+  };
+
   const getLabelCategoriaGasto = (categoria) =>
     CATEGORIAS_GASTO.find((item) => item.value === categoria)?.label ||
     categoria ||
@@ -1037,47 +1138,18 @@ export default function RoteiroExecucao() {
 
   useEffect(() => {
     if (!roteiro?.id) return;
+    carregarResumoExecucaoPersistido(roteiro.id, roteiro);
+  }, [roteiro?.id]);
 
-    const usuarioReferenciaId = String(
-      roteiro?.funcionarioId || usuario?.id || "",
-    ).trim();
-    if (!usuarioReferenciaId) return;
+  useEffect(() => {
+    if (!id) return;
 
-    const snapshot = obterManutencaoResumoSnapshotRoteiro({
-      roteiroId: roteiro.id,
-      usuarioId: usuarioReferenciaId,
-    });
+    const interval = window.setInterval(() => {
+      carregarResumoExecucaoPersistido(id, roteiro);
+    }, 30000);
 
-    if (snapshot) {
-      setResumoManutencaoRota({
-        totalRealizadas: Number(snapshot?.totalRealizadas || 0),
-        lojasComManutencao: Array.isArray(snapshot?.lojasComManutencao)
-          ? snapshot.lojasComManutencao
-          : [],
-        lojasSemManutencao: Array.isArray(snapshot?.lojasSemManutencao)
-          ? snapshot.lojasSemManutencao
-          : [],
-      });
-    } else {
-      const lojasRoteiroNomes = Array.from(
-        new Set(
-          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
-            .map((loja) => String(loja?.nome || "").trim())
-            .filter(Boolean),
-        ),
-      );
-
-      sincronizarResumoManutencaoRota({
-        roteiroAtual: roteiro,
-        resumoBase: {
-          totalRealizadas: 0,
-          lojasComManutencao: [],
-          lojasSemManutencao: lojasRoteiroNomes,
-        },
-        sobrescrever: false,
-      });
-    }
-  }, [roteiro, usuario?.id]);
+    return () => window.clearInterval(interval);
+  }, [id, roteiro]);
 
   // Efeito para selecionar automaticamente a loja quando volta da movimentação
   useEffect(() => {
@@ -1140,99 +1212,6 @@ export default function RoteiroExecucao() {
       const res = await carregarDadosRoteiroExecucao(id);
       setRoteiro(res.data);
 
-      const usuarioReferenciaId = String(
-        res?.data?.funcionarioId || usuario?.id || "",
-      ).trim();
-      let kmInicialSnapshotExistente = obterKmInicialPilotagemSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: usuarioReferenciaId,
-      });
-      const snapshotExistente = obterEstoqueInicialSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: usuarioReferenciaId,
-      });
-
-      if (!Number.isFinite(snapshotExistente) && usuarioReferenciaId) {
-        try {
-          const estoqueRes = await api.get("/estoque-usuarios/me");
-          const saldoAtual = somarSaldoEstoqueUsuario(estoqueRes.data);
-
-          salvarEstoqueInicialSnapshotRoteiro({
-            roteiroId: id,
-            usuarioId: usuarioReferenciaId,
-            quantidadeInicial: saldoAtual,
-            sobrescrever: false,
-          });
-        } catch {
-          // Sem bloqueio de fluxo caso a captura inicial falhe.
-        }
-      }
-
-      if (!Number.isFinite(kmInicialSnapshotExistente) && usuarioReferenciaId) {
-        const kmInicialPilotagemAtiva = obterKmInicialPilotagemAtiva({
-          usuarioId: usuarioReferenciaId,
-          veiculoId: res?.data?.veiculoId || res?.data?.veiculo?.id,
-        });
-
-        if (Number.isFinite(kmInicialPilotagemAtiva)) {
-          salvarKmInicialPilotagemSnapshotRoteiro({
-            roteiroId: id,
-            usuarioId: usuarioReferenciaId,
-            kmInicial: kmInicialPilotagemAtiva,
-            sobrescrever: false,
-          });
-          kmInicialSnapshotExistente = kmInicialPilotagemAtiva;
-        }
-      }
-
-      if (!Number.isFinite(kmInicialSnapshotExistente) && usuarioReferenciaId) {
-        try {
-          const ultimasRes = await api.get("/movimentacao-veiculos/ultimas");
-          const ultimasObj = ultimasRes?.data || {};
-          const ultimasMovs = Array.isArray(ultimasObj)
-            ? ultimasObj
-            : Object.values(ultimasObj);
-
-          const retiradaAtiva = ultimasMovs.find((mov) => {
-            const tipoMov = String(mov?.tipo || "").toLowerCase();
-            const usuarioMovId = String(
-              mov?.usuario?.id || mov?.usuarioId || mov?.funcionarioId || "",
-            );
-            const veiculoMovId = String(
-              mov?.veiculoId || mov?.veiculo?.id || "",
-            );
-            const veiculoRoteiroId = String(
-              res?.data?.veiculoId || res?.data?.veiculo?.id || "",
-            );
-
-            if (tipoMov !== "retirada") return false;
-            if (usuarioMovId !== usuarioReferenciaId) return false;
-            if (veiculoRoteiroId && veiculoMovId !== veiculoRoteiroId)
-              return false;
-            return true;
-          });
-
-          const kmInicialPilotagem = Number(
-            retiradaAtiva?.kmInicial ??
-              retiradaAtiva?.quilometragemInicial ??
-              retiradaAtiva?.kmRetirada ??
-              retiradaAtiva?.odometroInicial ??
-              retiradaAtiva?.km,
-          );
-
-          if (Number.isFinite(kmInicialPilotagem)) {
-            salvarKmInicialPilotagemSnapshotRoteiro({
-              roteiroId: id,
-              usuarioId: usuarioReferenciaId,
-              kmInicial: kmInicialPilotagem,
-              sobrescrever: false,
-            });
-          }
-        } catch {
-          // Sem bloqueio de fluxo caso a captura do KM inicial falhe.
-        }
-      }
-
       console.log("Roteiro carregado:", res.data);
     } catch (err) {
       if (err?.response?.status === 404) {
@@ -1273,20 +1252,11 @@ export default function RoteiroExecucao() {
   const handleSelecionarLoja = async (loja) => {
     // Verificar ordem das lojas
     if (roteiro?.lojas) {
-      const lojasPendentesJustificadas = new Set(
-        Array.isArray(roteiro?.lojasPendentesJustificadasIds)
-          ? roteiro.lojasPendentesJustificadasIds.map((item) =>
-              String(item || "").trim(),
-            )
-          : [],
-      );
       const lojasOrdenadas = [...roteiro.lojas].sort(
         (a, b) => (a.ordem || 0) - (b.ordem || 0),
       );
       const proximaLoja = lojasOrdenadas.find(
-        (l) =>
-          !lojaEstaConcluida(l.status) &&
-          !lojasPendentesJustificadas.has(String(l?.id || "").trim()),
+        (l) => !lojaEstaConcluida(l.status),
       );
 
       const ordemLojaSelecionada = Number(loja?.ordem || 0);
@@ -1311,15 +1281,63 @@ export default function RoteiroExecucao() {
         proximaLoja.id !== loja.id &&
         !lojaEstaConcluida(loja.status)
       ) {
-        setModalJustificativa({
-          aberto: true,
-          lojaId: loja.id,
-          lojaNome: loja.nome,
-          lojaIdEsperada: proximaLoja.id,
-          lojaEsperadaNome: proximaLoja.nome,
-          justificativa: "",
-        });
-        return;
+        try {
+          const statusRes = await api.get(`/roteiros/${id}/quebra-ordem/status`, {
+            params: { lojaId: loja.id },
+          });
+          const statusQuebra = statusRes?.data || {};
+          const precisaJustificativa = Boolean(
+            statusQuebra?.precisaJustificativa,
+          );
+          const motivoQuebra = String(statusQuebra?.motivo || "")
+            .trim()
+            .toLowerCase();
+
+          if (precisaJustificativa) {
+            setModalJustificativa({
+              aberto: true,
+              lojaId: loja.id,
+              lojaNome: loja.nome,
+              lojaIdEsperada: statusQuebra?.lojaEsperadaId || proximaLoja.id,
+              lojaEsperadaNome:
+                statusQuebra?.lojaEsperadaNome || proximaLoja.nome || "",
+              justificativa: "",
+            });
+            return;
+          }
+
+          const justificativaJaEnviada =
+            statusQuebra?.pontoPulado?.justificativaEnviada === true ||
+            motivoQuebra === "ja_justificado_hoje" ||
+            motivoQuebra === "ja_justificada_hoje" ||
+            motivoQuebra === "justificativa_ja_enviada";
+
+          if (justificativaJaEnviada) {
+            setSuccess(
+              "Esse ponto já foi pulado hoje e a justificativa já foi enviada. Não é necessário enviar novamente.",
+            );
+          }
+
+          // Não bloquear o fluxo quando o backend indicar ordem correta ou
+          // ausência de pendência na ordem.
+          if (
+            motivoQuebra === "na_ordem_correta" ||
+            motivoQuebra === "sem_pendencia_na_ordem"
+          ) {
+            // segue fluxo normal
+          }
+        } catch {
+          // Fallback seguro: se status não puder ser consultado, exige justificativa.
+          setModalJustificativa({
+            aberto: true,
+            lojaId: loja.id,
+            lojaNome: loja.nome,
+            lojaIdEsperada: proximaLoja.id,
+            lojaEsperadaNome: proximaLoja.nome,
+            justificativa: "",
+          });
+          return;
+        }
       }
     }
 
@@ -1373,29 +1391,22 @@ export default function RoteiroExecucao() {
         );
       }
 
-      const loja = roteiro.lojas.find(
-        (l) => l.id === modalJustificativa.lojaId,
-      );
+      const resRoteiroAtualizado = await carregarDadosRoteiroExecucao(id);
+      const roteiroAtualizado = resRoteiroAtualizado?.data || null;
 
-      setRoteiro((prev) => {
-        if (!prev) return prev;
+      if (roteiroAtualizado) {
+        setRoteiro(roteiroAtualizado);
+        await carregarResumoExecucaoPersistido(id, roteiroAtualizado);
+      }
 
-        const idsAtuais = Array.isArray(prev.lojasPendentesJustificadasIds)
-          ? prev.lojasPendentesJustificadasIds
+      const lojasAtualizadas = Array.isArray(roteiroAtualizado?.lojas)
+        ? roteiroAtualizado.lojas
+        : Array.isArray(roteiro?.lojas)
+          ? roteiro.lojas
           : [];
-
-        return {
-          ...prev,
-          lojasPendentesJustificadasIds: Array.from(
-            new Set(
-              [
-                ...idsAtuais,
-                String(modalJustificativa.lojaIdEsperada || "").trim(),
-              ].filter(Boolean),
-            ),
-          ),
-        };
-      });
+      const loja = lojasAtualizadas.find(
+        (l) => String(l?.id || "") === String(modalJustificativa.lojaId || ""),
+      );
 
       setLojaSelecionada(loja);
 
@@ -1430,35 +1441,6 @@ export default function RoteiroExecucao() {
     }
     setModalManutencao(false);
 
-    if (evento?.acao === "feito" && roteiro?.id) {
-      const lojaNomeEvento = String(
-        evento?.lojaNome || manutencaoPendente?.loja?.nome || "",
-      ).trim();
-      const lojasComAtualizadas = Array.from(
-        new Set([
-          ...(Array.isArray(resumoManutencaoRota.lojasComManutencao)
-            ? resumoManutencaoRota.lojasComManutencao
-            : []),
-          ...(lojaNomeEvento ? [lojaNomeEvento] : []),
-        ]),
-      );
-      const lojasSemAtualizadas = (
-        Array.isArray(resumoManutencaoRota.lojasSemManutencao)
-          ? resumoManutencaoRota.lojasSemManutencao
-          : []
-      ).filter((nomeLoja) => nomeLoja !== lojaNomeEvento);
-
-      sincronizarResumoManutencaoRota({
-        roteiroAtual: roteiro,
-        resumoBase: {
-          totalRealizadas:
-            Number(resumoManutencaoRota.totalRealizadas || 0) + 1,
-          lojasComManutencao: lojasComAtualizadas,
-          lojasSemManutencao: lojasSemAtualizadas,
-        },
-      });
-    }
-
     if (
       manutencaoRecemCriada?.id &&
       manutencaoPendente?.id === manutencaoRecemCriada.id
@@ -1470,28 +1452,7 @@ export default function RoteiroExecucao() {
     // Recarregar roteiro para atualizar status
     await carregarRoteiro();
 
-    try {
-      if (!roteiro?.id) return;
-      const manutRes = await api.get("/manutencoes", {
-        params: {
-          roteiroId: id,
-        },
-      });
-      const listaManut = Array.isArray(manutRes.data)
-        ? manutRes.data
-        : manutRes.data?.rows || [];
-      const resumoAtualizado = extrairResumoManutencoesDaLista(
-        listaManut,
-        roteiro,
-      );
-
-      sincronizarResumoManutencaoRota({
-        roteiroAtual: roteiro,
-        resumoBase: resumoAtualizado,
-      });
-    } catch {
-      // Sem bloqueio de fluxo se a sincronizacao por API falhar.
-    }
+    await carregarResumoExecucaoPersistido(id, roteiro);
   };
 
   const abrirModalNovaManutencao = () => {
@@ -1855,476 +1816,6 @@ export default function RoteiroExecucao() {
       }
     }
 
-    const extrairNumero = (...valores) => {
-      for (const valor of valores) {
-        const numero = Number(valor);
-        if (Number.isFinite(numero)) return numero;
-      }
-      return null;
-    };
-
-    const montarMensagemWhatsAppFinalizacao = async (finalizacaoData) => {
-      const normalizarListaResumo = (lista) => {
-        if (!Array.isArray(lista)) return [];
-
-        const itensNormalizados = lista
-          .map((item) => {
-            if (typeof item === "string") {
-              const valor = item.trim();
-              return valor ? valor : null;
-            }
-
-            if (!item || typeof item !== "object") return null;
-
-            const descricao = String(
-              item.nome ||
-                item.descricao ||
-                item.manutencaoNome ||
-                item.maquinaNome ||
-                "",
-            ).trim();
-            const pontoNome = String(
-              item.pontoNome ||
-                item.lojaNome ||
-                item.loja?.nome ||
-                item.ponto?.nome ||
-                "",
-            ).trim();
-
-            if (!descricao && !pontoNome) return null;
-
-            return {
-              ...item,
-              descricao,
-              pontoNome,
-            };
-          })
-          .filter(Boolean);
-
-        const chaves = new Set();
-        return itensNormalizados.filter((item) => {
-          const chave =
-            typeof item === "string"
-              ? `str:${item}`
-              : `obj:${String(item.id || "")}:${item.descricao || ""}:${item.pontoNome || ""}`;
-
-          if (chaves.has(chave)) return false;
-          chaves.add(chave);
-          return true;
-        });
-      };
-
-      const resumoExecucao = extrairResumoExecucaoRoteiro({
-        roteiro,
-        finalizacaoData,
-      });
-
-      const funcionarioDoRoteiro =
-        finalizacaoData?.funcionarioId ||
-        finalizacaoData?.funcionario?.id ||
-        roteiro?.funcionarioId ||
-        usuario?.id;
-      const kmInicialPilotagemSnapshot = obterKmInicialPilotagemSnapshotRoteiro(
-        {
-          roteiroId: id,
-          usuarioId: funcionarioDoRoteiro,
-        },
-      );
-
-      let totalPeluciasUsadas = extrairNumero(
-        finalizacaoData?.totalPeluciasUsadas,
-        finalizacaoData?.totalPeluciasUtilizadas,
-        finalizacaoData?.peluciasUsadas,
-        finalizacaoData?.totais?.peluciasUsadas,
-      );
-
-      let saldoPeluciasEstoque = extrairNumero(
-        finalizacaoData?.saldoPeluciasEstoqueUsuario,
-        finalizacaoData?.saldoEstoqueUsuario,
-        finalizacaoData?.peluciasRestantesEstoqueUsuario,
-        finalizacaoData?.totais?.saldoEstoqueUsuario,
-      );
-
-      if (saldoPeluciasEstoque === null) {
-        try {
-          if (!funcionarioDoRoteiro) {
-            throw new Error("usuario de referencia ausente");
-          }
-
-          const estoqueResUsuario = await api.get(
-            `/estoque-usuarios/${funcionarioDoRoteiro}`,
-          );
-          saldoPeluciasEstoque = somarSaldoEstoqueUsuario(
-            estoqueResUsuario.data,
-          );
-        } catch {
-          if (
-            funcionarioDoRoteiro &&
-            String(usuario?.id || "") === String(funcionarioDoRoteiro)
-          ) {
-            try {
-              const estoqueResMe = await api.get("/estoque-usuarios/me");
-              saldoPeluciasEstoque = somarSaldoEstoqueUsuario(
-                estoqueResMe.data,
-              );
-            } catch {
-              saldoPeluciasEstoque = null;
-            }
-          } else {
-            saldoPeluciasEstoque = null;
-          }
-        }
-      }
-
-      let saldoPeluciasInicial = obterEstoqueInicialSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: funcionarioDoRoteiro,
-      });
-
-      if (saldoPeluciasInicial === null) {
-        saldoPeluciasInicial = extrairNumero(
-          finalizacaoData?.saldoPeluciasInicialUsuario,
-          finalizacaoData?.saldoInicialEstoqueUsuario,
-          finalizacaoData?.peluciasIniciaisRoteiro,
-          finalizacaoData?.peluciasInicioRoteiro,
-          finalizacaoData?.estoqueInicialUsuario,
-          finalizacaoData?.totais?.saldoPeluciasInicialUsuario,
-          finalizacaoData?.totais?.saldoInicialEstoqueUsuario,
-          finalizacaoData?.totais?.peluciasIniciaisRoteiro,
-          roteiro?.saldoPeluciasInicialUsuario,
-          roteiro?.saldoInicialEstoqueUsuario,
-          roteiro?.peluciasIniciaisRoteiro,
-          roteiro?.peluciasInicioRoteiro,
-          roteiro?.estoqueInicialUsuario,
-        );
-      }
-
-      if (totalPeluciasUsadas === null || totalPeluciasUsadas <= 0) {
-        try {
-          const movRes = await api.get("/movimentacoes", {
-            params: {
-              roteiroId: id,
-            },
-          });
-
-          const listaMov = Array.isArray(movRes.data)
-            ? movRes.data
-            : movRes.data?.rows || movRes.data?.movimentacoes || [];
-
-          const totalPorMovimentacoes = somarPeluciasUsadasMovimentacoes(
-            listaMov,
-            funcionarioDoRoteiro,
-          );
-
-          if (
-            Number.isFinite(totalPorMovimentacoes) &&
-            totalPorMovimentacoes > 0
-          ) {
-            totalPeluciasUsadas = totalPorMovimentacoes;
-          }
-        } catch {
-          // Sem fallback adicional.
-        }
-      }
-
-      if (saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null) {
-        totalPeluciasUsadas = Math.max(
-          0,
-          saldoPeluciasInicial - saldoPeluciasEstoque,
-        );
-      } else if (
-        saldoPeluciasInicial === null &&
-        saldoPeluciasEstoque !== null &&
-        totalPeluciasUsadas !== null
-      ) {
-        saldoPeluciasInicial = saldoPeluciasEstoque + totalPeluciasUsadas;
-      }
-
-      const despesaTotal = extrairNumero(
-        finalizacaoData?.despesaTotal,
-        finalizacaoData?.totalDespesas,
-        finalizacaoData?.totalGastoHoje,
-        finalizacaoData?.totais?.despesaTotal,
-        roteiro?.totalGastoHoje,
-      );
-
-      const sobraValorDespesa = extrairNumero(
-        finalizacaoData?.sobraValorDespesa,
-        finalizacaoData?.saldoDespesa,
-        finalizacaoData?.saldoGastoHoje,
-        finalizacaoData?.totais?.sobraValorDespesa,
-        roteiro?.saldoGastoHoje,
-      );
-
-      let manutencoesRealizadas = normalizarListaResumo(
-        finalizacaoData?.manutencoesRealizadas ||
-          finalizacaoData?.manutencoesConcluidas ||
-          finalizacaoData?.totais?.manutencoesRealizadas ||
-          [],
-      );
-
-      let manutencoesNaoRealizadas = normalizarListaResumo(
-        finalizacaoData?.manutencoesNaoRealizadas ||
-          finalizacaoData?.manutencoesPendentes ||
-          finalizacaoData?.pendenciasManutencao ||
-          [],
-      );
-
-      const lojasRoteiroNomes = Array.from(
-        new Set(
-          (Array.isArray(roteiro?.lojas) ? roteiro.lojas : [])
-            .map((loja) => String(loja?.nome || "").trim())
-            .filter(Boolean),
-        ),
-      );
-      let lojasComManutencao = [];
-      let lojasSemManutencao = [...lojasRoteiroNomes];
-      let totalManutencoesRealizadas = 0;
-
-      const snapshotManutencao = obterManutencaoResumoSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: funcionarioDoRoteiro,
-      });
-
-      if (snapshotManutencao) {
-        lojasComManutencao = Array.isArray(
-          snapshotManutencao.lojasComManutencao,
-        )
-          ? snapshotManutencao.lojasComManutencao
-          : [];
-        lojasSemManutencao = Array.isArray(
-          snapshotManutencao.lojasSemManutencao,
-        )
-          ? snapshotManutencao.lojasSemManutencao
-          : lojasSemManutencao;
-        totalManutencoesRealizadas = Number(
-          snapshotManutencao.totalRealizadas || 0,
-        );
-      }
-
-      try {
-        const manutRes = await api.get("/manutencoes", {
-          params: {
-            roteiroId: id,
-          },
-        });
-
-        const listaManut = Array.isArray(manutRes.data)
-          ? manutRes.data
-          : manutRes.data?.rows || [];
-
-        const relacionadasRoteiro = listaManut.filter((item) => {
-          const rotaId = String(item?.roteiroId || item?.roteiro?.id || "");
-          return rotaId && rotaId === String(id);
-        });
-
-        const inicioSemanaAtual = new Date();
-        inicioSemanaAtual.setHours(0, 0, 0, 0);
-        inicioSemanaAtual.setDate(
-          inicioSemanaAtual.getDate() - inicioSemanaAtual.getDay(),
-        );
-
-        const relacionadasRoteiroSemanaAtual = relacionadasRoteiro.filter(
-          (item) => {
-            const status = String(item?.status || "").toLowerCase();
-            const dataReferencia = [
-              "feito",
-              "concluida",
-              "concluido",
-              "finalizada",
-              "finalizado",
-            ].includes(status)
-              ? item?.concluidoEm || item?.updatedAt || item?.createdAt
-              : item?.createdAt || item?.updatedAt || item?.verificadoEm;
-
-            const dataMs = new Date(dataReferencia).getTime();
-            if (!Number.isFinite(dataMs)) return false;
-
-            return dataMs >= inicioSemanaAtual.getTime();
-          },
-        );
-
-        const feitas = relacionadasRoteiroSemanaAtual.filter((item) => {
-          const status = String(item?.status || "").toLowerCase();
-          return [
-            "feito",
-            "concluida",
-            "concluido",
-            "finalizada",
-            "finalizado",
-          ].includes(status);
-        });
-
-        const pendentes = relacionadasRoteiroSemanaAtual.filter((item) => {
-          const status = String(item?.status || "").toLowerCase();
-          return ![
-            "feito",
-            "concluida",
-            "concluido",
-            "finalizada",
-            "finalizado",
-          ].includes(status);
-        });
-
-        // Fonte de verdade: quando a API responde, o resumo deve refletir
-        // exclusivamente o estado real das manutencoes do roteiro/pontos.
-        manutencoesRealizadas = normalizarListaResumo(feitas);
-        manutencoesNaoRealizadas = normalizarListaResumo(pendentes);
-        totalManutencoesRealizadas = feitas.length;
-        lojasComManutencao = Array.from(
-          new Set(
-            feitas
-              .map((item) =>
-                String(item?.loja?.nome || item?.lojaNome || "").trim(),
-              )
-              .filter(Boolean),
-          ),
-        );
-        lojasSemManutencao = lojasRoteiroNomes.filter(
-          (nomeLoja) => !lojasComManutencao.includes(nomeLoja),
-        );
-
-        if (funcionarioDoRoteiro) {
-          salvarManutencaoResumoSnapshotRoteiro({
-            roteiroId: id,
-            usuarioId: funcionarioDoRoteiro,
-            resumo: {
-              totalRealizadas: totalManutencoesRealizadas,
-              lojasComManutencao,
-              lojasSemManutencao,
-            },
-          });
-        }
-      } catch (err) {
-        if ([401, 403].includes(err?.response?.status)) {
-          throw err;
-        }
-        // Sem fallback adicional.
-      }
-
-      let kmInicialVeiculo = Number.isFinite(kmInicialPilotagemSnapshot)
-        ? kmInicialPilotagemSnapshot
-        : null;
-      let kmFinalVeiculo = null;
-      let fonteKmInicial = Number.isFinite(kmInicialPilotagemSnapshot)
-        ? "snapshot_pilotagem_usuario"
-        : "indefinida";
-      let fonteKmFinal = "indefinida";
-
-      try {
-        const movVeiculoRes = await api.get("/movimentacao-veiculos", {
-          params: {
-            roteiroId: id,
-          },
-        });
-
-        const listaMovimentacoesVeiculo = Array.isArray(movVeiculoRes.data)
-          ? movVeiculoRes.data
-          : movVeiculoRes.data?.rows || movVeiculoRes.data?.movimentacoes || [];
-
-        const resumoKm = extrairKmMovimentacoesRoteiro(
-          listaMovimentacoesVeiculo,
-          {
-            usuarioId: usuario?.id,
-            veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id,
-            roteiroId: id,
-          },
-        );
-
-        if (kmInicialVeiculo === null && Number.isFinite(resumoKm.kmInicial)) {
-          kmInicialVeiculo = resumoKm.kmInicial;
-          fonteKmInicial = "movimentacao_veiculo_retirada";
-        }
-
-        if (Number.isFinite(resumoKm.kmFinal)) {
-          kmFinalVeiculo = resumoKm.kmFinal;
-          fonteKmFinal = "movimentacao_veiculo_devolucao";
-        }
-      } catch {
-        if (kmInicialVeiculo === null) {
-          fonteKmInicial = "erro_busca_movimentacao";
-        }
-        fonteKmFinal = "erro_busca_movimentacao";
-      }
-
-      if (kmFinalVeiculo === null) {
-        const kmFinalFallback = extrairNumero(
-          finalizacaoData?.kmFinalVeiculo,
-          finalizacaoData?.kmFinal,
-          finalizacaoData?.quilometragemFinal,
-          finalizacaoData?.totais?.kmFinalVeiculo,
-        );
-
-        if (kmFinalFallback !== null) {
-          kmFinalVeiculo = kmFinalFallback;
-          fonteKmFinal = "finalizacao_data";
-        }
-      }
-
-      if (kmInicialVeiculo === null) {
-        fonteKmInicial =
-          fonteKmInicial === "indefinida"
-            ? "sem_dados_km_inicial"
-            : fonteKmInicial;
-      }
-
-      if (kmFinalVeiculo === null) {
-        fonteKmFinal =
-          fonteKmFinal === "indefinida" ? "sem_dados_km_final" : fonteKmFinal;
-      }
-
-      if (import.meta.env.DEV) {
-        console.log("[ResumoFinalizacao][KM][RoteiroExecucao]", {
-          roteiroId: id,
-          usuarioId: funcionarioDoRoteiro,
-          veiculoId: roteiro?.veiculoId || roteiro?.veiculo?.id || null,
-          kmInicialVeiculo,
-          kmFinalVeiculo,
-          fonteKmInicial,
-          fonteKmFinal,
-          kmInicialSnapshot: kmInicialPilotagemSnapshot,
-        });
-      }
-
-      return montarMensagemFinalizacaoRoteiro({
-        roteiroNome: roteiro?.nome,
-        possuiVeiculoAssociado: roteiroTemVeiculoAssociado(roteiro),
-        kmInicialVeiculo,
-        kmFinalVeiculo,
-        lojasFeitas: resumoExecucao.lojasFeitas,
-        lojasNaoFeitas: resumoExecucao.lojasNaoFeitas,
-        maquinasFeitas: resumoExecucao.maquinasFeitas,
-        maquinasNaoFeitas: resumoExecucao.maquinasNaoFeitas,
-        totalPeluciasUsadas,
-        saldoPeluciasEstoque,
-        despesaTotal,
-        sobraValorDespesa,
-        manutencoesRealizadas,
-        manutencoesNaoRealizadas,
-        totalManutencoesRealizadas,
-        lojasComManutencao,
-        lojasSemManutencao,
-        abastecimentosExtras: abastecimentosExtrasNaRota.map(
-          (item) =>
-            `${item.maquinaNome} (Tipo: ${item.tipoMaquina}) - ${item.produtoNome}: +${item.quantidade}`,
-        ),
-        maquinasComEdicao: maquinasEditadasNaRota.map(
-          (item) => `${item.nome} (Tipo: ${item.tipo})`,
-        ),
-        resumoConsumoProdutos:
-          saldoPeluciasInicial !== null && saldoPeluciasEstoque !== null
-            ? {
-                estoqueInicialTotal: saldoPeluciasInicial,
-                estoqueFinalTotal: saldoPeluciasEstoque,
-                consumoTotalProdutos: Math.max(
-                  0,
-                  saldoPeluciasInicial - saldoPeluciasEstoque,
-                ),
-              }
-            : null,
-      });
-    };
-
     const popupReservado = window.open("about:blank", "_blank");
 
     try {
@@ -2333,8 +1824,23 @@ export default function RoteiroExecucao() {
       setModalFinalizar((prev) => ({ ...prev, loading: true }));
 
       if (roteiroEstaFinalizado(roteiro?.status)) {
+        const resumoPersistido = await carregarResumoExecucaoPersistido(
+          id,
+          roteiro,
+        );
         const mensagemWhatsApp =
-          await montarMensagemWhatsAppFinalizacao(roteiro);
+          resumoPersistido?.mensagemResumoWhatsapp ||
+          roteiro?.mensagemResumoWhatsapp ||
+          "";
+
+        if (!mensagemWhatsApp) {
+          setError(
+            "Nao foi encontrada mensagem de resumo da rota no backend para envio.",
+          );
+          setModalFinalizar((prev) => ({ ...prev, loading: false }));
+          return;
+        }
+
         const abriuWhatsApp = abrirWhatsAppComMensagem(
           mensagemWhatsApp,
           popupReservado,
@@ -2355,9 +1861,6 @@ export default function RoteiroExecucao() {
       }
 
       const res = await api.post(`/roteiros/${id}/finalizar`);
-      const usuarioReferenciaId = String(
-        roteiro?.funcionarioId || usuario?.id || "",
-      ).trim();
       const pendencias = res?.data?.pendencias || [];
 
       if (pendencias.length > 0) {
@@ -2370,9 +1873,23 @@ export default function RoteiroExecucao() {
         setSuccess("Roteiro finalizado com sucesso!");
       }
 
-      const mensagemWhatsApp = await montarMensagemWhatsAppFinalizacao(
+      const resumoNormalizado = normalizarResumoExecucaoBackend(
         res?.data,
+        roteiro,
       );
+      setResumoExecucaoBackend(resumoNormalizado);
+      const mensagemWhatsApp =
+        resumoNormalizado?.mensagemResumoWhatsapp ||
+        String(res?.data?.mensagemResumoWhatsapp || "").trim();
+
+      if (!mensagemWhatsApp) {
+        setError(
+          "Rota finalizada, mas o backend nao retornou mensagemResumoWhatsapp.",
+        );
+        setModalFinalizar((prev) => ({ ...prev, loading: false }));
+        return;
+      }
+
       const abriuWhatsApp = abrirWhatsAppComMensagem(
         mensagemWhatsApp,
         popupReservado,
@@ -2383,14 +1900,6 @@ export default function RoteiroExecucao() {
         );
       }
 
-      removerEstoqueInicialSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: usuarioReferenciaId,
-      });
-      removerKmInicialPilotagemSnapshotRoteiro({
-        roteiroId: id,
-        usuarioId: usuarioReferenciaId,
-      });
       limparEdicoesMovimentacaoRota();
       setMaquinasEditadasNaRota([]);
 
@@ -2605,23 +2114,104 @@ export default function RoteiroExecucao() {
         </p>
         <section className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
           <h3 className="text-sm font-bold text-violet-900 mb-2">
-            🔧 Contador de manutenções da rota
+            📋 Resumo da execução (backend)
           </h3>
-          <p className="text-sm font-semibold text-violet-800">
-            Total realizadas nesta rota: {resumoManutencaoRota.totalRealizadas}
-          </p>
-          <p className="mt-2 text-xs text-violet-900">
-            Lojas com manutenção:{" "}
-            {resumoManutencaoRota.lojasComManutencao.length > 0
-              ? resumoManutencaoRota.lojasComManutencao.join(", ")
-              : "Nenhuma"}
-          </p>
-          <p className="mt-1 text-xs text-violet-900">
-            Lojas sem manutenção:{" "}
-            {resumoManutencaoRota.lojasSemManutencao.length > 0
-              ? resumoManutencaoRota.lojasSemManutencao.join(", ")
-              : "Nenhuma"}
-          </p>
+          {!resumoExecucaoBackend ? (
+            <p className="text-xs text-violet-900">
+              Resumo persistido ainda não disponível para hoje.
+            </p>
+          ) : (
+            <div className="space-y-1 text-xs text-violet-900">
+              <p>Roteiro: {resumoExecucaoBackend.roteiro || "-"}</p>
+              <p>
+                Pontos feitos:{" "}
+                {resumoExecucaoBackend.pontosFeitos.length > 0
+                  ? resumoExecucaoBackend.pontosFeitos.join(", ")
+                  : "Nenhum"}
+              </p>
+              <p>
+                Pontos não feitos:{" "}
+                {resumoExecucaoBackend.pontosNaoFeitos.length > 0
+                  ? resumoExecucaoBackend.pontosNaoFeitos.join(", ")
+                  : "Nenhum"}
+              </p>
+              <p>
+                Máquinas feitas:{" "}
+                {resumoExecucaoBackend.maquinasFeitas.length > 0
+                  ? resumoExecucaoBackend.maquinasFeitas.join(", ")
+                  : "Nenhuma"}
+              </p>
+              <p>
+                Máquinas não feitas:{" "}
+                {resumoExecucaoBackend.maquinasNaoFeitas.length > 0
+                  ? resumoExecucaoBackend.maquinasNaoFeitas.join(", ")
+                  : "Nenhuma"}
+              </p>
+              <p>
+                Estoque inicial:{" "}
+                {Number.isFinite(resumoExecucaoBackend.estoqueInicial)
+                  ? resumoExecucaoBackend.estoqueInicial
+                  : "Não informado"}
+              </p>
+              <p>
+                Estoque final:{" "}
+                {Number.isFinite(resumoExecucaoBackend.estoqueFinal)
+                  ? resumoExecucaoBackend.estoqueFinal
+                  : "Não informado"}
+              </p>
+              <p>
+                Total gasto na rota:{" "}
+                {Number.isFinite(resumoExecucaoBackend.totalGastoRota)
+                  ? resumoExecucaoBackend.totalGastoRota
+                  : "Não informado"}
+              </p>
+              <p>
+                Despesa total:{" "}
+                {Number.isFinite(resumoExecucaoBackend.despesaTotal)
+                  ? formatarMoedaBRL(resumoExecucaoBackend.despesaTotal)
+                  : "Não informado"}
+              </p>
+              <p>
+                Sobra valor despesa:{" "}
+                {Number.isFinite(resumoExecucaoBackend.sobraValorDespesa)
+                  ? formatarMoedaBRL(resumoExecucaoBackend.sobraValorDespesa)
+                  : "Não informado"}
+              </p>
+              <p>
+                Total de manutenções realizadas:{" "}
+                {Number.isFinite(resumoExecucaoBackend.totalManutencoesRealizadas)
+                  ? resumoExecucaoBackend.totalManutencoesRealizadas
+                  : "0"}
+              </p>
+              <p>
+                Lojas com manutenção realizada:{" "}
+                {resumoExecucaoBackend.lojasComManutencaoRealizada.length > 0
+                  ? resumoExecucaoBackend.lojasComManutencaoRealizada.join(", ")
+                  : "Nenhuma"}
+              </p>
+              <p>
+                Manutenções realizadas:{" "}
+                {resumoExecucaoBackend.manutencoesRealizadas.length > 0
+                  ? resumoExecucaoBackend.manutencoesRealizadas.join(", ")
+                  : "Nenhuma"}
+              </p>
+              <p>
+                Manutenções não realizadas:{" "}
+                {resumoExecucaoBackend.manutencoesNaoRealizadas.length > 0
+                  ? resumoExecucaoBackend.manutencoesNaoRealizadas.join(", ")
+                  : "Nenhuma"}
+              </p>
+              <p>
+                Manutenções não realizadas por ponto:{" "}
+                {resumoExecucaoBackend.manutencoesNaoRealizadasPorPonto
+                  .length > 0
+                  ? resumoExecucaoBackend.manutencoesNaoRealizadasPorPonto.join(
+                      ", ",
+                    )
+                  : "Nenhuma"}
+              </p>
+            </div>
+          )}
         </section>
         {error && (
           <AlertBox type="error" message={error} onClose={() => setError("")} />
