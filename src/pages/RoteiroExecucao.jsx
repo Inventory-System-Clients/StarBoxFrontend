@@ -1271,16 +1271,13 @@ export default function RoteiroExecucao() {
   };
 
   const handleSelecionarLoja = async (loja) => {
-    // Enviar WhatsApp pendente da loja anterior ao trocar de loja
-    if (lojaSelecionada && lojaSelecionada.id !== loja.id) {
-      enviarWhatsAppLoja(lojaSelecionada);
-    }
-
     // Verificar ordem das lojas
     if (roteiro?.lojas) {
       const lojasPendentesJustificadas = new Set(
         Array.isArray(roteiro?.lojasPendentesJustificadasIds)
-          ? roteiro.lojasPendentesJustificadasIds
+          ? roteiro.lojasPendentesJustificadasIds.map((item) =>
+              String(item || "").trim(),
+            )
           : [],
       );
       const lojasOrdenadas = [...roteiro.lojas].sort(
@@ -1288,7 +1285,8 @@ export default function RoteiroExecucao() {
       );
       const proximaLoja = lojasOrdenadas.find(
         (l) =>
-          !lojaEstaConcluida(l.status) && !lojasPendentesJustificadas.has(l.id),
+          !lojaEstaConcluida(l.status) &&
+          !lojasPendentesJustificadas.has(String(l?.id || "").trim()),
       );
 
       const ordemLojaSelecionada = Number(loja?.ordem || 0);
@@ -1398,11 +1396,6 @@ export default function RoteiroExecucao() {
           ),
         };
       });
-
-      // Enviar WhatsApp pendente da loja anterior ao trocar de loja
-      if (lojaSelecionada && lojaSelecionada.id !== loja.id) {
-        enviarWhatsAppLoja(lojaSelecionada);
-      }
 
       setLojaSelecionada(loja);
 
