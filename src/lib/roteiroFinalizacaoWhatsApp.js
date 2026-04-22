@@ -474,7 +474,9 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
   const linhaE = extrairLinha(/^E\s+/i);
   const linhaS = extrairLinha(/^S\s+/i);
   const saldoLinha = extrairLinha(/^Saldo:/i);
-  const mediaLinha = extrairLinha(/^(Jogadas medias por pelucia:|Media Bicho:)/i);
+  const mediaLinha = extrairLinha(
+    /^(Jogadas medias por pelucia:|Media Bicho:|Jogada:)/i,
+  );
   const cobrancaLinha = extrairLinha(/^Cobrado com\s+/i);
 
   const maquinaPartes = maquinaLinha
@@ -625,7 +627,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
           ]
         : []),
       `Saldo: ${formatarMoeda(saldo)}`,
-      `Media Bicho: ${formatarMoeda(mediaBicho)}`,
+      `Jogada: ${formatarMoeda(mediaBicho)}`,
       ...(Number.isFinite(Number(dias)) ? [`Cobrado com ${formatarInteiro(dias)} dia(s)`] : []),
       "___________________________________",
     ].join("\n");
