@@ -136,7 +136,11 @@ export function Maquinas() {
     {
       key: "codigo",
       label: "Código",
-      render: (maquina) => maquina.codigo || "-",
+      render: (maquina) => {
+        const codigo = String(maquina?.codigo || "").trim() || "-";
+        const modelo = String(maquina?.modelo || "").trim();
+        return modelo ? `${codigo} - ${modelo}` : codigo;
+      },
     },
     {
       key: "acoes",
