@@ -143,6 +143,13 @@ export function Maquinas() {
       },
     },
     {
+      key: "tipo",
+      label: "Tipo",
+      render: (maquina) => {
+        return maquina.tipo || "-";
+      },
+    },
+    {
       key: "acoes",
       label: "Ações",
       render: (maquina) => (
