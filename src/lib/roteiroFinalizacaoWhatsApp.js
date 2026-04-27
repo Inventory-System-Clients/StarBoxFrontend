@@ -459,9 +459,7 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     linhas.find((linha) => prefixoRegex.test(linha)) || "";
 
   const lojaMatch = linhas.find((linha) => /^\*.+\*$/.test(linha));
-  const lojaNome = lojaMatch
-    ? lojaMatch.replace(/^\*|\*$/g, "").trim()
-    : "";
+  const lojaNome = lojaMatch ? lojaMatch.replace(/^\*|\*$/g, "").trim() : "";
 
   const dataLinha = extrairLinha(/^Data(?:\/Hora)?:/i);
   const usuarioLinha = extrairLinha(
@@ -496,14 +494,17 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
   const inAnterior = parseNumeroPtBr(numerosE[0]) ?? 0;
   const inAtual = parseNumeroPtBr(numerosE[1]) ?? 0;
   const diferencaIn =
-    parseNumeroPtBr(numerosE[numerosE.length - 1]) ?? Math.max(0, inAtual - inAnterior);
+    parseNumeroPtBr(numerosE[numerosE.length - 1]) ??
+    Math.max(0, inAtual - inAnterior);
 
   const outAnterior = parseNumeroPtBr(numerosS[0]) ?? 0;
   const outAtual = parseNumeroPtBr(numerosS[1]) ?? 0;
   const quantidadeSaiu =
-    parseNumeroPtBr(numerosS[numerosS.length - 1]) ?? Math.max(0, outAtual - outAnterior);
+    parseNumeroPtBr(numerosS[numerosS.length - 1]) ??
+    Math.max(0, outAtual - outAnterior);
 
-  const saldo = parseNumeroPtBr(saldoLinha.replace(/^Saldo:\s*/i, "")) ?? diferencaIn;
+  const saldo =
+    parseNumeroPtBr(saldoLinha.replace(/^Saldo:\s*/i, "")) ?? diferencaIn;
   const mediaBicho = parseNumeroPtBr(mediaLinha) ?? 0;
   const quantidadeAbastecimentoExtra =
     parseNumeroPtBr(
@@ -543,9 +544,7 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     jogadasMediasPorPelucia: Number.isFinite(mediaBicho) ? mediaBicho : 0,
     diasDesdeUltimaMovimentacao,
     nomeProdutoAbastecido: nomeProdutoAbastecimentoExtra,
-    quantidadeAbastecidaInformada: Number.isFinite(
-      quantidadeAbastecimentoExtra,
-    )
+    quantidadeAbastecidaInformada: Number.isFinite(quantidadeAbastecimentoExtra)
       ? quantidadeAbastecimentoExtra
       : 0,
     quantidadeAbastecimentoExtra: Number.isFinite(quantidadeAbastecimentoExtra)
@@ -611,7 +610,9 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
 
   const blocosMaquinas = itensNormalizados.map((item) => {
     const r = item.resumo;
-    const codigo = normalizarTexto(r?.codigoMaquina || item?.maquinaNome || "-");
+    const codigo = normalizarTexto(
+      r?.codigoMaquina || item?.maquinaNome || "-",
+    );
     const tipo = normalizarTexto(r?.tipoMaquina || "Máquina");
     const nomeProdutoAbastecido = normalizarTexto(
       r?.nomeProdutoAbastecido || r?.nomeProdutoAbastecimentoExtra,
@@ -645,7 +646,9 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
         : []),
       `Saldo: ${formatarMoeda(saldo)}`,
       `Jogada: ${formatarMoeda(mediaBicho)}`,
-      ...(Number.isFinite(Number(dias)) ? [`Cobrado com ${formatarInteiro(dias)} dia(s)`] : []),
+      ...(Number.isFinite(Number(dias))
+        ? [`Cobrado com ${formatarInteiro(dias)} dia(s)`]
+        : []),
       "___________________________________",
     ].join("\n");
   });
@@ -663,14 +666,16 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     0,
   );
   const totalAbastecimentoExtra = itensNormalizados.reduce(
-    (acc, item) => acc + Number(item?.resumo?.quantidadeAbastecimentoExtra || 0),
+    (acc, item) =>
+      acc + Number(item?.resumo?.quantidadeAbastecimentoExtra || 0),
     0,
   );
   const nomeUsuarioLancamento =
     normalizarTexto(ultimoResumo?.nomeUsuario) ||
     normalizarTexto(
-      itensNormalizados.find((item) => normalizarTexto(item?.resumo?.nomeUsuario))
-        ?.resumo?.nomeUsuario,
+      itensNormalizados.find((item) =>
+        normalizarTexto(item?.resumo?.nomeUsuario),
+      )?.resumo?.nomeUsuario,
     ) ||
     "-";
 
@@ -1175,7 +1180,8 @@ export const montarMensagemFinalizacaoRoteiro = ({
     "descricao",
   );
   const pontosFeitosQuantidade = toArray(lojasFeitas).filter(Boolean).length;
-  const pontosNaoFeitosQuantidade = toArray(lojasNaoFeitas).filter(Boolean).length;
+  const pontosNaoFeitosQuantidade =
+    toArray(lojasNaoFeitas).filter(Boolean).length;
   const linhasKm = possuiVeiculoAssociado
     ? [
         `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
@@ -1228,7 +1234,7 @@ export const abrirWhatsAppComMensagem = (
   popupReservado = null,
   options = {},
 ) => {
-  const { preferSameTab = false } = options || {};
+  const { preferSameTab = false, noFallback = false } = options || {};
   const textoBruto = String(mensagem || "").trim();
   if (!textoBruto) {
     if (popupReservado && !popupReservado.closed) {
@@ -1250,6 +1256,7 @@ export const abrirWhatsAppComMensagem = (
   const isAndroid = /Android/i.test(userAgent);
 
   const redirecionarSeAindaVisivel = (url, delay) => {
+    if (noFallback) return;
     window.setTimeout(() => {
       if (document.visibilityState === "visible") {
         window.location.href = url;
