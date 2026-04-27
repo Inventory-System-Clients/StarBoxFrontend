@@ -593,18 +593,20 @@ export default function MovimentacaoMaquina() {
   }, [formData, resumoCalculo, isPrimeiraMovimentacao, ultimaMovimentacao]);
 
   useEffect(() => {
-    if (!maquina || !isPrimeiraMovimentacao) return;
-    const capacidadePadrao = Number(
-      maquina?.capacidadePadrao ?? maquina?.capacidade ?? 0,
-    );
-
-    if (formData.quantidadeAtualMaquina === "" && capacidadePadrao > 0) {
-      setFormData((prev) => ({
-        ...prev,
-        quantidadeAtualMaquina: String(capacidadePadrao),
-      }));
+    if (quantidadeAtualSugerida === null || quantidadeAtualSugerida === undefined) {
+      return;
     }
-  }, [maquina, isPrimeiraMovimentacao, formData.quantidadeAtualMaquina]);
+
+    setFormData((prev) => {
+      const valorAtual = String(prev.quantidadeAtualMaquina || "");
+      const valorSugerido = String(quantidadeAtualSugerida);
+      if (valorAtual === valorSugerido) return prev;
+      return {
+        ...prev,
+        quantidadeAtualMaquina: valorSugerido,
+      };
+    });
+  }, [quantidadeAtualSugerida]);
 
   useEffect(() => {
     if (!isPrimeiraMovimentacao) return;
@@ -1729,17 +1731,18 @@ export default function MovimentacaoMaquina() {
                 <input
                   type="number"
                   name="quantidadeAtualMaquina"
-                  value={formData.quantidadeAtualMaquina}
-                  onChange={handleChange}
+                  value={
+                    quantidadeAtualSugerida !== null
+                      ? quantidadeAtualSugerida
+                      : formData.quantidadeAtualMaquina
+                  }
                   className="input-field"
                   placeholder="0"
                   min="0"
-                  disabled={isFuncionarioAbastecedor}
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  {isFuncionarioAbastecedor
-                    ? "Para abastecedor, este campo usa a maior quantidade entre capacidade padrão e estoque atual da última movimentação"
-                    : "Quantos produtos tem agora"}
+                  Total pré calculado automaticamente pela diferença de saída.
                 </p>
                 {quantidadeAtualSugerida !== null && (
                   <p className="text-xs text-indigo-700 mt-1 font-semibold">
