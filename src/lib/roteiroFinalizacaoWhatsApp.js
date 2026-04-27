@@ -1174,6 +1174,8 @@ export const montarMensagemFinalizacaoRoteiro = ({
     toArray(abastecimentosExtras),
     "descricao",
   );
+  const pontosFeitosQuantidade = toArray(lojasFeitas).filter(Boolean).length;
+  const pontosNaoFeitosQuantidade = toArray(lojasNaoFeitas).filter(Boolean).length;
   const linhasKm = possuiVeiculoAssociado
     ? [
         `KM inicial (retirada): ${kmInicial !== null ? kmInicial : "Nao informado"}`,
@@ -1188,8 +1190,8 @@ export const montarMensagemFinalizacaoRoteiro = ({
     "___________________________________",
     `Roteiro: ${normalizarTexto(roteiroNome) || "-"}`,
     ...linhasKm,
-    `Pontos feitos: ${formatarLista(lojasFeitas)}`,
-    `Pontos nao feitos: ${formatarLista(lojasNaoFeitas)}`,
+    `Pontos feitos: ${formatarInteiro(pontosFeitosQuantidade)}`,
+    `Pontos nao feitos: ${formatarInteiro(pontosNaoFeitosQuantidade)}`,
     `Maquinas feitas: ${formatarLista(maquinasFeitas)}`,
     `Maquinas nao feitas: ${formatarLista(maquinasNaoFeitas)}`,
     ...(consumoResumoValido
