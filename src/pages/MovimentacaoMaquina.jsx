@@ -1226,6 +1226,24 @@ export default function MovimentacaoMaquina() {
         ? Math.max(0, estoqueAlvoAbastecedor)
         : parseInt(formData.quantidadeAtualMaquina, 10) || 0;
 
+      const totalPosUltima = Number(quantidadeAtualUltimaMovimentacao);
+      if (
+        Number.isFinite(totalPosUltima) &&
+        Number.isFinite(totalPreAjustado) &&
+        totalPreAjustado > totalPosUltima
+      ) {
+        const confirmou = window.confirm(
+          `Atenção: Não é permitido abastecer a máquina com uma quantidade maior (${totalPreAjustado}) do que o total pós da última movimentação (${totalPosUltima}). Confira o que você digitou.\n\nDeseja continuar mesmo assim?`,
+        );
+
+        if (!confirmou) {
+          setError(
+            "Movimentação cancelada. Ajuste a quantidade antes de continuar.",
+          );
+          return;
+        }
+      }
+
       const payload = {
         maquinaId: maquinaId,
         roteiroId: roteiroId,
