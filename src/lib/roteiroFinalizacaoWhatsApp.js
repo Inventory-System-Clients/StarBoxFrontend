@@ -1223,8 +1223,20 @@ export const montarMensagemFinalizacaoRoteiro = ({
   ].join("\n");
 };
 
-export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
-  const textoCodificado = encodeURIComponent(String(mensagem || ""));
+export const abrirWhatsAppComMensagem = (
+  mensagem,
+  popupReservado = null,
+  options = {},
+) => {
+  const { preferSameTab = false } = options || {};
+  const textoBruto = String(mensagem || "").trim();
+  if (!textoBruto) {
+    if (popupReservado && !popupReservado.closed) {
+      popupReservado.close();
+    }
+    return false;
+  }
+  const textoCodificado = encodeURIComponent(textoBruto);
   const whatsappAppUrl = `whatsapp://send?text=${textoCodificado}`;
   const whatsappFallbackUrl = `https://wa.me/?text=${textoCodificado}`;
   const userAgent = String(
@@ -1263,14 +1275,20 @@ export const abrirWhatsAppComMensagem = (mensagem, popupReservado = null) => {
     return true;
   }
 
-  if (popupReservado && !popupReservado.closed) {
-    popupReservado.location.href = whatsappAppUrl;
-    popupReservado.focus?.();
-    redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
+  if (preferSameTab) {
+    window.location.assign(whatsappFallbackUrl);
     return true;
   }
 
-  window.location.href = whatsappAppUrl;
-  redirecionarSeAindaVisivel(whatsappFallbackUrl, 1200);
+  if (popupReservado && !popupReservado.closed) {
+    popupReservado.location.href = whatsappFallbackUrl;
+    popupReservado.focus?.();
+    return true;
+  }
+
+  const novaAba = window.open(whatsappFallbackUrl, "_blank");
+  if (!novaAba) {
+    window.location.assign(whatsappFallbackUrl);
+  }
   return true;
 };

@@ -161,9 +161,15 @@ export default function RoteiroExecucao() {
       return;
     }
 
-    const abriuWhatsApp = abrirWhatsAppComMensagem(mensagem);
+    const abriuWhatsApp = abrirWhatsAppComMensagem(mensagem, null, {
+      preferSameTab: true,
+    });
     if (abriuWhatsApp) {
       setSuccess("Mensagem de leituras enviada para o WhatsApp.");
+    } else {
+      setError(
+        "Nao foi possivel abrir o WhatsApp. Verifique se o navegador bloqueou a abertura de janelas.",
+      );
     }
 
     salvarUltimaMensagemMovimentacoesWhatsAppLoja({
