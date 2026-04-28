@@ -328,10 +328,18 @@ export default function MovimentacaoMaquina() {
         const movimentacoesOrdenadas = [...movimentacoesMaquina].sort(
           (a, b) => {
             const tsA = new Date(
-              a?.dataColeta || a?.createdAt || a?.dataMovimentacao || a?.data || 0,
+              a?.dataColeta ||
+                a?.createdAt ||
+                a?.dataMovimentacao ||
+                a?.data ||
+                0,
             ).getTime();
             const tsB = new Date(
-              b?.dataColeta || b?.createdAt || b?.dataMovimentacao || b?.data || 0,
+              b?.dataColeta ||
+                b?.createdAt ||
+                b?.dataMovimentacao ||
+                b?.data ||
+                0,
             ).getTime();
 
             if (tsA !== tsB) return tsB - tsA;
@@ -342,10 +350,14 @@ export default function MovimentacaoMaquina() {
               return idB - idA;
             }
 
-            return String(b?.id || "").localeCompare(String(a?.id || ""), "pt-BR", {
-              numeric: true,
-              sensitivity: "base",
-            });
+            return String(b?.id || "").localeCompare(
+              String(a?.id || ""),
+              "pt-BR",
+              {
+                numeric: true,
+                sensitivity: "base",
+              },
+            );
           },
         );
 
@@ -593,7 +605,10 @@ export default function MovimentacaoMaquina() {
   }, [formData, resumoCalculo, isPrimeiraMovimentacao, ultimaMovimentacao]);
 
   useEffect(() => {
-    if (quantidadeAtualSugerida === null || quantidadeAtualSugerida === undefined) {
+    if (
+      quantidadeAtualSugerida === null ||
+      quantidadeAtualSugerida === undefined
+    ) {
       return;
     }
 
@@ -1235,7 +1250,7 @@ export default function MovimentacaoMaquina() {
         totalPreAjustado > totalPosUltima
       ) {
         const confirmou = window.confirm(
-          `Atenção: Não é permitido abastecer a máquina com uma quantidade maior (${totalPreAjustado}) do que o total pós da última movimentação (${totalPosUltima}). Confira o que você digitou.\n\nDeseja continuar mesmo assim?`,
+          `Atenção: A quantidade informada (${totalPreAjustado}) é maior do que o total pós da última movimentação (${totalPosUltima}). Confira o que você digitou.\n\nDeseja continuar mesmo assim?`,
         );
 
         if (!confirmou) {
