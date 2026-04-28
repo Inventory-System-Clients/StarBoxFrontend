@@ -1245,6 +1245,7 @@ export default function MovimentacaoMaquina() {
 
       const totalPosUltima = Number(quantidadeAtualUltimaMovimentacao);
       if (
+        !isPrimeiraMovimentacao &&
         Number.isFinite(totalPosUltima) &&
         Number.isFinite(totalPreAjustado) &&
         totalPreAjustado > totalPosUltima
