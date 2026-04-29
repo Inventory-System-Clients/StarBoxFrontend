@@ -59,8 +59,8 @@ export default function RoteiroExecucao() {
     aberto: false,
     lojaId: null,
     lojaNome: "",
-    lojaIdEsperada: null,
-    lojaEsperadaNome: "",
+    lojaPuladaId: null,
+    lojaPuladaNome: "",
     justificativa: "",
   });
   const [gastoForm, setGastoForm] = useState({
@@ -153,7 +153,6 @@ export default function RoteiroExecucao() {
           item.pontoSelecionadoId ||
           item.pontoSelecionado?.id ||
           item.loja?.id ||
-          item.id ||
           "",
       ).trim();
 
@@ -176,8 +175,21 @@ export default function RoteiroExecucao() {
 
     const pontoPulado =
       statusQuebra?.pontoPulado || statusQuebra?.ponto_pulado || null;
+    const lojaIdPontoPulado = String(
+      pontoPulado?.lojaId ||
+        pontoPulado?.loja_id ||
+        pontoPulado?.pontoSelecionadoId ||
+        pontoPulado?.pontoSelecionado?.id ||
+        "",
+    ).trim();
+    const lojaSelecionadaNormalizada = String(lojaIdSelecionada || "").trim();
+    const mesmaLojaSelecionada =
+      !!lojaIdPontoPulado &&
+      !!lojaSelecionadaNormalizada &&
+      lojaIdPontoPulado === lojaSelecionadaNormalizada;
+
     const lojaId = String(
-      lojaIdSelecionada || pontoPulado?.lojaId || pontoPulado?.loja_id || "",
+      lojaIdPontoPulado || lojaSelecionadaNormalizada,
     ).trim();
 
     if (!lojaId) return;
@@ -186,11 +198,9 @@ export default function RoteiroExecucao() {
       .trim()
       .toLowerCase();
     const justificativaEnviada =
-      pontoPulado?.justificativaEnviada === true ||
-      motivo === "ja_justificado_hoje" ||
-      motivo === "ja_justificada_hoje" ||
-      motivo === "justificativa_ja_enviada" ||
-      motivo === "ponto_selecionado_ja_justificado";
+      (pontoPulado?.justificativaEnviada === true &&
+        (!lojaSelecionadaNormalizada || mesmaLojaSelecionada)) ||
+      (motivo === "ponto_selecionado_ja_justificado" && mesmaLojaSelecionada);
 
     if (!justificativaEnviada) return;
 
@@ -1373,10 +1383,16 @@ export default function RoteiroExecucao() {
         !lojaEstaConcluida(loja.status)
       ) {
         try {
+          const lojaAtualId = String(
+            lojaSelecionada?.id || proximaLoja?.id || "",
+          ).trim();
           const statusRes = await api.get(
             `/roteiros/${id}/quebra-ordem/status`,
             {
-              params: { lojaId: loja.id },
+              params: {
+                lojaAtualId,
+                lojaId: loja.id,
+              },
             },
           );
           const statusQuebra = statusRes?.data || {};
@@ -1393,34 +1409,18 @@ export default function RoteiroExecucao() {
               aberto: true,
               lojaId: loja.id,
               lojaNome: loja.nome,
-              lojaIdEsperada: statusQuebra?.lojaEsperadaId || proximaLoja.id,
-              lojaEsperadaNome:
+              lojaPuladaId: statusQuebra?.lojaEsperadaId || proximaLoja.id,
+              lojaPuladaNome:
                 statusQuebra?.lojaEsperadaNome || proximaLoja.nome || "",
               justificativa: "",
             });
             return;
           }
 
-          const justificativaJaEnviada =
-            statusQuebra?.pontoPulado?.justificativaEnviada === true ||
-            motivoQuebra === "ja_justificado_hoje" ||
-            motivoQuebra === "ja_justificada_hoje" ||
-            motivoQuebra === "justificativa_ja_enviada" ||
-            motivoQuebra === "ponto_selecionado_ja_justificado";
-
-          if (justificativaJaEnviada) {
+          if (motivoQuebra === "ponto_selecionado_ja_justificado") {
             setSuccess(
               "Esse ponto já foi pulado hoje e a justificativa já foi enviada. Não é necessário enviar novamente.",
             );
-          }
-
-          // Não bloquear o fluxo quando o backend indicar ordem correta ou
-          // ausência de pendência na ordem.
-          if (
-            motivoQuebra === "na_ordem_correta" ||
-            motivoQuebra === "sem_pendencia_na_ordem"
-          ) {
-            // segue fluxo normal
           }
         } catch {
           // Fallback seguro: se status não puder ser consultado, exige justificativa.
@@ -1428,8 +1428,8 @@ export default function RoteiroExecucao() {
             aberto: true,
             lojaId: loja.id,
             lojaNome: loja.nome,
-            lojaIdEsperada: proximaLoja.id,
-            lojaEsperadaNome: proximaLoja.nome,
+            lojaPuladaId: proximaLoja.id,
+            lojaPuladaNome: proximaLoja.nome,
             justificativa: "",
           });
           return;
@@ -1460,20 +1460,36 @@ export default function RoteiroExecucao() {
       // Salvar justificativa via API
       await api.post(`/roteiros/${id}/justificar-ordem`, {
         lojaId: modalJustificativa.lojaId,
-        lojaIdEsperada: modalJustificativa.lojaIdEsperada,
+        lojaPuladaId: modalJustificativa.lojaPuladaId,
         justificativa: modalJustificativa.justificativa,
       });
+
+      // Marcar imediatamente a loja pulada como justificada no estado local,
+      // para que verificações futuras de quebra de ordem reconheçam que ela
+      // já foi justificada e não peçam justificativa novamente desnecessariamente.
+      if (modalJustificativa.lojaPuladaId) {
+        setPontosPuladosPorLoja((prev) => ({
+          ...prev,
+          [String(modalJustificativa.lojaPuladaId)]: {
+            justificativaEnviada: true,
+            justificativa: modalJustificativa.justificativa.trim(),
+          },
+        }));
+      }
 
       try {
         const statusAtualizadoRes = await api.get(
           `/roteiros/${id}/quebra-ordem/status`,
           {
-            params: { lojaId: modalJustificativa.lojaId },
+            params: {
+              lojaAtualId: modalJustificativa.lojaPuladaId,
+              lojaId: modalJustificativa.lojaId,
+            },
           },
         );
         atualizarPontosPuladosComStatus(
           statusAtualizadoRes?.data,
-          modalJustificativa.lojaId,
+          modalJustificativa.lojaPuladaId,
         );
       } catch {
         // Fluxo segue com recarregamento completo do roteiro.
@@ -1486,7 +1502,7 @@ export default function RoteiroExecucao() {
         `Roteiro: ${roteiro?.nome || "-"}`,
         `Funcionario: ${usuario?.nome || "-"}`,
         "___________________________________",
-        `Ponto esperado: ${modalJustificativa.lojaEsperadaNome || "-"}`,
+        `Ponto pulado: ${modalJustificativa.lojaPuladaNome || "-"}`,
         `Ponto selecionado: ${modalJustificativa.lojaNome || "-"}`,
         `Justificativa: ${modalJustificativa.justificativa.trim()}`,
       ].join("\n");
@@ -1507,9 +1523,27 @@ export default function RoteiroExecucao() {
 
       if (roteiroAtualizado) {
         setRoteiro(roteiroAtualizado);
-        setPontosPuladosPorLoja(
-          normalizarPontosPuladosBackend(roteiroAtualizado),
-        );
+        const pontosPuladosBackend =
+          normalizarPontosPuladosBackend(roteiroAtualizado);
+        setPontosPuladosPorLoja((prev) => {
+          if (Object.keys(pontosPuladosBackend).length === 0) {
+            return prev;
+          }
+
+          const merged = { ...prev };
+          Object.entries(pontosPuladosBackend).forEach(([lojaId, info]) => {
+            merged[lojaId] = {
+              justificativaEnviada:
+                info?.justificativaEnviada === true ||
+                prev?.[lojaId]?.justificativaEnviada === true,
+              justificativa: String(
+                info?.justificativa || prev?.[lojaId]?.justificativa || "",
+              ).trim(),
+            };
+          });
+
+          return merged;
+        });
         await carregarResumoExecucaoPersistido(id, roteiroAtualizado);
       }
 
@@ -1533,8 +1567,8 @@ export default function RoteiroExecucao() {
         aberto: false,
         lojaId: null,
         lojaNome: "",
-        lojaIdEsperada: null,
-        lojaEsperadaNome: "",
+        lojaPuladaId: null,
+        lojaPuladaNome: "",
         justificativa: "",
       });
     } catch (err) {
@@ -2894,8 +2928,8 @@ export default function RoteiroExecucao() {
               aberto: false,
               lojaId: null,
               lojaNome: "",
-              lojaIdEsperada: null,
-              lojaEsperadaNome: "",
+              lojaPuladaId: null,
+              lojaPuladaNome: "",
               justificativa: "",
             })
           }
@@ -2908,9 +2942,9 @@ export default function RoteiroExecucao() {
                 ⚠️ Você está pulando a ordem das lojas!
               </p>
               <p className="text-sm text-yellow-700">
-                Loja esperada:{" "}
+                Ponto pulado:{" "}
                 <span className="font-bold">
-                  {modalJustificativa.lojaEsperadaNome}
+                  {modalJustificativa.lojaPuladaNome}
                 </span>
               </p>
               <p className="text-sm text-yellow-700">
@@ -2943,8 +2977,8 @@ export default function RoteiroExecucao() {
                     aberto: false,
                     lojaId: null,
                     lojaNome: "",
-                    lojaIdEsperada: null,
-                    lojaEsperadaNome: "",
+                    lojaPuladaId: null,
+                    lojaPuladaNome: "",
                     justificativa: "",
                   })
                 }
