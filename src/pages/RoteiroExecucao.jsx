@@ -105,6 +105,7 @@ export default function RoteiroExecucao() {
   const [produtosAbastecimentoExtra, setProdutosAbastecimentoExtra] = useState(
     [],
   );
+  const [pontosPuladosPorLoja, setPontosPuladosPorLoja] = useState({});
 
   const perfisPermitidosEditarMovimentacaoRota = new Set([
     "FUNCIONARIO",
@@ -129,6 +130,80 @@ export default function RoteiroExecucao() {
     ["finalizado", "finalizada", "concluido", "concluida"].includes(
       String(status || "").toLowerCase(),
     );
+
+  const normalizarPontosPuladosBackend = (payload) => {
+    const candidatos = [
+      payload?.pontosPulados,
+      payload?.pontos_pulados,
+      payload?.quebrasOrdem,
+      payload?.quebras_ordem,
+      payload?.resumoExecucao?.pontosPulados,
+      payload?.resumoExecucao?.pontos_pulados,
+    ];
+
+    const lista = candidatos.find((item) => Array.isArray(item));
+    if (!Array.isArray(lista)) return {};
+
+    return lista.reduce((acc, item) => {
+      if (!item || typeof item !== "object") return acc;
+
+      const lojaId = String(
+        item.lojaId ||
+          item.loja_id ||
+          item.pontoSelecionadoId ||
+          item.pontoSelecionado?.id ||
+          item.loja?.id ||
+          item.id ||
+          "",
+      ).trim();
+
+      if (!lojaId) return acc;
+
+      acc[lojaId] = {
+        justificativaEnviada:
+          item.justificativaEnviada === true ||
+          item.justificativa_enviada === true ||
+          String(item.status || "").toLowerCase() === "justificada",
+        justificativa: String(item.justificativa || "").trim(),
+      };
+
+      return acc;
+    }, {});
+  };
+
+  const atualizarPontosPuladosComStatus = (statusQuebra, lojaIdSelecionada) => {
+    if (!statusQuebra || typeof statusQuebra !== "object") return;
+
+    const pontoPulado =
+      statusQuebra?.pontoPulado || statusQuebra?.ponto_pulado || null;
+    const lojaId = String(
+      lojaIdSelecionada || pontoPulado?.lojaId || pontoPulado?.loja_id || "",
+    ).trim();
+
+    if (!lojaId) return;
+
+    const motivo = String(statusQuebra?.motivo || "")
+      .trim()
+      .toLowerCase();
+    const justificativaEnviada =
+      pontoPulado?.justificativaEnviada === true ||
+      motivo === "ja_justificado_hoje" ||
+      motivo === "ja_justificada_hoje" ||
+      motivo === "justificativa_ja_enviada" ||
+      motivo === "ponto_selecionado_ja_justificado";
+
+    if (!justificativaEnviada) return;
+
+    setPontosPuladosPorLoja((prev) => ({
+      ...prev,
+      [lojaId]: {
+        justificativaEnviada: true,
+        justificativa: String(
+          pontoPulado?.justificativa || prev?.[lojaId]?.justificativa || "",
+        ).trim(),
+      },
+    }));
+  };
 
   const lojaComMaquinasFinalizadas = (loja) => {
     const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
@@ -1226,6 +1301,7 @@ export default function RoteiroExecucao() {
       setErroCarregamentoInicial("");
       const res = await carregarDadosRoteiroExecucao(id);
       setRoteiro(res.data);
+      setPontosPuladosPorLoja(normalizarPontosPuladosBackend(res.data));
 
       console.log("Roteiro carregado:", res.data);
     } catch (err) {
@@ -1304,6 +1380,7 @@ export default function RoteiroExecucao() {
             },
           );
           const statusQuebra = statusRes?.data || {};
+          atualizarPontosPuladosComStatus(statusQuebra, loja.id);
           const precisaJustificativa = Boolean(
             statusQuebra?.precisaJustificativa,
           );
@@ -1328,7 +1405,8 @@ export default function RoteiroExecucao() {
             statusQuebra?.pontoPulado?.justificativaEnviada === true ||
             motivoQuebra === "ja_justificado_hoje" ||
             motivoQuebra === "ja_justificada_hoje" ||
-            motivoQuebra === "justificativa_ja_enviada";
+            motivoQuebra === "justificativa_ja_enviada" ||
+            motivoQuebra === "ponto_selecionado_ja_justificado";
 
           if (justificativaJaEnviada) {
             setSuccess(
@@ -1386,6 +1464,21 @@ export default function RoteiroExecucao() {
         justificativa: modalJustificativa.justificativa,
       });
 
+      try {
+        const statusAtualizadoRes = await api.get(
+          `/roteiros/${id}/quebra-ordem/status`,
+          {
+            params: { lojaId: modalJustificativa.lojaId },
+          },
+        );
+        atualizarPontosPuladosComStatus(
+          statusAtualizadoRes?.data,
+          modalJustificativa.lojaId,
+        );
+      } catch {
+        // Fluxo segue com recarregamento completo do roteiro.
+      }
+
       const mensagemWhatsAppQuebraOrdem = [
         "STAR BOX",
         "*Quebra de ordem do roteiro*",
@@ -1414,6 +1507,9 @@ export default function RoteiroExecucao() {
 
       if (roteiroAtualizado) {
         setRoteiro(roteiroAtualizado);
+        setPontosPuladosPorLoja(
+          normalizarPontosPuladosBackend(roteiroAtualizado),
+        );
         await carregarResumoExecucaoPersistido(id, roteiroAtualizado);
       }
 
@@ -2564,6 +2660,9 @@ export default function RoteiroExecucao() {
                 .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
                 .map((loja, index) => {
                   const pontoFinalizado = lojaComMaquinasFinalizadas(loja);
+                  const pontoPuladoJustificado =
+                    pontosPuladosPorLoja[String(loja.id)]?.justificativaEnviada ===
+                    true;
 
                   return (
                     <div key={loja.id} className="space-y-3">
@@ -2585,6 +2684,11 @@ export default function RoteiroExecucao() {
                         {lojaEstaConcluida(loja.status) && (
                           <span className="mt-1 ml-9 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
                             Concluída
+                          </span>
+                        )}
+                        {pontoPuladoJustificado && (
+                          <span className="mt-1 ml-9 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold border border-amber-300">
+                            Ponto pulado justificado
                           </span>
                         )}
                       </button>
