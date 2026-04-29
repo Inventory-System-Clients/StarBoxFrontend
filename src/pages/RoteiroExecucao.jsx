@@ -1383,9 +1383,9 @@ export default function RoteiroExecucao() {
         !lojaEstaConcluida(loja.status)
       ) {
         try {
-          const lojaAtualId = String(
-            lojaSelecionada?.id || proximaLoja?.id || "",
-          ).trim();
+          // A validação deve considerar o próximo ponto pendente real do roteiro,
+          // e não apenas a loja selecionada na UI.
+          const lojaAtualId = String(proximaLoja?.id || "").trim();
           const statusRes = await api.get(
             `/roteiros/${id}/quebra-ordem/status`,
             {
