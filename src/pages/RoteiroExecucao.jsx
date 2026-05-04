@@ -445,6 +445,13 @@ export default function RoteiroExecucao() {
     if (!payloadResumo || typeof payloadResumo !== "object") return null;
 
     const resumo = payloadResumo?.resumoExecucao || payloadResumo;
+    const textoResumo = String(
+      resumo?.resumoTextoCopiar ||
+        payloadResumo?.resumoTextoCopiar ||
+        resumo?.mensagemResumoWhatsapp ||
+        payloadResumo?.mensagemResumoWhatsapp ||
+        "",
+    ).trim();
 
     const extrairNumero = (...valores) => {
       for (const valor of valores) {
@@ -453,6 +460,90 @@ export default function RoteiroExecucao() {
       }
       return null;
     };
+
+    const extrairNumeroDoResumoTexto = (...rotulos) => {
+      if (!textoResumo) return null;
+
+      for (const rotulo of rotulos) {
+        const regex = new RegExp(`${rotulo}\\s*:\\s*([\\d.]+)`, "i");
+        const match = textoResumo.match(regex);
+        if (!match?.[1]) continue;
+
+        const numero = Number(String(match[1]).replace(/\./g, ""));
+        if (Number.isFinite(numero)) return numero;
+      }
+
+      return null;
+    };
+
+    const pontosFeitos = normalizarListaResumoBackend(
+      resumo?.pontosFeitos || resumo?.lojasFeitas || [],
+    );
+    const pontosNaoFeitos = normalizarListaResumoBackend(
+      resumo?.pontosNaoFeitos || resumo?.lojasNaoFeitas || [],
+    );
+    const totalPontosNaRota =
+      extrairNumero(
+        resumo?.totalPontosNaRota,
+        payloadResumo?.totalPontosNaRota,
+      ) ||
+      extrairNumeroDoResumoTexto("Total de pontos na rota") ||
+      pontosFeitos.length + pontosNaoFeitos.length;
+
+    const estoqueInicial = extrairNumero(
+      resumo?.estoqueInicial,
+      resumo?.resumoConsumoProdutos?.estoqueInicialTotal,
+      resumo?.estoqueInicialTotal,
+      payloadResumo?.estoqueInicial,
+      payloadResumo?.estoqueInicialTotal,
+    );
+
+    const totalGastoRota = extrairNumero(
+      resumo?.totalGastoRota,
+      resumo?.resumoConsumoProdutos?.consumoTotalProdutos,
+      resumo?.consumoTotalProdutos,
+      payloadResumo?.totalGastoRota,
+      payloadResumo?.consumoTotalProdutos,
+    );
+
+    const estoqueAdicional =
+      extrairNumero(
+        resumo?.estoqueAdicional,
+        resumo?.resumoConsumoProdutos?.estoqueAdicional,
+        payloadResumo?.estoqueAdicional,
+      ) ||
+      extrairNumeroDoResumoTexto("Estoque adicional");
+
+    const estoqueInicialSeguro = Number(estoqueInicial || 0);
+    const consumoTotalSeguro = Number(totalGastoRota || 0);
+    const estoqueAdicionalSeguro = Number(estoqueAdicional || 0);
+    const consumoDoAdicional = Math.max(0, consumoTotalSeguro - estoqueInicialSeguro);
+    const sobraEstoqueInicialCalculada = Math.max(
+      0,
+      estoqueInicialSeguro - consumoTotalSeguro,
+    );
+    const sobraEstoqueAdicionalCalculada = Math.max(
+      0,
+      estoqueAdicionalSeguro - consumoDoAdicional,
+    );
+
+    const sobraEstoqueInicial =
+      extrairNumero(
+        resumo?.sobraEstoqueInicial,
+        resumo?.resumoConsumoProdutos?.sobraEstoqueInicial,
+        payloadResumo?.sobraEstoqueInicial,
+      ) ||
+      extrairNumeroDoResumoTexto("Sobra estoque inicial") ||
+      sobraEstoqueInicialCalculada;
+
+    const sobraEstoqueAdicional =
+      extrairNumero(
+        resumo?.sobraEstoqueAdicional,
+        resumo?.resumoConsumoProdutos?.sobraEstoqueAdicional,
+        payloadResumo?.sobraEstoqueAdicional,
+      ) ||
+      extrairNumeroDoResumoTexto("Sobra estoque adicional") ||
+      sobraEstoqueAdicionalCalculada;
 
     return {
       roteiro:
@@ -463,30 +554,24 @@ export default function RoteiroExecucao() {
             roteiroAtual?.nome ||
             "",
         ).trim() || "-",
-      pontosFeitos: normalizarListaResumoBackend(
-        resumo?.pontosFeitos || resumo?.lojasFeitas || [],
-      ),
-      pontosNaoFeitos: normalizarListaResumoBackend(
-        resumo?.pontosNaoFeitos || resumo?.lojasNaoFeitas || [],
-      ),
+      pontosFeitos,
+      pontosNaoFeitos,
+      totalPontosNaRota,
       maquinasFeitas: normalizarListaResumoBackend(
         resumo?.maquinasFeitas || [],
       ),
       maquinasNaoFeitas: normalizarListaResumoBackend(
         resumo?.maquinasNaoFeitas || [],
       ),
-      estoqueInicial: extrairNumero(
-        resumo?.estoqueInicial,
-        resumo?.resumoConsumoProdutos?.estoqueInicialTotal,
-      ),
+      estoqueInicial,
+      estoqueAdicional,
+      sobraEstoqueInicial,
+      sobraEstoqueAdicional,
       estoqueFinal: extrairNumero(
         resumo?.estoqueFinal,
         resumo?.resumoConsumoProdutos?.estoqueFinalTotal,
       ),
-      totalGastoRota: extrairNumero(
-        resumo?.totalGastoRota,
-        resumo?.resumoConsumoProdutos?.consumoTotalProdutos,
-      ),
+      totalGastoRota,
       despesaTotal: extrairNumero(resumo?.despesaTotal),
       sobraValorDespesa: extrairNumero(resumo?.sobraValorDespesa),
       totalManutencoesRealizadas: extrairNumero(
@@ -2349,6 +2434,9 @@ export default function RoteiroExecucao() {
           ) : (
             <div className="space-y-2 text-xs text-violet-900">
               <p>Roteiro: {resumoExecucaoBackend.roteiro || "-"}</p>
+              <p className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                Total de pontos na rota: {Number(resumoExecucaoBackend.totalPontosNaRota || 0)}
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
                   Pontos feitos: {resumoExecucaoBackend.pontosFeitos.length}
@@ -2361,6 +2449,32 @@ export default function RoteiroExecucao() {
                 </span>
                 <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
                   Máquinas não feitas: {resumoExecucaoBackend.maquinasNaoFeitas.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Estoque inicial: {Number(resumoExecucaoBackend.estoqueInicial || 0)} produtos
+                </span>
+                {Number(resumoExecucaoBackend.estoqueAdicional || 0) > 0 && (
+                  <span className="rounded-md bg-blue-50 px-2 py-1 border border-blue-300 text-blue-900 font-semibold">
+                    Estoque adicional: {Number(resumoExecucaoBackend.estoqueAdicional || 0)} produtos
+                  </span>
+                )}
+                {Number(resumoExecucaoBackend.estoqueAdicional || 0) > 0 && (
+                  <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                    Sobra estoque inicial: {Number(resumoExecucaoBackend.sobraEstoqueInicial || 0)} produtos
+                  </span>
+                )}
+                {Number(resumoExecucaoBackend.estoqueAdicional || 0) > 0 && (
+                  <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                    Sobra estoque adicional: {Number(resumoExecucaoBackend.sobraEstoqueAdicional || 0)} produtos
+                  </span>
+                )}
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Estoque final: {Number(resumoExecucaoBackend.estoqueFinal || 0)} produtos
+                </span>
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Total gasto na rota: {Number(resumoExecucaoBackend.totalGastoRota || 0)} produtos
                 </span>
               </div>
               {obterTextoResumoParaCompartilhar() && (
