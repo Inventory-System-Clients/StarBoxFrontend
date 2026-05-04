@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
@@ -118,6 +118,56 @@ export function Roteiros() {
   const [draggedLoja, setDraggedLoja] = useState(null);
   const [draggedFromRoteiro, setDraggedFromRoteiro] = useState(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState(null);
+  const autoScrollIntervalRef = useRef(null);
+  const dragScrollDirectionRef = useRef(0);
+
+  const pararAutoScrollDrag = () => {
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+    dragScrollDirectionRef.current = 0;
+  };
+
+  const iniciarAutoScrollDrag = (direcao) => {
+    if (dragScrollDirectionRef.current === direcao) return;
+
+    pararAutoScrollDrag();
+    dragScrollDirectionRef.current = direcao;
+
+    autoScrollIntervalRef.current = setInterval(() => {
+      const distancia = 20;
+      window.scrollBy({ top: direcao * distancia, behavior: "auto" });
+    }, 16);
+  };
+
+  const atualizarAutoScrollDrag = (clientY) => {
+    if (typeof clientY !== "number") {
+      pararAutoScrollDrag();
+      return;
+    }
+
+    const limite = 140;
+    const alturaJanela = window.innerHeight;
+
+    if (clientY <= limite) {
+      iniciarAutoScrollDrag(-1);
+      return;
+    }
+
+    if (clientY >= alturaJanela - limite) {
+      iniciarAutoScrollDrag(1);
+      return;
+    }
+
+    pararAutoScrollDrag();
+  };
+
+  useEffect(() => {
+    return () => {
+      pararAutoScrollDrag();
+    };
+  }, []);
 
   const isRoteiroFinalizado = (roteiro) =>
     STATUS_ROTEIRO_FINALIZADO.has(
@@ -1046,6 +1096,7 @@ export function Roteiros() {
     }
 
     e.preventDefault();
+    atualizarAutoScrollDrag(e.clientY);
     setDraggedOverIndex(index);
   };
 
@@ -1055,6 +1106,7 @@ export function Roteiros() {
 
   const onDrop = (e, roteiroDestinoId, dropIndex = null) => {
     e.preventDefault();
+    pararAutoScrollDrag();
     setDraggedOverIndex(null);
 
     if (!isGestorRoteiro) return;
@@ -1085,6 +1137,13 @@ export function Roteiros() {
       handleMoverLoja(draggedLoja.id, draggedFromRoteiro, roteiroDestinoId);
     }
 
+    setDraggedLoja(null);
+    setDraggedFromRoteiro(null);
+  };
+
+  const onDragEnd = () => {
+    pararAutoScrollDrag();
+    setDraggedOverIndex(null);
     setDraggedLoja(null);
     setDraggedFromRoteiro(null);
   };
@@ -1455,6 +1514,8 @@ export function Roteiros() {
                                 isGestorRoteiro && !isRoteiroFinalizado(roteiro)
                               }
                               onDragStart={() => onDragStart(loja, roteiro.id)}
+                              onDrag={(e) => atualizarAutoScrollDrag(e.clientY)}
+                              onDragEnd={onDragEnd}
                               onDragOver={(e) =>
                                 onDragOver(e, index, roteiro.id)
                               }
