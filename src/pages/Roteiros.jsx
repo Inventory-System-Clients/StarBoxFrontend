@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
@@ -13,6 +13,7 @@ import {
 export function Roteiros() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isGestorRoteiro =
     usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
@@ -23,15 +24,6 @@ export function Roteiros() {
     "concluido",
     "concluida",
   ]);
-  const STATUS_ROTEIRO_PENDENTE = new Set([
-    "pendente",
-    "em_andamento",
-    "em-andamento",
-    "aberto",
-    "nao_iniciado",
-    "não_iniciado",
-  ]);
-
   // --- ESTADOS DE DADOS ---
   const [roteiros, setRoteiros] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
@@ -109,6 +101,10 @@ export function Roteiros() {
   const [orcamentosPendentes, setOrcamentosPendentes] = useState({});
   const [salvandoOrcamento, setSalvandoOrcamento] = useState({});
   const [apagandoRoteiros, setApagandoRoteiros] = useState({});
+  const [iniciandoRoteiros, setIniciandoRoteiros] = useState({});
+  const [kmInicialVeiculoPorRoteiro, setKmInicialVeiculoPorRoteiro] =
+    useState({});
+  const [desfinalizandoRoteiros, setDesfinalizandoRoteiros] = useState({});
   const [lojasExpandidasPorRoteiro, setLojasExpandidasPorRoteiro] =
     useState({});
   const [modalFinalizar, setModalFinalizar] = useState({
@@ -130,14 +126,23 @@ export function Roteiros() {
         .toLowerCase(),
     );
 
-  const isRoteiroPendenteOuEmAndamento = (roteiro) => {
+  const isRoteiroStatusFinalizado = (roteiro) =>
+    String(roteiro?.status || "")
+      .trim()
+      .toLowerCase() === "finalizado";
+
+  const isRoteiroEmAndamento = (roteiro) => {
     const status = String(roteiro?.status || "")
       .trim()
       .toLowerCase();
 
-    if (!status) return true;
-    if (STATUS_ROTEIRO_PENDENTE.has(status)) return true;
-    return !isRoteiroFinalizado(roteiro);
+    return new Set([
+      "em_andamento",
+      "em-andamento",
+      "em andamento",
+      "iniciado",
+      "ativo",
+    ]).has(status);
   };
 
   const getRoteiroById = (roteiroId) =>
@@ -176,6 +181,40 @@ export function Roteiros() {
   const getVeiculoResumoRoteiro = (roteiro) => {
     if (!roteiro?.veiculo) return "Sem veículo associado";
     return getVeiculoLabel(roteiro.veiculo);
+  };
+
+  const getKmInicialSugeridoDoVeiculo = (roteiro) => {
+    const veiculoId = String(roteiro?.veiculoId || roteiro?.veiculo?.id || "")
+      .trim();
+    const usuarioId = String(usuario?.id || "").trim();
+
+    if (!veiculoId || !usuarioId) return "";
+
+    const kmInicial = obterKmInicialPilotagemAtiva({
+      usuarioId,
+      veiculoId,
+    });
+
+    return Number.isFinite(Number(kmInicial)) ? String(Number(kmInicial)) : "";
+  };
+
+  const getKmInicialInputRoteiro = (roteiro) => {
+    const kmDigitado = kmInicialVeiculoPorRoteiro[roteiro.id];
+    if (kmDigitado !== undefined) return kmDigitado;
+    return getKmInicialSugeridoDoVeiculo(roteiro);
+  };
+
+  const parseKmInteiroNaoNegativo = (valor) => {
+    const texto = String(valor ?? "").trim();
+    if (!texto) return { ok: false, numero: null };
+    if (!/^\d+$/.test(texto)) return { ok: false, numero: null };
+
+    const numero = Number(texto);
+    if (!Number.isInteger(numero) || numero < 0) {
+      return { ok: false, numero: null };
+    }
+
+    return { ok: true, numero };
   };
 
   const getMensagemErroVeiculo = (err, fallback) => {
@@ -390,6 +429,40 @@ export function Roteiros() {
     carregarDadosIniciais();
   }, [usuario?.role]);
 
+  useEffect(() => {
+    const roteiroIdState = String(
+      location.state?.roteiroIdParaFinalizar || "",
+    ).trim();
+
+    if (!location.state?.pilotagemFinalizada || !roteiroIdState) {
+      return;
+    }
+
+    const roteiroAlvo = getRoteiroById(roteiroIdState);
+    if (roteiroAlvo && !isRoteiroFinalizado(roteiroAlvo)) {
+      setSuccess(
+        "Veículo finalizado com sucesso. Confirme a finalização da rota para concluir o roteiro.",
+      );
+      setModalFinalizar({
+        aberto: true,
+        etapa: 1,
+        roteiro: roteiroAlvo,
+        loading: false,
+      });
+    }
+
+    const proximoState = { ...(location.state || {}) };
+    delete proximoState.pilotagemFinalizada;
+    delete proximoState.roteiroIdParaFinalizar;
+    delete proximoState.alertaFinalizarVeiculo;
+    delete proximoState.alertaFinalizarVeiculoToken;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(proximoState).length > 0 ? proximoState : {},
+    });
+  }, [location.pathname, location.state, navigate, roteiros]);
+
   const carregarDadosIniciais = async () => {
     try {
       setLoading(true);
@@ -550,24 +623,26 @@ export function Roteiros() {
     }
   };
 
-  const iniciarOuContinuarRoteiro = async (roteiroId) => {
+  const iniciarOuContinuarRoteiro = async (roteiro) => {
     setError("");
+    setSuccess("");
 
-    const roteiroAtual = (Array.isArray(roteiros) ? roteiros : []).find(
-      (item) => String(item?.id) === String(roteiroId),
-    );
+    const roteiroAtual = roteiro || null;
+    if (!roteiroAtual?.id) return;
+
+    if (iniciandoRoteiros[roteiroAtual.id]) return;
 
     if (roteiroTemVeiculoAssociado(roteiroAtual)) {
       const podeProsseguir = await usuarioTemPilotagemAtiva(
         false,
         roteiroAtual,
       );
+
       if (!podeProsseguir) {
         const mensagemBloqueio =
-          "Voce precisa iniciar a pilotagem de um veiculo antes de comecar o roteiro. Voce sera redirecionado para a aba de veiculos.";
+          "Você precisa iniciar a pilotagem de um veículo antes de começar a rota. Você será redirecionado para Veículos.";
 
         setError(mensagemBloqueio);
-        window.alert(mensagemBloqueio);
         navigate("/veiculos", {
           state: {
             origem: "roteiros",
@@ -578,7 +653,61 @@ export function Roteiros() {
       }
     }
 
-    navigate(`/roteiros/${roteiroId}/executar`);
+    if (isRoteiroEmAndamento(roteiroAtual)) {
+      navigate(`/roteiros/${roteiroAtual.id}/executar`);
+      return;
+    }
+
+    const payload = {
+      veiculoId: normalizarIdOpcional(roteiroAtual?.veiculoId),
+      funcionarioId: normalizarIdOpcional(
+        isGestorRoteiro ? usuario?.id : roteiroAtual?.funcionarioId,
+      ),
+      funcionarioNome: String(
+        isGestorRoteiro
+          ? usuario?.nome
+          : roteiroAtual?.funcionarioNome || "",
+      ).trim(),
+    };
+
+    if (roteiroTemVeiculoAssociado(roteiroAtual)) {
+      const kmDigitado = getKmInicialInputRoteiro(roteiroAtual);
+      const kmValidado = parseKmInteiroNaoNegativo(kmDigitado);
+
+      if (!kmValidado.ok) {
+        setError(
+          "Informe um KM inicial do veículo válido (inteiro maior ou igual a zero).",
+        );
+        return;
+      }
+
+      payload.kmInicialVeiculo = kmValidado.numero;
+    }
+
+    try {
+      setIniciandoRoteiros((prev) => ({ ...prev, [roteiroAtual.id]: true }));
+
+      await api.post(`/roteiros/${roteiroAtual.id}/iniciar`, payload);
+
+      navigate(`/roteiros/${roteiroAtual.id}/executar`);
+    } catch (err) {
+      const status = err?.response?.status;
+      const mensagemApi = err?.response?.data?.error;
+
+      if (status === 400) {
+        setError(mensagemApi || "KM inicial inválido para iniciar a rota.");
+      } else if (status === 403) {
+        setError("Você não tem permissão para esta ação.");
+      } else if (status === 404) {
+        setError("Roteiro ou veículo não encontrado.");
+      } else if (status === 500) {
+        setError("Erro interno. Tente novamente.");
+      } else {
+        setError(mensagemApi || "Erro ao iniciar rota.");
+      }
+    } finally {
+      setIniciandoRoteiros((prev) => ({ ...prev, [roteiroAtual.id]: false }));
+    }
   };
 
   const exigirFinalizarPilotagemAntesDaRota = async (roteiroId) => {
@@ -721,6 +850,63 @@ export function Roteiros() {
       carregarDadosIniciais();
     } catch (err) {
       setError("Erro ao reordenar ponto.");
+    }
+  };
+
+  const handleDesfinalizarRoteiro = async (roteiro) => {
+    if (!roteiro?.id || desfinalizandoRoteiros[roteiro.id]) return;
+
+    const confirmar = window.confirm(
+      "Tem certeza que deseja desfinalizar este roteiro? Ele voltará para pendente.",
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setError("");
+      setSuccess("");
+      setDesfinalizandoRoteiros((prev) => ({ ...prev, [roteiro.id]: true }));
+
+      const response = await api.post(`/roteiros/${roteiro.id}/desfinalizar`);
+
+      setRoteiros((prev) =>
+        prev.map((item) =>
+          item.id === roteiro.id
+            ? {
+                ...item,
+                status: String(response?.data?.status || "pendente")
+                  .trim()
+                  .toLowerCase(),
+              }
+            : item,
+        ),
+      );
+
+      setSuccess(
+        response?.data?.message || "Roteiro desfinalizado com sucesso.",
+      );
+      carregarDadosIniciais();
+    } catch (err) {
+      const status = err?.response?.status;
+
+      if (status === 401) {
+        setError("Sessão expirada. Faça login novamente.");
+      } else if (status === 403) {
+        setError("Você não tem permissão para desfinalizar este roteiro.");
+      } else if (status === 404) {
+        setError("Roteiro não encontrado.");
+      } else if (status === 409) {
+        setError("Este roteiro não está finalizado hoje.");
+      } else if (status === 500) {
+        setError("Erro ao desfinalizar roteiro. Tente novamente.");
+      } else {
+        setError(
+          err?.response?.data?.error ||
+            "Erro ao desfinalizar roteiro. Tente novamente.",
+        );
+      }
+    } finally {
+      setDesfinalizandoRoteiros((prev) => ({ ...prev, [roteiro.id]: false }));
     }
   };
 
@@ -964,6 +1150,10 @@ export function Roteiros() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {roteirosFiltrados.map((roteiro) => (
+            (() => {
+              const roteiroEstaFinalizado = isRoteiroStatusFinalizado(roteiro);
+
+              return (
             <div
               key={roteiro.id}
               onDragOver={(e) => {
@@ -975,14 +1165,14 @@ export function Roteiros() {
                 onDrop(e, roteiro.id);
               }}
               className={`rounded-xl shadow-lg p-6 border-2 transition-all 
-                ${roteiro.status === "finalizado" ? "bg-green-50 border-green-600" : "bg-white border-transparent"}
+                ${roteiroEstaFinalizado ? "bg-green-50 border-green-600" : "bg-white border-transparent"}
                 ${draggedLoja && draggedFromRoteiro !== roteiro.id && !isRoteiroFinalizado(roteiro) ? "border-blue-400 border-dashed bg-blue-50" : ""}
               `}
             >
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-extrabold flex items-center gap-2">
                   {roteiro.nome}
-                  {roteiro.status === "finalizado" && (
+                  {roteiroEstaFinalizado && (
                     <span className="ml-2 px-2 py-1 rounded-full bg-green-200 text-green-800 text-xs font-bold uppercase">
                       Finalizado
                     </span>
@@ -1028,7 +1218,7 @@ export function Roteiros() {
                       );
 
                       try {
-                        await api.post(`/roteiros/${roteiro.id}/iniciar`, {
+                        await api.patch(`/roteiros/${roteiro.id}`, {
                           funcionarioId,
                           funcionarioNome,
                           veiculoId,
@@ -1309,18 +1499,50 @@ export function Roteiros() {
               </div>
 
               {/* Botões de Ação com lógica dinâmica */}
-              <div className="flex gap-2 mt-auto">
-                {isRoteiroPendenteOuEmAndamento(roteiro) ? (
+              <div className="flex flex-wrap gap-2 mt-auto">
+                {!roteiroEstaFinalizado ? (
                   <>
+                    {roteiroTemVeiculoAssociado(roteiro) &&
+                      !isRoteiroEmAndamento(roteiro) && (
+                        <div className="w-full">
+                          <label className="text-[11px] font-bold text-gray-500 block mb-1">
+                            KM INICIAL DO VEÍCULO
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputMode="numeric"
+                            value={getKmInicialInputRoteiro(roteiro)}
+                            onChange={(e) =>
+                              setKmInicialVeiculoPorRoteiro((prev) => ({
+                                ...prev,
+                                [roteiro.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 focus:ring-[#24094E] outline-none"
+                            placeholder="Ex: 12345"
+                          />
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            Pré-preenchido com o KM inicial da pilotagem ativa do veículo associado.
+                          </p>
+                        </div>
+                      )}
                     <button
-                      onClick={() => iniciarOuContinuarRoteiro(roteiro.id)}
-                      className="flex-1 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors"
+                      onClick={() => iniciarOuContinuarRoteiro(roteiro)}
+                      disabled={Boolean(iniciandoRoteiros[roteiro.id])}
+                      className="flex-1 min-w-35 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {roteiro.funcionarioId ? "Continuar" : "Começar Rota"}
+                      {iniciandoRoteiros[roteiro.id]
+                        ? "Iniciando..."
+                        : isRoteiroEmAndamento(roteiro)
+                          ? "Continuar"
+                          : "Começar Rota"}
                     </button>
                     {roteiro.funcionarioId && (
                       <button
                         onClick={() => abrirModalFinalizacao(roteiro)}
+                        disabled={Boolean(desfinalizandoRoteiros[roteiro.id])}
                         className="bg-green-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
                       >
                         Finalizar
@@ -1344,9 +1566,18 @@ export function Roteiros() {
                       onClick={() =>
                         navigate(`/roteiros/${roteiro.id}/executar`)
                       }
-                      className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
+                      className="flex-1 min-w-35 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
                     >
                       Abrir Rota
+                    </button>
+                    <button
+                      onClick={() => handleDesfinalizarRoteiro(roteiro)}
+                      disabled={Boolean(desfinalizandoRoteiros[roteiro.id])}
+                      className="bg-yellow-500 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-yellow-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {desfinalizandoRoteiros[roteiro.id]
+                        ? "Desfinalizando..."
+                        : "Desfinalizar"}
                     </button>
                     {isGestorRoteiro && (
                       <button
@@ -1363,6 +1594,8 @@ export function Roteiros() {
                 ) : null}
               </div>
             </div>
+              );
+            })()
           ))}
         </div>
       </main>

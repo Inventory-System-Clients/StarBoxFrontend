@@ -40,6 +40,9 @@ export default function RoteiroExecucao() {
     etapa: 1,
     loading: false,
   });
+  const [kmFinalVeiculoInput, setKmFinalVeiculoInput] = useState("");
+  const [enviandoResumoWhatsapp, setEnviandoResumoWhatsapp] = useState(false);
+  const [copiandoResumo, setCopiandoResumo] = useState(false);
   const [modalNovaManutencao, setModalNovaManutencao] = useState({
     aberto: false,
     loading: false,
@@ -510,6 +513,11 @@ export default function RoteiroExecucao() {
           payloadResumo?.mensagemResumoWhatsapp ||
           "",
       ).trim(),
+      resumoTextoCopiar: String(
+        resumo?.resumoTextoCopiar ||
+          payloadResumo?.resumoTextoCopiar ||
+          "",
+      ).trim(),
       finalizado:
         Boolean(resumo?.finalizado) ||
         roteiroEstaFinalizado(
@@ -522,6 +530,81 @@ export default function RoteiroExecucao() {
     const texto = String(valorTexto || "").trim();
     if (!texto) return 0;
     return Number(texto.replace(",", "."));
+  };
+
+  const parseKmInteiroNaoNegativo = (valor) => {
+    const texto = String(valor ?? "").trim();
+    if (!texto) return { ok: false, numero: null };
+    if (!/^\d+$/.test(texto)) return { ok: false, numero: null };
+
+    const numero = Number(texto);
+    if (!Number.isInteger(numero) || numero < 0) {
+      return { ok: false, numero: null };
+    }
+
+    return { ok: true, numero };
+  };
+
+  const obterTextoResumoParaCompartilhar = () =>
+    String(
+      resumoExecucaoBackend?.resumoTextoCopiar ||
+        resumoExecucaoBackend?.mensagemResumoWhatsapp ||
+        roteiro?.resumoTextoCopiar ||
+        roteiro?.mensagemResumoWhatsapp ||
+        "",
+    ).trim();
+
+  const enviarResumoWhatsapp = async () => {
+    if (enviandoResumoWhatsapp) return;
+
+    const textoResumo = obterTextoResumoParaCompartilhar();
+    if (!textoResumo) {
+      setError(
+        "Resumo ainda não disponível para envio. Finalize a rota e tente novamente.",
+      );
+      return;
+    }
+
+    const popupReservado = window.open("about:blank", "_blank");
+
+    try {
+      setError("");
+      setSuccess("");
+      setEnviandoResumoWhatsapp(true);
+
+      const abriuWhatsApp = abrirWhatsAppComMensagem(textoResumo, popupReservado);
+      if (!abriuWhatsApp) {
+        setSuccess(
+          "Resumo pronto, mas o navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
+        );
+      } else {
+        setSuccess("Resumo do roteiro enviado para confirmação no WhatsApp.");
+      }
+    } finally {
+      setEnviandoResumoWhatsapp(false);
+    }
+  };
+
+  const copiarResumoFinalizacao = async () => {
+    if (copiandoResumo) return;
+
+    const textoResumo = obterTextoResumoParaCompartilhar();
+    if (!textoResumo) {
+      setError("Resumo ainda não disponível para cópia.");
+      return;
+    }
+
+    try {
+      setCopiandoResumo(true);
+      await navigator.clipboard.writeText(textoResumo);
+      setSuccess("Resumo copiado com sucesso");
+    } catch {
+      setError(
+        "Não foi possível copiar automaticamente. Verifique permissão de clipboard no navegador.",
+      );
+    } finally {
+      setCopiandoResumo(false);
+    }
   };
 
   const extrairTextoValido = (...valores) => {
@@ -1293,6 +1376,7 @@ export default function RoteiroExecucao() {
       "Veículo finalizado com sucesso. Confirme a finalização da rota para enviar o resumo no WhatsApp.",
     );
     setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+    setKmFinalVeiculoInput("");
 
     const proximoState = { ...(location.state || {}) };
     delete proximoState.pilotagemFinalizada;
@@ -1862,7 +1946,7 @@ export default function RoteiroExecucao() {
   };
 
   const executarFinalizacaoRoteiro = async () => {
-    if (!roteiro) return;
+    if (!roteiro || modalFinalizar.loading) return;
 
     const validarPilotagemAtivaUsuario = async () => {
       try {
@@ -1964,6 +2048,19 @@ export default function RoteiroExecucao() {
       }
     }
 
+    const payload = {};
+
+    if (roteiroTemVeiculoAssociado(roteiro)) {
+      const kmFinalValidado = parseKmInteiroNaoNegativo(kmFinalVeiculoInput);
+      if (!kmFinalValidado.ok) {
+        setError(
+          "Informe um KM final de devolução válido (inteiro maior ou igual a zero).",
+        );
+        return;
+      }
+      payload.kmFinalVeiculo = kmFinalValidado.numero;
+    }
+
     const popupReservado = window.open("about:blank", "_blank");
 
     try {
@@ -1971,44 +2068,7 @@ export default function RoteiroExecucao() {
       setSuccess("");
       setModalFinalizar((prev) => ({ ...prev, loading: true }));
 
-      if (roteiroEstaFinalizado(roteiro?.status)) {
-        const resumoPersistido = await carregarResumoExecucaoPersistido(
-          id,
-          roteiro,
-        );
-        const mensagemWhatsApp =
-          resumoPersistido?.mensagemResumoWhatsapp ||
-          roteiro?.mensagemResumoWhatsapp ||
-          "";
-
-        if (!mensagemWhatsApp) {
-          setError(
-            "Nao foi encontrada mensagem de resumo da rota no backend para envio.",
-          );
-          setModalFinalizar((prev) => ({ ...prev, loading: false }));
-          return;
-        }
-
-        const abriuWhatsApp = abrirWhatsAppComMensagem(
-          mensagemWhatsApp,
-          popupReservado,
-        );
-        if (!abriuWhatsApp) {
-          setSuccess(
-            "Roteiro já finalizado. O navegador bloqueou a abertura do WhatsApp. Libere pop-up para o StarBox.",
-          );
-        } else {
-          setSuccess("Resumo do roteiro enviado para confirmação no WhatsApp.");
-        }
-
-        limparEdicoesMovimentacaoRota();
-        setMaquinasEditadasNaRota([]);
-        setModalFinalizar({ aberto: false, etapa: 1, loading: false });
-        await carregarRoteiro();
-        return;
-      }
-
-      const res = await api.post(`/roteiros/${id}/finalizar`);
+      const res = await api.post(`/roteiros/${id}/finalizar`, payload);
       const pendencias = res?.data?.pendencias || [];
 
       if (pendencias.length > 0) {
@@ -2050,6 +2110,7 @@ export default function RoteiroExecucao() {
 
       limparEdicoesMovimentacaoRota();
       setMaquinasEditadasNaRota([]);
+      setKmFinalVeiculoInput("");
 
       setModalFinalizar({ aberto: false, etapa: 1, loading: false });
       await carregarRoteiro();
@@ -2057,7 +2118,20 @@ export default function RoteiroExecucao() {
       if (popupReservado && !popupReservado.closed) {
         popupReservado.close();
       }
-      setError(err?.response?.data?.error || "Erro ao finalizar roteiro.");
+      const status = err?.response?.status;
+      const mensagemApi = err?.response?.data?.error;
+
+      if (status === 400) {
+        setError(mensagemApi || "KM final inválido para finalizar a rota.");
+      } else if (status === 403) {
+        setError("Você não tem permissão para esta ação.");
+      } else if (status === 404) {
+        setError("Roteiro ou veículo não encontrado.");
+      } else if (status === 500) {
+        setError("Erro interno. Tente novamente.");
+      } else {
+        setError(mensagemApi || "Erro ao finalizar roteiro.");
+      }
       setModalFinalizar((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -2070,6 +2144,7 @@ export default function RoteiroExecucao() {
         ).trim();
         if (!veiculoRoteiroId) {
           setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+          setKmFinalVeiculoInput("");
           return;
         }
 
@@ -2088,6 +2163,7 @@ export default function RoteiroExecucao() {
 
         if (!veiculoDoRoteiro?.emUso) {
           setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+          setKmFinalVeiculoInput("");
           return;
         }
 
@@ -2159,11 +2235,13 @@ export default function RoteiroExecucao() {
     }
 
     setModalFinalizar({ aberto: true, etapa: 1, loading: false });
+    setKmFinalVeiculoInput("");
   };
 
   const fecharModalFinalizacao = () => {
     if (modalFinalizar.loading) return;
     setModalFinalizar({ aberto: false, etapa: 1, loading: false });
+    setKmFinalVeiculoInput("");
   };
 
   const avancarConfirmacaoFinalizacao = () => {
@@ -2269,97 +2347,30 @@ export default function RoteiroExecucao() {
               Resumo persistido ainda não disponível para hoje.
             </p>
           ) : (
-            <div className="space-y-1 text-xs text-violet-900">
+            <div className="space-y-2 text-xs text-violet-900">
               <p>Roteiro: {resumoExecucaoBackend.roteiro || "-"}</p>
-              <p>
-                Pontos feitos:{" "}
-                {resumoExecucaoBackend.pontosFeitos.length > 0
-                  ? resumoExecucaoBackend.pontosFeitos.join(", ")
-                  : "Nenhum"}
-              </p>
-              <p>
-                Pontos não feitos:{" "}
-                {resumoExecucaoBackend.pontosNaoFeitos.length > 0
-                  ? resumoExecucaoBackend.pontosNaoFeitos.join(", ")
-                  : "Nenhum"}
-              </p>
-              <p>
-                Máquinas feitas:{" "}
-                {resumoExecucaoBackend.maquinasFeitas.length > 0
-                  ? resumoExecucaoBackend.maquinasFeitas.join(", ")
-                  : "Nenhuma"}
-              </p>
-              <p>
-                Máquinas não feitas:{" "}
-                {resumoExecucaoBackend.maquinasNaoFeitas.length > 0
-                  ? resumoExecucaoBackend.maquinasNaoFeitas.join(", ")
-                  : "Nenhuma"}
-              </p>
-              <p>
-                Estoque inicial:{" "}
-                {Number.isFinite(resumoExecucaoBackend.estoqueInicial)
-                  ? resumoExecucaoBackend.estoqueInicial
-                  : "Não informado"}
-              </p>
-              <p>
-                Estoque final:{" "}
-                {Number.isFinite(resumoExecucaoBackend.estoqueFinal)
-                  ? resumoExecucaoBackend.estoqueFinal
-                  : "Não informado"}
-              </p>
-              <p>
-                Total gasto na rota:{" "}
-                {Number.isFinite(resumoExecucaoBackend.totalGastoRota)
-                  ? resumoExecucaoBackend.totalGastoRota
-                  : "Não informado"}
-              </p>
-              <p>
-                Despesa total:{" "}
-                {Number.isFinite(resumoExecucaoBackend.despesaTotal)
-                  ? formatarMoedaBRL(resumoExecucaoBackend.despesaTotal)
-                  : "Não informado"}
-              </p>
-              <p>
-                Sobra valor despesa:{" "}
-                {Number.isFinite(resumoExecucaoBackend.sobraValorDespesa)
-                  ? formatarMoedaBRL(resumoExecucaoBackend.sobraValorDespesa)
-                  : "Não informado"}
-              </p>
-              <p>
-                Total de manutenções realizadas:{" "}
-                {Number.isFinite(
-                  resumoExecucaoBackend.totalManutencoesRealizadas,
-                )
-                  ? resumoExecucaoBackend.totalManutencoesRealizadas
-                  : "0"}
-              </p>
-              <p>
-                Lojas com manutenção realizada:{" "}
-                {resumoExecucaoBackend.lojasComManutencaoRealizada.length > 0
-                  ? resumoExecucaoBackend.lojasComManutencaoRealizada.join(", ")
-                  : "Nenhuma"}
-              </p>
-              <p>
-                Manutenções realizadas:{" "}
-                {resumoExecucaoBackend.manutencoesRealizadas.length > 0
-                  ? resumoExecucaoBackend.manutencoesRealizadas.join(", ")
-                  : "Nenhuma"}
-              </p>
-              <p>
-                Manutenções não realizadas:{" "}
-                {resumoExecucaoBackend.manutencoesNaoRealizadas.length > 0
-                  ? resumoExecucaoBackend.manutencoesNaoRealizadas.join(", ")
-                  : "Nenhuma"}
-              </p>
-              <p>
-                Manutenções não realizadas por ponto:{" "}
-                {resumoExecucaoBackend.manutencoesNaoRealizadasPorPonto.length >
-                0
-                  ? resumoExecucaoBackend.manutencoesNaoRealizadasPorPonto.join(
-                      ", ",
-                    )
-                  : "Nenhuma"}
-              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Pontos feitos: {resumoExecucaoBackend.pontosFeitos.length}
+                </span>
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Pontos não feitos: {resumoExecucaoBackend.pontosNaoFeitos.length}
+                </span>
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Máquinas feitas: {resumoExecucaoBackend.maquinasFeitas.length}
+                </span>
+                <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
+                  Máquinas não feitas: {resumoExecucaoBackend.maquinasNaoFeitas.length}
+                </span>
+              </div>
+              {obterTextoResumoParaCompartilhar() && (
+                <div>
+                  <p className="font-semibold mb-1">Texto do resumo (inclui KM):</p>
+                  <pre className="whitespace-pre-wrap rounded-md border border-violet-200 bg-white/70 p-2 text-[11px]">
+                    {obterTextoResumoParaCompartilhar()}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -2855,19 +2866,37 @@ export default function RoteiroExecucao() {
           )}
           <button
             className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
-              roteiroEstaFinalizado(roteiro.status)
+              roteiroEstaFinalizado(roteiro.status) && !enviandoResumoWhatsapp
                 ? "bg-emerald-600 hover:bg-emerald-700"
                 : "bg-emerald-300 cursor-not-allowed"
             }`}
-            onClick={executarFinalizacaoRoteiro}
-            disabled={!roteiroEstaFinalizado(roteiro.status)}
+            onClick={enviarResumoWhatsapp}
+            disabled={
+              !roteiroEstaFinalizado(roteiro.status) || enviandoResumoWhatsapp
+            }
             title={
               roteiroEstaFinalizado(roteiro.status)
                 ? ""
                 : "Finalize a rota para enviar o resumo no WhatsApp"
             }
           >
-            Enviar resumo Whats
+            {enviandoResumoWhatsapp ? "Enviando Whats..." : "Enviar resumo Whats"}
+          </button>
+          <button
+            className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
+              roteiroEstaFinalizado(roteiro.status) && !copiandoResumo
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-blue-300 cursor-not-allowed"
+            }`}
+            onClick={copiarResumoFinalizacao}
+            disabled={!roteiroEstaFinalizado(roteiro.status) || copiandoResumo}
+            title={
+              roteiroEstaFinalizado(roteiro.status)
+                ? ""
+                : "Finalize a rota para copiar o resumo"
+            }
+          >
+            {copiandoResumo ? "Copiando..." : "Copiar resumo"}
           </button>
           <button
             className="w-full sm:w-auto bg-gray-200 text-gray-700 py-2 px-6 rounded-lg font-bold"
@@ -2893,6 +2922,27 @@ export default function RoteiroExecucao() {
                 ? "Deseja realmente finalizar esta rota?"
                 : "Confirma novamente: finalizar agora este roteiro?"}
             </p>
+            {roteiroTemVeiculoAssociado(roteiro) && modalFinalizar.etapa === 2 && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  KM final de devolução do veículo
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Ex: 12380"
+                  value={kmFinalVeiculoInput}
+                  onChange={(e) => setKmFinalVeiculoInput(e.target.value)}
+                  disabled={modalFinalizar.loading}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Campo obrigatório quando o roteiro possui veículo.
+                </p>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 className="btn-secondary"
