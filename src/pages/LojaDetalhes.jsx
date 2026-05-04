@@ -386,7 +386,9 @@ export function LojaDetalhes() {
               ? diferencaIn / quantidadeSaiu - precoProduto
               : 0;
           const jogadasMediasPorPelucia =
-            quantidadeSaiu > 0 ? diferencaIn / 2 / quantidadeSaiu : 0;
+            quantidadeSaiu > 0 && valorJogada > 0
+              ? diferencaIn / valorJogada / quantidadeSaiu
+              : 0;
           const valorNotas = Number(mov.quantidade_notas_entrada || 0);
           const valorDigital = Number(mov.valor_entrada_maquininha_pix || 0);
 

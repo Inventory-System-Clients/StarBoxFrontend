@@ -1002,9 +1002,10 @@ export default function MovimentacaoMaquina() {
       (p) => String(p.id) === String(formData.produto_id),
     );
     const precoProduto = Number(produtoSelecionado?.preco || 0);
-    const valorJogadaMedia = 2;
     const jogadasMediasPorPelucia =
-      quantidadeSaiu > 0 ? diferencaIn / valorJogadaMedia / quantidadeSaiu : 0;
+      quantidadeSaiu > 0 && valorJogada > 0
+        ? diferencaIn / valorJogada / quantidadeSaiu
+        : 0;
 
     const lojaNome = maquina?.loja?.nome || "Ponto sem nome";
     const dataMovimentacao = new Date().toLocaleString("pt-BR");
