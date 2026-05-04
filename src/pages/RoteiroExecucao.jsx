@@ -2460,16 +2460,6 @@ export default function RoteiroExecucao() {
                     Estoque adicional: {Number(resumoExecucaoBackend.estoqueAdicional || 0)} produtos
                   </span>
                 )}
-                {Number(resumoExecucaoBackend.estoqueAdicional || 0) > 0 && (
-                  <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
-                    Sobra estoque inicial: {Number(resumoExecucaoBackend.sobraEstoqueInicial || 0)} produtos
-                  </span>
-                )}
-                {Number(resumoExecucaoBackend.estoqueAdicional || 0) > 0 && (
-                  <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
-                    Sobra estoque adicional: {Number(resumoExecucaoBackend.sobraEstoqueAdicional || 0)} produtos
-                  </span>
-                )}
                 <span className="rounded-md bg-white/70 px-2 py-1 border border-violet-200">
                   Estoque final: {Number(resumoExecucaoBackend.estoqueFinal || 0)} produtos
                 </span>
