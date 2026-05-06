@@ -124,6 +124,26 @@ export default function RoteiroExecucao() {
       String(status || "").toLowerCase(),
     );
 
+  const lojaMarcadaConcluidaNoBackend = (loja) => {
+    const camposBooleanos = [
+      loja?.concluida,
+      loja?.concluída,
+      loja?.statusConcluida,
+      loja?.status_concluida,
+      loja?.pontoConcluido,
+      loja?.ponto_concluido,
+    ];
+
+    return camposBooleanos.some((valor) => {
+      if (valor === true) return true;
+      if (valor === 1) return true;
+      return String(valor || "").trim().toLowerCase() === "true";
+    });
+  };
+
+  const pontoEstaConcluido = (loja) =>
+    lojaMarcadaConcluidaNoBackend(loja) || lojaEstaConcluida(loja?.status);
+
   const roteiroEstaFinalizado = (status) =>
     ["finalizado", "finalizada", "concluido", "concluida"].includes(
       String(status || "").toLowerCase(),
@@ -220,7 +240,7 @@ export default function RoteiroExecucao() {
 
   const lojaComMaquinasFinalizadas = (loja) => {
     const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
-    if (!lojaEstaConcluida(loja?.status) || maquinas.length === 0) {
+    if (!pontoEstaConcluido(loja) || maquinas.length === 0) {
       return false;
     }
 
@@ -280,7 +300,7 @@ export default function RoteiroExecucao() {
   const roteiroTemPendencias = (roteiroAtual) => {
     const lojas = Array.isArray(roteiroAtual?.lojas) ? roteiroAtual.lojas : [];
     return lojas.some((loja) => {
-      const statusLojaConcluido = lojaEstaConcluida(loja?.status);
+      const statusLojaConcluido = pontoEstaConcluido(loja);
       const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
 
       if (!statusLojaConcluido) return true;
@@ -1526,7 +1546,7 @@ export default function RoteiroExecucao() {
         (a, b) => (a.ordem || 0) - (b.ordem || 0),
       );
       const proximaLoja = lojasOrdenadas.find(
-        (l) => !lojaEstaConcluida(l.status),
+        (l) => !pontoEstaConcluido(l),
       );
 
       const ordemLojaSelecionada = Number(loja?.ordem || 0);
@@ -1549,7 +1569,7 @@ export default function RoteiroExecucao() {
       if (
         pulouParaFrente &&
         proximaLoja.id !== loja.id &&
-        !lojaEstaConcluida(loja.status)
+        !pontoEstaConcluido(loja)
       ) {
         try {
           // A validação deve considerar o próximo ponto pendente real do roteiro,
@@ -2819,7 +2839,7 @@ export default function RoteiroExecucao() {
                         onClick={() => handleSelecionarLoja(loja)}
                         className={`p-4 rounded-lg shadow border-2 font-bold text-lg transition-all flex flex-col items-start w-full 
                         ${lojaSelecionada?.id === loja.id ? "border-blue-600" : "border-transparent"}
-                        ${lojaEstaConcluida(loja.status) ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+                        ${pontoEstaConcluido(loja) ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
                       >
                         <div className="flex items-center gap-2 w-full">
                           <span className="bg-[#24094E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">
@@ -2830,7 +2850,7 @@ export default function RoteiroExecucao() {
                         <span className="text-xs text-gray-500 ml-9">
                           {loja.cidade}, {loja.estado}
                         </span>
-                        {lojaEstaConcluida(loja.status) && (
+                        {pontoEstaConcluido(loja) && (
                           <span className="mt-1 ml-9 px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-semibold">
                             Concluída
                           </span>
