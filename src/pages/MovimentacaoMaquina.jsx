@@ -171,6 +171,43 @@ export default function MovimentacaoMaquina() {
     return null;
   };
 
+  const obterTimestampMovimentacao = (movimentacao) => {
+    const data =
+      movimentacao?.dataColeta ||
+      movimentacao?.createdAt ||
+      movimentacao?.dataMovimentacao ||
+      movimentacao?.data ||
+      null;
+
+    if (!data) return 0;
+
+    const timestamp = new Date(data).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  };
+
+  const compararMovimentacaoMaisRecente = (a, b) => {
+    const tsA = obterTimestampMovimentacao(a);
+    const tsB = obterTimestampMovimentacao(b);
+
+    if (tsA !== tsB) return tsB - tsA;
+
+    const totalPosA = obterTotalPosUltimaMovimentacao(a) ?? -1;
+    const totalPosB = obterTotalPosUltimaMovimentacao(b) ?? -1;
+
+    if (totalPosA !== totalPosB) return totalPosB - totalPosA;
+
+    const idA = Number(a?.id || 0);
+    const idB = Number(b?.id || 0);
+    if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) {
+      return idB - idA;
+    }
+
+    return String(b?.id || "").localeCompare(String(a?.id || ""), "pt-BR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+  };
+
   const obterContadorOutUltimoMovimento = (movimentacao) => {
     if (!movimentacao) return null;
 
@@ -221,7 +258,6 @@ export default function MovimentacaoMaquina() {
     resumo,
     primeiraMovimentacao,
     ultimaMov,
-    maquinaAtual,
   }) => {
     const contadorOutAtual = obterContadorOutAtualDigitado(dadosForm);
 
@@ -235,21 +271,13 @@ export default function MovimentacaoMaquina() {
             resumo?.contadorOutSugerido,
         );
 
-    const capacidadePadraoMaquina = toNumero(
-      maquinaAtual?.capacidadePadrao ?? maquinaAtual?.capacidade,
-    );
-
     const totalPosUltimoMovimento = obterTotalPosUltimaMovimentacao(ultimaMov);
     const totalPosResumo = toNumero(resumo?.totalPosUltimaMovimentacao);
 
-    // Prioridade: ultima movimentacao real > capacidade padrao > resumo da API.
-    // Isso evita sugestao zerada quando a API retorna totalPosUltimaMovimentacao=0 de forma inconsistente.
     const totalPosUltima =
-      totalPosUltimoMovimento !== null && totalPosUltimoMovimento > 0
+      totalPosUltimoMovimento !== null
         ? totalPosUltimoMovimento
-        : capacidadePadraoMaquina !== null && capacidadePadraoMaquina > 0
-          ? capacidadePadraoMaquina
-          : totalPosResumo;
+        : totalPosResumo;
 
     if (contadorOutBase === null || totalPosUltima === null) return null;
 
@@ -258,7 +286,7 @@ export default function MovimentacaoMaquina() {
       contadorOutAtual - contadorOutBase,
     );
 
-    return Math.max(0, totalPosUltima - quantidadeSaiuDesdeUltima);
+    return totalPosUltima - quantidadeSaiuDesdeUltima;
   };
 
   useEffect(() => {
@@ -326,39 +354,7 @@ export default function MovimentacaoMaquina() {
           ? movRes.data
           : [];
         const movimentacoesOrdenadas = [...movimentacoesMaquina].sort(
-          (a, b) => {
-            const tsA = new Date(
-              a?.dataColeta ||
-                a?.createdAt ||
-                a?.dataMovimentacao ||
-                a?.data ||
-                0,
-            ).getTime();
-            const tsB = new Date(
-              b?.dataColeta ||
-                b?.createdAt ||
-                b?.dataMovimentacao ||
-                b?.data ||
-                0,
-            ).getTime();
-
-            if (tsA !== tsB) return tsB - tsA;
-
-            const idA = Number(a?.id || 0);
-            const idB = Number(b?.id || 0);
-            if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) {
-              return idB - idA;
-            }
-
-            return String(b?.id || "").localeCompare(
-              String(a?.id || ""),
-              "pt-BR",
-              {
-                numeric: true,
-                sensitivity: "base",
-              },
-            );
-          },
+          compararMovimentacaoMaisRecente,
         );
 
         const existeMovimentacaoReal = movimentacoesOrdenadas.some((mov) => {
@@ -537,7 +533,6 @@ export default function MovimentacaoMaquina() {
           resumo: res.data,
           primeiraMovimentacao: primeiraMovimentacaoAtual,
           ultimaMov: ultimaMovimentacao,
-          maquinaAtual: maquina,
         });
 
         const quantidadeCalculada =
@@ -590,11 +585,10 @@ export default function MovimentacaoMaquina() {
       resumo: resumoCalculo,
       primeiraMovimentacao: isPrimeiraMovimentacao,
       ultimaMov: ultimaMovimentacao,
-      maquinaAtual: maquina,
     });
 
     if (calculadaPorSaida !== null) {
-      return Math.max(0, Math.round(calculadaPorSaida));
+      return Math.round(calculadaPorSaida);
     }
 
     const fallback = Number(
@@ -1755,7 +1749,6 @@ export default function MovimentacaoMaquina() {
                   }
                   className="input-field"
                   placeholder="0"
-                  min="0"
                   disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">
