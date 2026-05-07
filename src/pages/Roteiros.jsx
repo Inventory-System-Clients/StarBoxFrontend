@@ -32,6 +32,7 @@ export function Roteiros() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [avisoAndamento, setAvisoAndamento] = useState(null);
 
   // --- DIAS DA SEMANA ---
   const DIAS_SEMANA = [
@@ -169,23 +170,154 @@ export function Roteiros() {
     };
   }, []);
 
-  const isRoteiroFinalizado = (roteiro) =>
-    STATUS_ROTEIRO_FINALIZADO.has(
-      String(roteiro?.status || "")
-        .trim()
-        .toLowerCase(),
-    );
-
-  const isRoteiroStatusFinalizado = (roteiro) =>
-    String(roteiro?.status || "")
-      .trim()
-      .toLowerCase() === "finalizado";
-
-  const isRoteiroEmAndamento = (roteiro) => {
-    const status = String(roteiro?.status || "")
+  const normalizarStatusTexto = (valor) =>
+    String(valor || "")
       .trim()
       .toLowerCase();
 
+  const extrairStatusExecucaoBackend = (payload) => {
+    if (!payload || typeof payload !== "object") {
+      return { statusTexto: "", emAndamento: false, finalizado: false };
+    }
+
+    const statusTexto = normalizarStatusTexto(
+      payload?.statusExecucao ||
+        payload?.status_execucao ||
+        payload?.status ||
+        payload?.estado ||
+        payload?.execucaoStatus ||
+        payload?.execucao_status ||
+        "",
+    );
+
+    const emAndamento =
+      payload?.emAndamento === true ||
+      payload?.em_andamento === true ||
+      payload?.ativo === true ||
+      payload?.iniciado === true ||
+      new Set([
+        "em_andamento",
+        "em-andamento",
+        "em andamento",
+        "iniciado",
+        "ativo",
+      ]).has(statusTexto);
+
+    const finalizado =
+      payload?.finalizado === true ||
+      payload?.finalizada === true ||
+      payload?.concluido === true ||
+      payload?.concluida === true ||
+      STATUS_ROTEIRO_FINALIZADO.has(statusTexto);
+
+    return { statusTexto, emAndamento, finalizado };
+  };
+
+  const normalizarExecucaoSemanal = (roteiro, payloadExtra = null) => {
+    const execucaoBase =
+      roteiro?.execucaoSemanal ||
+      roteiro?.execucao_semanal ||
+      roteiro?.execucao ||
+      null;
+    const execucaoPayload =
+      payloadExtra?.execucaoSemanal ||
+      payloadExtra?.execucao_semanal ||
+      payloadExtra?.execucao ||
+      payloadExtra ||
+      null;
+
+    const execucao =
+      execucaoBase && typeof execucaoBase === "object"
+        ? execucaoBase
+        : execucaoPayload && typeof execucaoPayload === "object"
+          ? execucaoPayload
+          : null;
+
+    if (!execucao) return null;
+
+    const usuarioAssociado =
+      execucao?.usuarioAssociado ||
+      execucao?.usuario_associado ||
+      execucao?.usuario ||
+      null;
+
+    return {
+      emAndamento: execucao?.emAndamento === true || execucao?.em_andamento === true,
+      usuarioId:
+        execucao?.usuarioAssociadoId ||
+        execucao?.usuario_associado_id ||
+        usuarioAssociado?.id ||
+        execucao?.usuarioId ||
+        execucao?.usuario_id ||
+        null,
+      usuarioNome:
+        execucao?.usuarioAssociadoNome ||
+        execucao?.usuario_associado_nome ||
+        usuarioAssociado?.nome ||
+        execucao?.usuarioNome ||
+        execucao?.usuario_nome ||
+        "",
+      dataInicio:
+        execucao?.dataInicio ||
+        execucao?.data_inicio ||
+        execucao?.iniciadoEm ||
+        execucao?.iniciado_em ||
+        execucao?.data ||
+        null,
+      finalizadoEm: execucao?.finalizadoEm || execucao?.finalizado_em || null,
+    };
+  };
+
+  const obterStatusExecucaoRoteiro = (roteiro) =>
+    normalizarStatusTexto(
+      roteiro?.statusExecucao ||
+        roteiro?.status_execucao ||
+        roteiro?.statusExecucaoTexto ||
+        roteiro?.status ||
+        "",
+    );
+
+  const roteiroTemPontosConcluidos = (roteiro) => {
+    const lojas = Array.isArray(roteiro?.lojas) ? roteiro.lojas : [];
+
+    return lojas.some((loja) => {
+      const camposBooleanos = [
+        loja?.concluida,
+        loja?.concluída,
+        loja?.statusConcluida,
+        loja?.status_concluida,
+        loja?.pontoConcluido,
+        loja?.ponto_concluido,
+      ];
+
+      const concluidoPorBooleano = camposBooleanos.some((valor) => {
+        if (valor === true) return true;
+        if (valor === 1) return true;
+        return String(valor || "").trim().toLowerCase() === "true";
+      });
+
+      if (concluidoPorBooleano) return true;
+
+      const status = normalizarStatusTexto(loja?.status);
+      return STATUS_ROTEIRO_FINALIZADO.has(status);
+    });
+  };
+
+  const isRoteiroFinalizado = (roteiro) => {
+    if (roteiro?.statusExecucaoFinalizado === true) return true;
+
+    const status = obterStatusExecucaoRoteiro(roteiro);
+    return STATUS_ROTEIRO_FINALIZADO.has(status);
+  };
+
+  const isRoteiroStatusFinalizado = (roteiro) => isRoteiroFinalizado(roteiro);
+
+  const isRoteiroEmAndamento = (roteiro) => {
+    if (roteiro?.statusExecucaoEmAndamento === true) return true;
+
+    const execucaoSemanal = normalizarExecucaoSemanal(roteiro);
+    if (execucaoSemanal?.emAndamento === true) return true;
+    const status = obterStatusExecucaoRoteiro(roteiro);
     return new Set([
       "em_andamento",
       "em-andamento",
@@ -193,6 +325,22 @@ export function Roteiros() {
       "iniciado",
       "ativo",
     ]).has(status);
+  };
+
+  const isRoteiroEmAndamentoPorOutro = (roteiro) => {
+    const execucaoSemanal = normalizarExecucaoSemanal(roteiro);
+    if (!execucaoSemanal?.emAndamento) return false;
+
+    const usuarioAtualId = String(usuario?.id || "").trim();
+    const usuarioAssociadoId = String(execucaoSemanal?.usuarioId || "").trim();
+
+    if (!usuarioAtualId || !usuarioAssociadoId) return false;
+    return usuarioAtualId !== usuarioAssociadoId;
+  };
+
+  const abrirAndamentoRoteiro = (roteiroId) => {
+    if (!roteiroId) return;
+    navigate(`/roteiros/${roteiroId}/andamento`);
   };
 
   const getRoteiroById = (roteiroId) =>
@@ -513,6 +661,51 @@ export function Roteiros() {
     });
   }, [location.pathname, location.state, navigate, roteiros]);
 
+  const aplicarStatusExecucaoRoteiros = async (lista) => {
+    const requisicoes = lista.map((item) => {
+      const roteiroId = String(item?.id || "").trim();
+      if (!roteiroId) {
+        return Promise.resolve({ data: null, __skip: true });
+      }
+
+      return api.get(`/roteiro-status/${roteiroId}/status-execucao`);
+    });
+
+    const resultados = await Promise.allSettled(requisicoes);
+
+    return lista.map((roteiro, index) => {
+      const resultado = resultados[index];
+      if (resultado?.status !== "fulfilled") return roteiro;
+      if (resultado?.value?.__skip) return roteiro;
+
+      const payloadStatus = resultado.value?.data || null;
+      const statusInfo = extrairStatusExecucaoBackend(payloadStatus);
+      const execucaoSemanalNormalizada = normalizarExecucaoSemanal(
+        roteiro,
+        payloadStatus,
+      );
+      let statusTexto = statusInfo.statusTexto;
+
+      if (!statusTexto) {
+        if (statusInfo.finalizado) {
+          statusTexto = "finalizado";
+        } else if (statusInfo.emAndamento) {
+          statusTexto = "em_andamento";
+        }
+      }
+
+      return {
+        ...roteiro,
+        execucaoSemanal: execucaoSemanalNormalizada || roteiro?.execucaoSemanal,
+        statusExecucao: statusTexto || roteiro?.statusExecucao || null,
+        statusExecucaoEmAndamento:
+          statusInfo.emAndamento || execucaoSemanalNormalizada?.emAndamento,
+        statusExecucaoFinalizado:
+          statusInfo.finalizado || Boolean(execucaoSemanalNormalizada?.finalizadoEm),
+      };
+    });
+  };
+
   const carregarDadosIniciais = async () => {
     try {
       setLoading(true);
@@ -526,7 +719,13 @@ export function Roteiros() {
       ];
       const [resRoteiros, resLojas, resFuncionarios, resVeiculos] =
         await Promise.all(promises);
-      setRoteiros(resRoteiros.data || []);
+      const listaRoteiros = Array.isArray(resRoteiros.data)
+        ? resRoteiros.data
+        : [];
+      const listaComStatusExecucao = await aplicarStatusExecucaoRoteiros(
+        listaRoteiros,
+      );
+      setRoteiros(listaComStatusExecucao);
       setTodasLojas(resLojas.data || []);
       setFuncionarios(resFuncionarios.data || []);
       setVeiculos(resVeiculos.data || []);
@@ -676,8 +875,10 @@ export function Roteiros() {
   const iniciarOuContinuarRoteiro = async (roteiro) => {
     setError("");
     setSuccess("");
+    setAvisoAndamento(null);
 
     const roteiroAtual = roteiro || null;
+
     if (!roteiroAtual?.id) return;
 
     if (iniciandoRoteiros[roteiroAtual.id]) return;
@@ -703,7 +904,21 @@ export function Roteiros() {
       }
     }
 
+    if (isRoteiroEmAndamentoPorOutro(roteiroAtual)) {
+      const execucaoSemanal = normalizarExecucaoSemanal(roteiroAtual);
+      setAvisoAndamento({
+        roteiroId: roteiroAtual.id,
+        usuarioNome: execucaoSemanal?.usuarioNome || "outro usuário",
+      });
+      return;
+    }
+
     if (isRoteiroEmAndamento(roteiroAtual)) {
+      navigate(`/roteiros/${roteiroAtual.id}/executar`);
+      return;
+    }
+
+    if (roteiroTemPontosConcluidos(roteiroAtual)) {
       navigate(`/roteiros/${roteiroAtual.id}/executar`);
       return;
     }
@@ -743,6 +958,21 @@ export function Roteiros() {
     } catch (err) {
       const status = err?.response?.status;
       const mensagemApi = err?.response?.data?.error;
+      const statusRota = String(err?.response?.data?.statusRota || "")
+        .trim()
+        .toLowerCase();
+
+      if (status === 403 && statusRota === "em_andamento_por_outro") {
+        const usuarioNome =
+          String(err?.response?.data?.usuarioAssociadoNome || "").trim() ||
+          String(err?.response?.data?.usuarioAssociado || "").trim() ||
+          "outro usuário";
+        setAvisoAndamento({
+          roteiroId: roteiroAtual.id,
+          usuarioNome,
+        });
+        return;
+      }
 
       if (status === 400) {
         setError(mensagemApi || "KM inicial inválido para iniciar a rota.");
@@ -755,6 +985,7 @@ export function Roteiros() {
       } else {
         setError(mensagemApi || "Erro ao iniciar rota.");
       }
+      setError(mensagemApi || "Erro ao iniciar rota.");
     } finally {
       setIniciandoRoteiros((prev) => ({ ...prev, [roteiroAtual.id]: false }));
     }
@@ -1193,6 +1424,36 @@ export function Roteiros() {
             onClose={() => setSuccess("")}
           />
         )}
+        {avisoAndamento && (
+          <div className="alert alert-warning">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">
+                  Este roteiro está em andamento por {avisoAndamento.usuarioNome}.
+                </p>
+                <p className="text-xs">
+                  Clique em "Ver andamento" para visualizar em modo leitura.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => abrirAndamentoRoteiro(avisoAndamento.roteiroId)}
+                >
+                  Ver andamento
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setAvisoAndamento(null)}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Funcionários veem só os roteiros atribuídos a eles */}
         {!isGestorRoteiro && roteirosDoUsuario.length === 0 && (
@@ -1211,6 +1472,21 @@ export function Roteiros() {
           {roteirosFiltrados.map((roteiro) => (
             (() => {
               const roteiroEstaFinalizado = isRoteiroStatusFinalizado(roteiro);
+              const execucaoSemanal = normalizarExecucaoSemanal(roteiro);
+              const execucaoEmAndamento =
+                Boolean(execucaoSemanal?.emAndamento) ||
+                isRoteiroEmAndamento(roteiro);
+              const usuarioAssociadoId = String(
+                execucaoSemanal?.usuarioId || "",
+              ).trim();
+              const usuarioAtualId = String(usuario?.id || "").trim();
+              const andamentoPorOutroUsuario =
+                execucaoEmAndamento &&
+                usuarioAssociadoId &&
+                usuarioAtualId &&
+                usuarioAssociadoId !== usuarioAtualId;
+              const nomeResponsavel =
+                execucaoSemanal?.usuarioNome || "outro usuário";
 
               return (
             <div
@@ -1229,18 +1505,33 @@ export function Roteiros() {
               `}
             >
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-extrabold flex items-center gap-2">
+                <h2 className="text-xl font-extrabold flex items-center gap-2 flex-wrap">
                   {roteiro.nome}
                   {roteiroEstaFinalizado && (
                     <span className="ml-2 px-2 py-1 rounded-full bg-green-200 text-green-800 text-xs font-bold uppercase">
                       Finalizado
                     </span>
                   )}
+                  {execucaoEmAndamento && !roteiroEstaFinalizado && (
+                    <span
+                      className={`ml-2 px-2 py-1 rounded-full text-xs font-bold uppercase ${
+                        andamentoPorOutroUsuario
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {andamentoPorOutroUsuario
+                        ? `Em andamento por ${nomeResponsavel}`
+                        : "Seu roteiro em andamento"}
+                    </span>
+                  )}
                 </h2>
                 <span
-                  className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${roteiro.funcionarioId ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-500"}`}
+                  className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${isRoteiroEmAndamento(roteiro) || roteiroTemPontosConcluidos(roteiro) ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-500"}`}
                 >
-                  {roteiro.funcionarioId ? "Ativo" : "Pendente"}
+                  {isRoteiroEmAndamento(roteiro) || roteiroTemPontosConcluidos(roteiro)
+                    ? "Ativo"
+                    : "Pendente"}
                 </span>
               </div>
 
@@ -1590,20 +1881,35 @@ export function Roteiros() {
                         </div>
                       )}
                     <button
-                      onClick={() => iniciarOuContinuarRoteiro(roteiro)}
+                      onClick={() =>
+                        andamentoPorOutroUsuario
+                          ? abrirAndamentoRoteiro(roteiro.id)
+                          : iniciarOuContinuarRoteiro(roteiro)
+                      }
                       disabled={Boolean(iniciandoRoteiros[roteiro.id])}
                       className="flex-1 min-w-35 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {iniciandoRoteiros[roteiro.id]
                         ? "Iniciando..."
-                        : isRoteiroEmAndamento(roteiro)
-                          ? "Continuar"
-                          : "Começar Rota"}
+                        : andamentoPorOutroUsuario
+                          ? "Ver andamento"
+                          : isRoteiroEmAndamento(roteiro) ||
+                              roteiroTemPontosConcluidos(roteiro)
+                            ? "Continuar rota"
+                            : "Começar Rota"}
                     </button>
                     {roteiro.funcionarioId && (
                       <button
                         onClick={() => abrirModalFinalizacao(roteiro)}
-                        disabled={Boolean(desfinalizandoRoteiros[roteiro.id])}
+                        disabled={
+                          Boolean(desfinalizandoRoteiros[roteiro.id]) ||
+                          andamentoPorOutroUsuario
+                        }
+                        title={
+                          andamentoPorOutroUsuario
+                            ? "Roteiro em andamento por outro usuário."
+                            : ""
+                        }
                         className="bg-green-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
                       >
                         Finalizar

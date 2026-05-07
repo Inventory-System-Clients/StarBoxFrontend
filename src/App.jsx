@@ -28,6 +28,7 @@ import { Relatorios } from "./pages/Relatorios";
 import { StyleGuide } from "./pages/StyleGuide";
 import { Roteiros } from "./pages/Roteiros";
 import RoteiroExecucao from "./pages/RoteiroExecucao";
+import RoteiroAndamento from "./pages/RoteiroAndamento";
 import MovimentacaoMaquina from "./pages/MovimentacaoMaquina";
 import Manutencoes from "./pages/Manutencoes.jsx";
 import PecasPage from "./pages/PecasPage.jsx";
@@ -118,6 +119,14 @@ function AppRoutes() {
       <Route path="/registrar" element={<Registrar />} />
       <Route path="/style-guide" element={<StyleGuide />} />
       <Route path="/roteiros" element={<Roteiros />} />
+      <Route
+        path="/roteiros/:id/andamento"
+        element={
+          <PrivateRoute>
+            <RoteiroAndamento />
+          </PrivateRoute>
+        }
+      />
       <Route
         path="/"
         element={
