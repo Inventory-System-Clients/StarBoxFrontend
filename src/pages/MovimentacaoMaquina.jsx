@@ -266,8 +266,8 @@ export default function MovimentacaoMaquina() {
     const contadorOutBase = primeiraMovimentacao
       ? toNumero(dadosForm?.contadorOutAnterior)
       : toNumero(
-          resumo?.contadorOutUltimaMovimentacao ??
-            obterContadorOutUltimoMovimento(ultimaMov) ??
+          obterContadorOutUltimoMovimento(ultimaMov) ??
+            resumo?.contadorOutUltimaMovimentacao ??
             resumo?.contadorOutSugerido,
         );
 
