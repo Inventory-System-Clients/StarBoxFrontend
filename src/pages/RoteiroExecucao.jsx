@@ -118,6 +118,8 @@ export default function RoteiroExecucao() {
   ]);
   const EDICOES_MOVIMENTACAO_ROTA_STORAGE_PREFIX =
     "starbox:roteiro:edicoes-movimentacao:";
+  const STATUS_EXECUCAO_ROTEIRO_STORAGE_PREFIX =
+    "starbox:roteiro:execucao-semanal-status:";
 
   const lojaEstaConcluida = (status) =>
     ["concluido", "concluida", "finalizado", "finalizada"].includes(
@@ -153,6 +155,307 @@ export default function RoteiroExecucao() {
     ["finalizado", "finalizada", "concluido", "concluida"].includes(
       String(status || "").toLowerCase(),
     );
+
+  const maquinaMarcadaConcluidaNoBackend = (maquina) => {
+    const camposBooleanos = [
+      maquina?.concluida,
+      maquina?.["concluida"],
+      maquina?.statusConcluida,
+      maquina?.status_concluida,
+      maquina?.maquinaConcluida,
+      maquina?.maquina_concluida,
+      maquina?.finalizada,
+      maquina?.finalizado,
+    ];
+
+    return camposBooleanos.some((valor) => {
+      if (valor === true) return true;
+      if (valor === 1) return true;
+      return String(valor || "").trim().toLowerCase() === "true";
+    });
+  };
+
+  const maquinaEstaConcluidaNoBackend = (maquina) =>
+    maquinaMarcadaConcluidaNoBackend(maquina) ||
+    maquinaEstaConcluida(maquina?.status);
+
+  const listaTemItens = (lista) => Array.isArray(lista) && lista.length > 0;
+
+  const normalizarExecucaoSemanalRoteiro = (roteiroAtual) => {
+    const execucao =
+      roteiroAtual?.execucaoSemanal ||
+      roteiroAtual?.execucao_semanal ||
+      roteiroAtual?.execucao ||
+      null;
+
+    const execucaoFonte =
+      execucao && typeof execucao === "object" ? execucao : roteiroAtual;
+
+    if (!execucaoFonte || typeof execucaoFonte !== "object") return null;
+
+    const statusTexto = String(
+      execucaoFonte?.status ||
+        execucaoFonte?.statusExecucao ||
+        execucaoFonte?.status_execucao ||
+        roteiroAtual?.statusExecucao ||
+        roteiroAtual?.status_execucao ||
+        roteiroAtual?.status ||
+        "",
+    )
+      .trim()
+      .toLowerCase();
+
+    return {
+      emAndamento:
+        execucaoFonte?.emAndamento === true ||
+        execucaoFonte?.em_andamento === true ||
+        execucaoFonte?.statusExecucaoEmAndamento === true ||
+        execucaoFonte?.ativo === true ||
+        ["em_andamento", "em-andamento", "em andamento", "iniciado", "ativo"].includes(
+          statusTexto,
+        ),
+      dataInicio:
+        execucaoFonte?.dataInicio ||
+        execucaoFonte?.data_inicio ||
+        execucaoFonte?.iniciadoEm ||
+        execucaoFonte?.iniciado_em ||
+        execucaoFonte?.data ||
+        null,
+      finalizadoEm:
+        execucaoFonte?.finalizadoEm || execucaoFonte?.finalizado_em || null,
+    };
+  };
+
+  const obterChaveStatusExecucaoRoteiro = (roteiroAtual) => {
+    const roteiroId = String(roteiroAtual?.id || id || "").trim();
+    const execucao = normalizarExecucaoSemanalRoteiro(roteiroAtual);
+    const dataInicio = String(execucao?.dataInicio || "").trim();
+
+    if (!roteiroId || !dataInicio) return "";
+    return `${STATUS_EXECUCAO_ROTEIRO_STORAGE_PREFIX}${roteiroId}:${dataInicio}`;
+  };
+
+  const limparStatusExecucoesAnteriores = (roteiroAtual, chaveAtual = "") => {
+    const roteiroId = String(roteiroAtual?.id || id || "").trim();
+    if (!roteiroId) return;
+
+    const prefixoRoteiro = `${STATUS_EXECUCAO_ROTEIRO_STORAGE_PREFIX}${roteiroId}:`;
+
+    try {
+      Object.keys(window.localStorage)
+        .filter(
+          (chave) =>
+            chave.startsWith(prefixoRoteiro) && (!chaveAtual || chave !== chaveAtual),
+        )
+        .forEach((chave) => window.localStorage.removeItem(chave));
+    } catch {
+      // Sem bloqueio de fluxo caso localStorage falhe.
+    }
+  };
+
+  const lerStatusExecucaoRoteiro = (chave) => {
+    if (!chave) return { lojas: {}, maquinas: {} };
+
+    try {
+      const dados = JSON.parse(window.localStorage.getItem(chave) || "{}");
+      return {
+        lojas: dados?.lojas && typeof dados.lojas === "object" ? dados.lojas : {},
+        maquinas:
+          dados?.maquinas && typeof dados.maquinas === "object"
+            ? dados.maquinas
+            : {},
+      };
+    } catch {
+      return { lojas: {}, maquinas: {} };
+    }
+  };
+
+  const salvarStatusExecucaoRoteiro = (chave, dados) => {
+    if (!chave) return;
+
+    try {
+      window.localStorage.setItem(chave, JSON.stringify(dados));
+    } catch {
+      // Sem bloqueio de fluxo caso localStorage falhe.
+    }
+  };
+
+  const extrairListasMovimentacoesRoteiro = (roteiroAtual) => {
+    const listas = [
+      roteiroAtual?.movimentacoesConsideradas,
+      roteiroAtual?.movimentacoes_consideradas,
+      roteiroAtual?.movimentacoesHoje,
+      roteiroAtual?.movimentacoes_hoje,
+      roteiroAtual?.movimentacoes,
+    ];
+
+    (Array.isArray(roteiroAtual?.lojas) ? roteiroAtual.lojas : []).forEach(
+      (loja) => {
+        listas.push(
+          loja?.movimentacoesConsideradas,
+          loja?.movimentacoes_consideradas,
+          loja?.movimentacoesHoje,
+          loja?.movimentacoes_hoje,
+          loja?.movimentacoes,
+        );
+        (Array.isArray(loja?.maquinas) ? loja.maquinas : []).forEach(
+          (maquina) => {
+            listas.push(
+              maquina?.movimentacoesConsideradas,
+              maquina?.movimentacoes_consideradas,
+              maquina?.movimentacoesHoje,
+              maquina?.movimentacoes_hoje,
+              maquina?.movimentacoes,
+            );
+          },
+        );
+      },
+    );
+
+    return listas.filter(Array.isArray).flat();
+  };
+
+  const coletarStatusFinalizadosRoteiro = (roteiroAtual) => {
+    const finalizados = { lojas: {}, maquinas: {} };
+    const lojas = Array.isArray(roteiroAtual?.lojas) ? roteiroAtual.lojas : [];
+    const maquinaParaLoja = {};
+
+    lojas.forEach((loja) => {
+      const lojaId = String(loja?.id || "").trim();
+      const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
+      const temMovimentacoesLoja = [
+        loja?.movimentacoesConsideradas,
+        loja?.movimentacoes_consideradas,
+        loja?.movimentacoesHoje,
+        loja?.movimentacoes_hoje,
+        loja?.movimentacoes,
+      ].some(listaTemItens);
+
+      if (lojaId && (pontoEstaConcluido(loja) || temMovimentacoesLoja)) {
+        finalizados.lojas[lojaId] = true;
+      }
+
+      maquinas.forEach((maquina) => {
+        const maquinaId = String(maquina?.id || "").trim();
+        if (!maquinaId) return;
+
+        maquinaParaLoja[maquinaId] = lojaId;
+
+        const temMovimentacoes = [
+          maquina?.movimentacoesConsideradas,
+          maquina?.movimentacoes_consideradas,
+          maquina?.movimentacoesHoje,
+          maquina?.movimentacoes_hoje,
+          maquina?.movimentacoes,
+        ].some(listaTemItens);
+
+        if (maquinaEstaConcluidaNoBackend(maquina) || temMovimentacoes) {
+          finalizados.maquinas[maquinaId] = true;
+          if (lojaId) finalizados.lojas[lojaId] = true;
+        }
+      });
+    });
+
+    extrairListasMovimentacoesRoteiro(roteiroAtual).forEach((mov) => {
+      const maquinaId = String(
+        mov?.maquinaId || mov?.maquina_id || mov?.maquina?.id || "",
+      ).trim();
+      const lojaId = String(
+        mov?.lojaId ||
+          mov?.loja_id ||
+          mov?.loja?.id ||
+          mov?.maquina?.lojaId ||
+          mov?.maquina?.loja?.id ||
+          maquinaParaLoja[maquinaId] ||
+          "",
+      ).trim();
+
+      if (maquinaId) finalizados.maquinas[maquinaId] = true;
+      if (lojaId) finalizados.lojas[lojaId] = true;
+    });
+
+    return finalizados;
+  };
+
+  const aplicarStatusFinalizadosPersistidos = (roteiroAtual, finalizados) => {
+    if (!roteiroAtual || typeof roteiroAtual !== "object") return roteiroAtual;
+
+    const lojas = Array.isArray(roteiroAtual?.lojas)
+      ? roteiroAtual.lojas.map((loja) => {
+          const lojaId = String(loja?.id || "").trim();
+          const maquinas = Array.isArray(loja?.maquinas)
+            ? loja.maquinas.map((maquina) => {
+                const maquinaId = String(maquina?.id || "").trim();
+                if (!maquinaId || !finalizados.maquinas[maquinaId]) {
+                  return maquina;
+                }
+
+                return {
+                  ...maquina,
+                  status: "finalizado",
+                  statusConcluida: true,
+                };
+              })
+            : loja?.maquinas;
+
+          if (!lojaId || !finalizados.lojas[lojaId]) {
+            return { ...loja, maquinas };
+          }
+
+          return {
+            ...loja,
+            maquinas,
+            status: "finalizado",
+            statusConcluida: true,
+            concluida: true,
+          };
+        })
+      : roteiroAtual?.lojas;
+
+    return { ...roteiroAtual, lojas };
+  };
+
+  const normalizarRoteiroComStatusSemanalPersistido = (roteiroAtual) => {
+    const execucaoBruta =
+      roteiroAtual?.execucaoSemanal ||
+      roteiroAtual?.execucao_semanal ||
+      roteiroAtual?.execucao ||
+      null;
+    const temExecucaoSemanalExplicita =
+      execucaoBruta && typeof execucaoBruta === "object";
+    const execucao = normalizarExecucaoSemanalRoteiro(roteiroAtual);
+    const chave = obterChaveStatusExecucaoRoteiro(roteiroAtual);
+    const execucaoAtiva =
+      execucao?.emAndamento === true && !execucao?.finalizadoEm && Boolean(chave);
+
+    if (!chave) {
+      if (
+        temExecucaoSemanalExplicita &&
+        (execucao?.emAndamento === false || execucao?.finalizadoEm)
+      ) {
+        limparStatusExecucoesAnteriores(roteiroAtual);
+      }
+
+      return roteiroAtual;
+    }
+
+    if (!execucaoAtiva) {
+      limparStatusExecucoesAnteriores(roteiroAtual);
+      return roteiroAtual;
+    }
+
+    limparStatusExecucoesAnteriores(roteiroAtual, chave);
+
+    const persistidos = lerStatusExecucaoRoteiro(chave);
+    const atuais = coletarStatusFinalizadosRoteiro(roteiroAtual);
+    const finalizados = {
+      lojas: { ...persistidos.lojas, ...atuais.lojas },
+      maquinas: { ...persistidos.maquinas, ...atuais.maquinas },
+    };
+
+    salvarStatusExecucaoRoteiro(chave, finalizados);
+    return aplicarStatusFinalizadosPersistidos(roteiroAtual, finalizados);
+  };
 
   const normalizarPontosPuladosBackend = (payload) => {
     const candidatos = [
@@ -244,7 +547,7 @@ export default function RoteiroExecucao() {
       return false;
     }
 
-    return maquinas.every((maquina) => maquinaEstaConcluida(maquina?.status));
+    return maquinas.every((maquina) => maquinaEstaConcluidaNoBackend(maquina));
   };
 
   const enviarWhatsAppLoja = (loja) => {
@@ -304,7 +607,7 @@ export default function RoteiroExecucao() {
       const maquinas = Array.isArray(loja?.maquinas) ? loja.maquinas : [];
 
       if (!statusLojaConcluido) return true;
-      return maquinas.some((maquina) => !maquinaEstaConcluida(maquina?.status));
+      return maquinas.some((maquina) => !maquinaEstaConcluidaNoBackend(maquina));
     });
   };
 
@@ -776,7 +1079,7 @@ export default function RoteiroExecucao() {
 
   const podeEditarUltimaMovimentacaoDaMaquina = (maquina) => {
     // Exibir para todas as roles quando a máquina já está finalizada.
-    return maquinaEstaConcluida(maquina?.status);
+    return maquinaEstaConcluidaNoBackend(maquina);
   };
 
   const registrarMaquinaEditadaNaRota = (maquina) => {
@@ -1457,7 +1760,7 @@ export default function RoteiroExecucao() {
         if (location.state?.origemMovimentacao) {
           const todasFinalizadas =
             loja.maquinas?.length > 0 &&
-            loja.maquinas.every((m) => maquinaEstaConcluida(m.status));
+            loja.maquinas.every((m) => maquinaEstaConcluidaNoBackend(m));
           if (todasFinalizadas) {
             enviarWhatsAppLoja(loja);
           }
@@ -1499,10 +1802,15 @@ export default function RoteiroExecucao() {
       setLoading(true);
       setErroCarregamentoInicial("");
       const res = await carregarDadosRoteiroExecucao(id);
-      setRoteiro(res.data);
-      setPontosPuladosPorLoja(normalizarPontosPuladosBackend(res.data));
+      const roteiroNormalizado = normalizarRoteiroComStatusSemanalPersistido(
+        res.data,
+      );
+      setRoteiro(roteiroNormalizado);
+      setPontosPuladosPorLoja(
+        normalizarPontosPuladosBackend(roteiroNormalizado),
+      );
 
-      console.log("Roteiro carregado:", res.data);
+      console.log("Roteiro carregado:", roteiroNormalizado);
     } catch (err) {
       if (err?.response?.status === 404) {
         setErroCarregamentoInicial(
@@ -1711,9 +2019,11 @@ export default function RoteiroExecucao() {
       const roteiroAtualizado = resRoteiroAtualizado?.data || null;
 
       if (roteiroAtualizado) {
-        setRoteiro(roteiroAtualizado);
+        const roteiroNormalizado =
+          normalizarRoteiroComStatusSemanalPersistido(roteiroAtualizado);
+        setRoteiro(roteiroNormalizado);
         const pontosPuladosBackend =
-          normalizarPontosPuladosBackend(roteiroAtualizado);
+          normalizarPontosPuladosBackend(roteiroNormalizado);
         setPontosPuladosPorLoja((prev) => {
           if (Object.keys(pontosPuladosBackend).length === 0) {
             return prev;
@@ -1733,7 +2043,7 @@ export default function RoteiroExecucao() {
 
           return merged;
         });
-        await carregarResumoExecucaoPersistido(id, roteiroAtualizado);
+        await carregarResumoExecucaoPersistido(id, roteiroNormalizado);
       }
 
       const lojasAtualizadas = Array.isArray(roteiroAtualizado?.lojas)
@@ -2214,6 +2524,7 @@ export default function RoteiroExecucao() {
       }
 
       limparEdicoesMovimentacaoRota();
+      limparStatusExecucoesAnteriores(roteiro);
       setMaquinasEditadasNaRota([]);
       setKmFinalVeiculoInput("");
 
@@ -2893,9 +3204,8 @@ export default function RoteiroExecucao() {
                             {loja.maquinas && loja.maquinas.length > 0 ? (
                               loja.maquinas.map((maquina) =>
                                 (() => {
-                                  const maquinaConcluida = maquinaEstaConcluida(
-                                    maquina.status,
-                                  );
+                                  const maquinaConcluida =
+                                    maquinaEstaConcluidaNoBackend(maquina);
                                   const podeEditarUltimaMovimentacao =
                                     podeEditarUltimaMovimentacaoDaMaquina(
                                       maquina,
