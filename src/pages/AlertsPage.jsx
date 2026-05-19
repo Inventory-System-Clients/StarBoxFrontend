@@ -437,8 +437,8 @@ export default function AlertsPage() {
                                   {alert.account}
                                 </h3>
                                 <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                  <span className="font-medium">
-                                    {alert.category}
+                                  <span className="font-medium wrap-break-word">
+                                    {alert.account}
                                   </span>
                                   <span>•</span>
                                   <span className="wrap-break-word">{alert.city}</span>
@@ -530,8 +530,8 @@ export default function AlertsPage() {
                                   {alert.account}
                                 </h3>
                                 <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                  <span className="font-medium">
-                                    {alert.category}
+                                  <span className="font-medium wrap-break-word">
+                                    {alert.account}
                                   </span>
                                   <span>•</span>
                                   <span className="wrap-break-word">{alert.city}</span>
@@ -623,8 +623,8 @@ export default function AlertsPage() {
                                   {alert.account}
                                 </h3>
                                 <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                  <span className="font-medium">
-                                    {alert.category}
+                                  <span className="font-medium wrap-break-word">
+                                    {alert.account}
                                   </span>
                                   <span>•</span>
                                   <span className="wrap-break-word">{alert.city}</span>
