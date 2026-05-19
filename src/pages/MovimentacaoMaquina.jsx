@@ -11,6 +11,7 @@ export default function MovimentacaoMaquina() {
   const { roteiroId, lojaId, maquinaId } = useParams();
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const isAdmin = usuario?.role === "ADMIN";
   const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
   const isPerfilFuncionario = [
     "FUNCIONARIO",
@@ -599,6 +600,8 @@ export default function MovimentacaoMaquina() {
   }, [formData, resumoCalculo, isPrimeiraMovimentacao, ultimaMovimentacao]);
 
   useEffect(() => {
+    if (isAdmin) return;
+
     if (
       quantidadeAtualSugerida === null ||
       quantidadeAtualSugerida === undefined
@@ -615,7 +618,7 @@ export default function MovimentacaoMaquina() {
         quantidadeAtualMaquina: valorSugerido,
       };
     });
-  }, [quantidadeAtualSugerida]);
+  }, [isAdmin, quantidadeAtualSugerida]);
 
   useEffect(() => {
     if (!isPrimeiraMovimentacao) return;
@@ -1743,16 +1746,19 @@ export default function MovimentacaoMaquina() {
                   type="number"
                   name="quantidadeAtualMaquina"
                   value={
-                    quantidadeAtualSugerida !== null
+                    !isAdmin && quantidadeAtualSugerida !== null
                       ? quantidadeAtualSugerida
                       : formData.quantidadeAtualMaquina
                   }
+                  onChange={handleChange}
                   className="input-field"
                   placeholder="0"
-                  disabled
+                  disabled={!isAdmin}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Total pré calculado automaticamente pela diferença de saída.
+                  {isAdmin
+                    ? "Admin pode ajustar o total pré manualmente."
+                    : "Total pré calculado automaticamente pela diferença de saída."}
                 </p>
                 {quantidadeAtualSugerida !== null && (
                   <p className="text-xs text-indigo-700 mt-1 font-semibold">

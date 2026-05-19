@@ -14,8 +14,9 @@ export function Roteiros() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdmin = usuario?.role === "ADMIN";
   const isGestorRoteiro =
-    usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
+    isAdmin || usuario?.role === "GERENCIADOR";
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
   const ORCAMENTO_SEMANAL_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
@@ -273,6 +274,8 @@ export function Roteiros() {
       roteiro?.statusExecucao ||
         roteiro?.status_execucao ||
         roteiro?.statusExecucaoTexto ||
+        roteiro?.statusRota ||
+        roteiro?.status_rota ||
         roteiro?.status ||
         "",
     );
@@ -312,6 +315,17 @@ export function Roteiros() {
 
   const isRoteiroStatusFinalizado = (roteiro) => isRoteiroFinalizado(roteiro);
 
+  const isRoteiroPendente = (roteiro) => {
+    const status = obterStatusExecucaoRoteiro(roteiro);
+    if (status) return status === "pendente";
+
+    return (
+      !isRoteiroEmAndamento(roteiro) &&
+      !isRoteiroFinalizado(roteiro) &&
+      !roteiroTemPontosConcluidos(roteiro)
+    );
+  };
+
   const isRoteiroEmAndamento = (roteiro) => {
     if (roteiro?.statusExecucaoEmAndamento === true) return true;
 
@@ -328,6 +342,8 @@ export function Roteiros() {
   };
 
   const isRoteiroEmAndamentoPorOutro = (roteiro) => {
+    if (isAdmin) return false;
+
     const execucaoSemanal = normalizarExecucaoSemanal(roteiro);
     if (!execucaoSemanal?.emAndamento) return false;
 
@@ -336,6 +352,20 @@ export function Roteiros() {
 
     if (!usuarioAtualId || !usuarioAssociadoId) return false;
     return usuarioAtualId !== usuarioAssociadoId;
+  };
+
+  const usuarioPodeIniciarRoteiro = (roteiro) => {
+    if (!isRoteiroPendente(roteiro)) return false;
+    if (isGestorRoteiro) return true;
+
+    const funcionarioRoteiroId = String(roteiro?.funcionarioId || "").trim();
+    const usuarioAtualId = String(usuario?.id || "").trim();
+
+    return Boolean(
+      funcionarioRoteiroId &&
+        usuarioAtualId &&
+        funcionarioRoteiroId === usuarioAtualId,
+    );
   };
 
   const abrirAndamentoRoteiro = (roteiroId) => {
@@ -366,6 +396,44 @@ export function Roteiros() {
   const normalizarIdOpcional = (valor) => {
     const texto = String(valor || "").trim();
     return texto || null;
+  };
+
+  const usuarioPodeSerResponsavelRoteiro = (item) =>
+    ["ADMIN", "FUNCIONARIO", "FUNCIONARIO_TODAS_LOJAS"].includes(
+      String(item?.role || "")
+        .trim()
+        .toUpperCase(),
+    );
+
+  const obterLabelResponsavelRoteiro = (item) => {
+    const nome = String(item?.nome || "").trim();
+    const role = String(item?.role || "").trim().toUpperCase();
+    const sufixo = role === "ADMIN" ? " (Admin)" : "";
+    return `${nome || "Usuário sem nome"}${sufixo}`;
+  };
+
+  const normalizarResponsaveisRoteiro = (listas) => {
+    const mapa = new Map();
+
+    listas.flat().forEach((item) => {
+      const id = String(item?.id || "").trim();
+      if (!id || !usuarioPodeSerResponsavelRoteiro(item)) return;
+      if (item?.ativo === false) return;
+      mapa.set(id, {
+        ...item,
+        id,
+        nome: String(item?.nome || "").trim(),
+        role: String(item?.role || "").trim().toUpperCase(),
+      });
+    });
+
+    return Array.from(mapa.values()).sort((a, b) =>
+      obterLabelResponsavelRoteiro(a).localeCompare(
+        obterLabelResponsavelRoteiro(b),
+        "pt-BR",
+        { sensitivity: "base" },
+      ),
+    );
   };
 
   const getVeiculoLabel = (veiculo) => {
@@ -715,9 +783,12 @@ export function Roteiros() {
         isGestorRoteiro
           ? api.get("/usuarios/funcionarios")
           : Promise.resolve({ data: [] }),
+        isAdmin
+          ? api.get("/usuarios?ativo=true").catch(() => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
         isGestorRoteiro ? api.get("/veiculos") : Promise.resolve({ data: [] }),
       ];
-      const [resRoteiros, resLojas, resFuncionarios, resVeiculos] =
+      const [resRoteiros, resLojas, resFuncionarios, resUsuarios, resVeiculos] =
         await Promise.all(promises);
       const listaRoteiros = Array.isArray(resRoteiros.data)
         ? resRoteiros.data
@@ -727,7 +798,13 @@ export function Roteiros() {
       );
       setRoteiros(listaComStatusExecucao);
       setTodasLojas(resLojas.data || []);
-      setFuncionarios(resFuncionarios.data || []);
+      setFuncionarios(
+        normalizarResponsaveisRoteiro([
+          Array.isArray(resFuncionarios.data) ? resFuncionarios.data : [],
+          Array.isArray(resUsuarios.data) ? resUsuarios.data : [],
+          isAdmin && usuario ? [usuario] : [],
+        ]),
+      );
       setVeiculos(resVeiculos.data || []);
     } catch (err) {
       setError("Erro ao carregar dados dos roteiros.");
@@ -883,6 +960,11 @@ export function Roteiros() {
 
     if (iniciandoRoteiros[roteiroAtual.id]) return;
 
+    if (!usuarioPodeIniciarRoteiro(roteiroAtual)) {
+      setError("Esta rota só pode ser iniciada quando estiver pendente.");
+      return;
+    }
+
     if (roteiroTemVeiculoAssociado(roteiroAtual)) {
       const podeProsseguir = await usuarioTemPilotagemAtiva(
         false,
@@ -923,16 +1005,22 @@ export function Roteiros() {
       return;
     }
 
+    const funcionarioRoteiroId = normalizarIdOpcional(
+      roteiroAtual?.funcionarioId,
+    );
+    const funcionarioRoteiroNome = String(
+      roteiroAtual?.funcionarioNome || "",
+    ).trim();
+
+    if (!funcionarioRoteiroId) {
+      setError("Atribua um funcionário ativo ao roteiro antes de iniciar.");
+      return;
+    }
+
     const payload = {
       veiculoId: normalizarIdOpcional(roteiroAtual?.veiculoId),
-      funcionarioId: normalizarIdOpcional(
-        isGestorRoteiro ? usuario?.id : roteiroAtual?.funcionarioId,
-      ),
-      funcionarioNome: String(
-        isGestorRoteiro
-          ? usuario?.nome
-          : roteiroAtual?.funcionarioNome || "",
-      ).trim(),
+      funcionarioId: funcionarioRoteiroId,
+      funcionarioNome: funcionarioRoteiroNome,
     };
 
     if (roteiroTemVeiculoAssociado(roteiroAtual)) {
@@ -962,6 +1050,18 @@ export function Roteiros() {
         .trim()
         .toLowerCase();
 
+      if (status === 409 && statusRota === "em_uso_por_outro_usuario") {
+        setError("Esta rota já está em uso por outro usuário.");
+        return;
+      }
+
+      if (status === 409 && statusRota === "finalizado_ate_reset") {
+        setError(
+          "Esta rota já foi finalizada e só pode ser iniciada novamente após o reset semanal.",
+        );
+        return;
+      }
+
       if (status === 403 && statusRota === "em_andamento_por_outro") {
         const usuarioNome =
           String(err?.response?.data?.usuarioAssociadoNome || "").trim() ||
@@ -985,7 +1085,6 @@ export function Roteiros() {
       } else {
         setError(mensagemApi || "Erro ao iniciar rota.");
       }
-      setError(mensagemApi || "Erro ao iniciar rota.");
     } finally {
       setIniciandoRoteiros((prev) => ({ ...prev, [roteiroAtual.id]: false }));
     }
@@ -1480,13 +1579,17 @@ export function Roteiros() {
                 execucaoSemanal?.usuarioId || "",
               ).trim();
               const usuarioAtualId = String(usuario?.id || "").trim();
-              const andamentoPorOutroUsuario =
+              const execucaoPertenceOutroUsuario =
                 execucaoEmAndamento &&
                 usuarioAssociadoId &&
                 usuarioAtualId &&
                 usuarioAssociadoId !== usuarioAtualId;
+              const andamentoPorOutroUsuario =
+                execucaoPertenceOutroUsuario && !isAdmin;
               const nomeResponsavel =
                 execucaoSemanal?.usuarioNome || "outro usuário";
+
+              const podeIniciarRoteiro = usuarioPodeIniciarRoteiro(roteiro);
 
               return (
             <div
@@ -1520,7 +1623,7 @@ export function Roteiros() {
                           : "bg-blue-100 text-blue-700"
                       }`}
                     >
-                      {andamentoPorOutroUsuario
+                      {execucaoPertenceOutroUsuario
                         ? `Em andamento por ${nomeResponsavel}`
                         : "Seu roteiro em andamento"}
                     </span>
@@ -1574,7 +1677,7 @@ export function Roteiros() {
                           veiculoId,
                         });
                         setSuccess(
-                          `Funcionário ${funcionarioNome || "removido"} atribuído com sucesso.`,
+                          `Responsável ${funcionarioNome || "removido"} atribuído com sucesso.`,
                         );
                         // Recarregar dados do backend para garantir persistência
                         carregarDadosIniciais();
@@ -1582,7 +1685,7 @@ export function Roteiros() {
                         setError(
                           getMensagemErroVeiculo(
                             err,
-                            "Erro ao atribuir funcionário ao roteiro.",
+                            "Erro ao atribuir responsável ao roteiro.",
                           ),
                         );
                         // Reverter se falhou
@@ -1600,10 +1703,10 @@ export function Roteiros() {
                       }
                     }}
                   >
-                    <option value="">Selecione um funcionário</option>
+                    <option value="">Selecione um responsável</option>
                     {funcionarios.map((f) => (
                       <option key={f.id} value={String(f.id)}>
-                        {f.nome}
+                        {obterLabelResponsavelRoteiro(f)}
                       </option>
                     ))}
                   </select>
@@ -1855,7 +1958,7 @@ export function Roteiros() {
                 {!roteiroEstaFinalizado ? (
                   <>
                     {roteiroTemVeiculoAssociado(roteiro) &&
-                      !isRoteiroEmAndamento(roteiro) && (
+                      podeIniciarRoteiro && (
                         <div className="w-full">
                           <label className="text-[11px] font-bold text-gray-500 block mb-1">
                             KM INICIAL DO VEÍCULO
@@ -1884,13 +1987,23 @@ export function Roteiros() {
                       onClick={() =>
                         andamentoPorOutroUsuario
                           ? abrirAndamentoRoteiro(roteiro.id)
-                          : iniciarOuContinuarRoteiro(roteiro)
+                          : podeIniciarRoteiro
+                            ? iniciarOuContinuarRoteiro(roteiro)
+                            : navigate(`/roteiros/${roteiro.id}/executar`)
                       }
-                      disabled={Boolean(iniciandoRoteiros[roteiro.id])}
+                      disabled={
+                        Boolean(iniciandoRoteiros[roteiro.id]) ||
+                        (!podeIniciarRoteiro &&
+                          !andamentoPorOutroUsuario &&
+                          !isRoteiroEmAndamento(roteiro) &&
+                          !roteiroTemPontosConcluidos(roteiro))
+                      }
                       className="flex-1 min-w-35 bg-[#24094E] text-white py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {iniciandoRoteiros[roteiro.id]
                         ? "Iniciando..."
+                        : podeIniciarRoteiro
+                          ? "Iniciar rota"
                         : andamentoPorOutroUsuario
                           ? "Ver andamento"
                           : isRoteiroEmAndamento(roteiro) ||

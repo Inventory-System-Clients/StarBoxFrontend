@@ -32,6 +32,7 @@ export default function ModalEditarMovimentacao({
 }) {
   const { usuario } = useAuth();
   const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
+  const podeEditarTotalPre = usuario?.role === "ADMIN";
   const [loading, setLoading] = useState(false);
   const [produtos, setProdutos] = useState([]);
   const [produtoIdSelecionado, setProdutoIdSelecionado] = useState(null);
@@ -128,7 +129,6 @@ export default function ModalEditarMovimentacao({
 
       // Preparar dados para envio
       const dadosParaEnviar = {
-        totalPre: formData.totalPre ? parseInt(formData.totalPre) : null,
         sairam: formData.sairam ? parseInt(formData.sairam) : null,
         abastecidas: formData.abastecidas
           ? parseInt(formData.abastecidas)
@@ -153,6 +153,12 @@ export default function ModalEditarMovimentacao({
         produtoId: produtoIdSelecionado || null,
       };
 
+      if (podeEditarTotalPre) {
+        dadosParaEnviar.totalPre = formData.totalPre
+          ? parseInt(formData.totalPre)
+          : null;
+      }
+
       // Enviar requisição PUT
       const response = await api.put(
         `/movimentacoes/${movimentacao.id}`,
@@ -173,7 +179,12 @@ export default function ModalEditarMovimentacao({
       console.error("Erro ao atualizar movimentação:", error);
 
       // Tratar erros específicos
-      if (error.response?.status === 403) {
+      if (
+        error.response?.status === 403 &&
+        error.response?.data?.code === "MOVIMENTACAO_TOTAL_PRE_ADMIN_ONLY"
+      ) {
+        alert("Somente ADMIN pode editar a quantidade pré de produtos.");
+      } else if (error.response?.status === 403) {
         alert("Você não tem permissão para editar esta movimentação.");
       } else if (error.response?.status === 404) {
         alert("Movimentação não encontrada.");
@@ -241,9 +252,15 @@ export default function ModalEditarMovimentacao({
                   name="totalPre"
                   value={formData.totalPre}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  disabled={!podeEditarTotalPre}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 disabled:text-gray-600"
                   min="0"
                 />
+                {!podeEditarTotalPre && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Somente ADMIN pode editar a quantidade pré.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
