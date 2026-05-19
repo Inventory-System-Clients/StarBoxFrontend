@@ -423,7 +423,7 @@ export default function AlertsPage() {
                         }}
                         title="Clique para ver informações da conta"
                       >
-                        <div className="flex items-start space-x-4">
+                        <div className="flex flex-wrap items-start gap-4">
                           <div
                             className={`p-3 rounded-lg ${config.iconBg} shrink-0`}
                           >
@@ -431,21 +431,21 @@ export default function AlertsPage() {
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
+                            <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                              <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
                                 </h3>
-                                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                                   <span className="font-medium">
                                     {alert.category}
                                   </span>
                                   <span>•</span>
-                                  <span>{alert.city}</span>
+                                  <span className="wrap-break-word">{alert.city}</span>
                                 </div>
                               </div>
                               <span
-                                className={`px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
+                                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
                                 {config.label}
                               </span>
@@ -516,7 +516,7 @@ export default function AlertsPage() {
                         }}
                         title="Clique para ver informações da conta"
                       >
-                        <div className="flex items-start space-x-4">
+                        <div className="flex flex-wrap items-start gap-4">
                           <div
                             className={`p-3 rounded-lg ${config.iconBg} shrink-0`}
                           >
@@ -524,21 +524,21 @@ export default function AlertsPage() {
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
+                            <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                              <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
                                 </h3>
-                                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                                   <span className="font-medium">
                                     {alert.category}
                                   </span>
                                   <span>•</span>
-                                  <span>{alert.city}</span>
+                                  <span className="wrap-break-word">{alert.city}</span>
                                 </div>
                               </div>
                               <span
-                                className={`px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
+                                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
                                 {config.label}
                               </span>
@@ -609,7 +609,7 @@ export default function AlertsPage() {
                         }}
                         title="Clique para ver informações da conta"
                       >
-                        <div className="flex items-start space-x-4">
+                        <div className="flex flex-wrap items-start gap-4">
                           <div
                             className={`p-3 rounded-lg ${config.iconBg} shrink-0`}
                           >
@@ -617,21 +617,21 @@ export default function AlertsPage() {
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
+                            <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                              <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
                                 </h3>
-                                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                                   <span className="font-medium">
                                     {alert.category}
                                   </span>
                                   <span>•</span>
-                                  <span>{alert.city}</span>
+                                  <span className="wrap-break-word">{alert.city}</span>
                                 </div>
                               </div>
                               <span
-                                className={`px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
+                                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
                                 {config.label}
                               </span>
