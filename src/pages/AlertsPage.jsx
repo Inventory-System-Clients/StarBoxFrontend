@@ -98,6 +98,14 @@ export default function AlertsPage() {
     return availableBills.find((bill) => isSameBill(bill, alert)) || null;
   };
 
+  const getAlertAccountName = (alert) => {
+    const alertName = alert?.account || alert?.name;
+    if (alertName) return alertName;
+
+    const matchedBill = findBillForAlert(alert, bills);
+    return matchedBill?.name || "Conta sem nome";
+  };
+
   const buildFallbackBillFromAlert = (alert) => ({
     id: alert?.bill_id ?? alert?.billId ?? alert?.id ?? null,
     name: alert?.account || "Conta sem nome",
@@ -406,6 +414,7 @@ export default function AlertsPage() {
                   redAlerts.map((alert) => {
                     const config = getUrgencyConfig(alert.urgency);
                     const Icon = config.icon;
+                    const accountName = getAlertAccountName(alert);
 
                     return (
                       <div
@@ -433,14 +442,13 @@ export default function AlertsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
                               <div className="min-w-0">
+                                <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide mb-1">
+                                  Nome da Conta
+                                </p>
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
-                                  {alert.account}
-                                </h3>                                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                    <span className="font-medium wrap-break-word">
-                                      {alert.account}
-                                    </span>
-                                  </div>
-</div>
+                                  {accountName}
+                                </h3>
+                              </div>
                               <span
                                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
@@ -496,6 +504,7 @@ export default function AlertsPage() {
                   yellowAlerts.map((alert) => {
                     const config = getUrgencyConfig(alert.urgency);
                     const Icon = config.icon;
+                    const accountName = getAlertAccountName(alert);
 
                     return (
                       <div
@@ -523,14 +532,13 @@ export default function AlertsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
                               <div className="min-w-0">
+                                <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide mb-1">
+                                  Nome da Conta
+                                </p>
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
-                                  {alert.account}
-                                </h3>                                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                    <span className="font-medium wrap-break-word">
-                                      {alert.account}
-                                    </span>
-                                  </div>
-</div>
+                                  {accountName}
+                                </h3>
+                              </div>
                               <span
                                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
@@ -586,6 +594,7 @@ export default function AlertsPage() {
                   greenAlerts.map((alert) => {
                     const config = getUrgencyConfig(alert.urgency);
                     const Icon = config.icon;
+                    const accountName = getAlertAccountName(alert);
 
                     return (
                       <div
@@ -613,14 +622,13 @@ export default function AlertsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
                               <div className="min-w-0">
+                                <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide mb-1">
+                                  Nome da Conta
+                                </p>
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
-                                  {alert.account}
-                                </h3>                                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                    <span className="font-medium wrap-break-word">
-                                      {alert.account}
-                                    </span>
-                                  </div>
-</div>
+                                  {accountName}
+                                </h3>
+                              </div>
                               <span
                                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
