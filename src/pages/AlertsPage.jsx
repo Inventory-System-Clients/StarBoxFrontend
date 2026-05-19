@@ -435,15 +435,12 @@ export default function AlertsPage() {
                               <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
-                                </h3>
-                                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                  <span className="font-medium wrap-break-word">
-                                    {alert.account}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="wrap-break-word">{alert.account}</span>
-                                </div>
-                              </div>
+                                </h3>                                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                                    <span className="font-medium wrap-break-word">
+                                      {alert.account}
+                                    </span>
+                                  </div>
+</div>
                               <span
                                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
@@ -528,15 +525,12 @@ export default function AlertsPage() {
                               <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
-                                </h3>
-                                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                  <span className="font-medium wrap-break-word">
-                                    {alert.account}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="wrap-break-word">{alert.account}</span>
-                                </div>
-                              </div>
+                                </h3>                                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                                    <span className="font-medium wrap-break-word">
+                                      {alert.account}
+                                    </span>
+                                  </div>
+</div>
                               <span
                                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
@@ -621,15 +615,12 @@ export default function AlertsPage() {
                               <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
-                                </h3>
-                                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                                  <span className="font-medium wrap-break-word">
-                                    {alert.account}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="wrap-break-word">{alert.account}</span>
-                                </div>
-                              </div>
+                                </h3>                                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                                    <span className="font-medium wrap-break-word">
+                                      {alert.account}
+                                    </span>
+                                  </div>
+</div>
                               <span
                                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}
                               >
