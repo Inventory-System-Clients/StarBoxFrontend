@@ -283,10 +283,10 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col app-container">
+    <div className="min-h-screen flex flex-col app-container overflow-x-hidden">
       <Header />
 
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8 overflow-x-hidden">
         <div className="fade-in">
           <div className="mb-8">
             <h1
@@ -430,10 +430,10 @@ export default function AlertsPage() {
                             <Icon className={config.iconColor} size={24} />
                           </div>
 
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h3 className="text-lg font-bold text-blue-700 mb-1">
+                                <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
                                 </h3>
                                 <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -523,10 +523,10 @@ export default function AlertsPage() {
                             <Icon className={config.iconColor} size={24} />
                           </div>
 
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h3 className="text-lg font-bold text-blue-700 mb-1">
+                                <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
                                 </h3>
                                 <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -616,10 +616,10 @@ export default function AlertsPage() {
                             <Icon className={config.iconColor} size={24} />
                           </div>
 
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h3 className="text-lg font-bold text-blue-700 mb-1">
+                                <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
                                   {alert.account}
                                 </h3>
                                 <div className="flex items-center space-x-2 text-sm text-gray-600">
