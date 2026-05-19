@@ -441,7 +441,7 @@ export default function AlertsPage() {
                                     {alert.account}
                                   </span>
                                   <span>•</span>
-                                  <span className="wrap-break-word">{alert.city}</span>
+                                  <span className="wrap-break-word">{alert.account}</span>
                                 </div>
                               </div>
                               <span
@@ -534,7 +534,7 @@ export default function AlertsPage() {
                                     {alert.account}
                                   </span>
                                   <span>•</span>
-                                  <span className="wrap-break-word">{alert.city}</span>
+                                  <span className="wrap-break-word">{alert.account}</span>
                                 </div>
                               </div>
                               <span
@@ -627,7 +627,7 @@ export default function AlertsPage() {
                                     {alert.account}
                                   </span>
                                   <span>•</span>
-                                  <span className="wrap-break-word">{alert.city}</span>
+                                  <span className="wrap-break-word">{alert.account}</span>
                                 </div>
                               </div>
                               <span
