@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { reportsAPI } from '../services/api.js';
-import { Button } from '../components/ui/button.jsx';
-import { Plus, TrendingUp, TrendingDown, AlertTriangle, Calendar, Download, RefreshCw } from 'lucide-react';
-import BillModal from '../components/BillModal.jsx';
-import { categoriesAPI } from '../services/api.js';
-import { toast } from 'sonner';
-import Header from '../components/Header.jsx';
-import Footer from '../components/Footer.jsx';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext.jsx";
+import { reportsAPI } from "../services/api.js";
+import { Button } from "../components/ui/button.jsx";
+import {
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Calendar,
+  Download,
+  RefreshCw,
+} from "lucide-react";
+import BillModal from "../components/BillModal.jsx";
+import { categoriesAPI } from "../services/api.js";
+import { toast } from "sonner";
+import Header from "../components/Header.jsx";
+import Footer from "../components/Footer.jsx";
+import { useNavigate } from "react-router-dom";
 
 // Estilos para animação de pulsar
 const pulseStyles = `
@@ -29,10 +37,10 @@ const pulseStyles = `
 
 // Função auxiliar para formatar valores em reais
 const formatCurrency = (value) => {
-  if (value === null || value === undefined) return 'R$ 0,00';
-  return value.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
+  if (value === null || value === undefined) return "R$ 0,00";
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
   });
 };
 
@@ -59,33 +67,33 @@ export default function DashboardPage() {
       const [reportData, alertsData, categoriesData] = await Promise.all([
         reportsAPI.getDashboard(),
         reportsAPI.getAlerts(),
-        categoriesAPI.getAll()
+        categoriesAPI.getAll(),
       ]);
 
       // Validar campos essenciais
-      if (typeof reportData.bills_due_today === 'undefined') {
-        console.warn('Campo bills_due_today não encontrado na resposta');
+      if (typeof reportData.bills_due_today === "undefined") {
+        console.warn("Campo bills_due_today não encontrado na resposta");
       }
 
       setReport(reportData);
       setAlerts(alertsData);
       setCategories(categoriesData);
       setLastUpdate(new Date());
-      
+
       if (isRefresh) {
-        toast.success('Dashboard atualizado!');
+        toast.success("Dashboard atualizado!");
       }
     } catch (error) {
-      console.error('Erro ao carregar dashboard:', error);
-      
+      console.error("Erro ao carregar dashboard:", error);
+
       if (error.response?.status === 403) {
-        toast.error('Você não tem permissão para acessar esta funcionalidade');
-        navigate('/');
+        toast.error("Você não tem permissão para acessar esta funcionalidade");
+        navigate("/");
       } else if (error.response?.status === 401) {
-        toast.error('Sessão expirada. Faça login novamente.');
-        navigate('/login');
+        toast.error("Sessão expirada. Faça login novamente.");
+        navigate("/login");
       } else {
-        toast.error('Erro ao carregar dados do dashboard');
+        toast.error("Erro ao carregar dados do dashboard");
       }
     } finally {
       setLoading(false);
@@ -101,7 +109,7 @@ export default function DashboardPage() {
     try {
       const blob = await reportsAPI.export(format);
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `relatorio_contas.${format}`;
       document.body.appendChild(a);
@@ -110,11 +118,13 @@ export default function DashboardPage() {
       document.body.removeChild(a);
       toast.success(`Relatório ${format.toUpperCase()} exportado com sucesso!`);
     } catch (error) {
-      toast.error('Erro ao exportar relatório');
+      toast.error("Erro ao exportar relatório");
     }
   };
 
-  const urgentAlerts = alerts.filter(a => a.urgency === 'red' || a.urgency === 'yellow');
+  const urgentAlerts = alerts.filter(
+    (a) => a.urgency === "red" || a.urgency === "yellow",
+  );
 
   if (loading) {
     return (
@@ -131,12 +141,17 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col app-container">
       <style>{pulseStyles}</style>
       <Header />
-      
+
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="fade-in">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 space-y-4 sm:space-y-0">
             <div>
-              <h1 className="text-4xl font-bold text-gray-800 mb-2" data-testid="page-title">Dashboard</h1>
+              <h1
+                className="text-4xl font-bold text-gray-800 mb-2"
+                data-testid="page-title"
+              >
+                Dashboard
+              </h1>
               <p className="text-gray-600">Visão geral das contas a pagar</p>
               <div className="flex items-center gap-4 mt-2">
                 <button
@@ -145,20 +160,41 @@ export default function DashboardPage() {
                   className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2 transition-colors"
                   title="Atualizar dashboard"
                 >
-                  <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-                  {refreshing ? 'Atualizando...' : 'Atualizar'}
+                  <RefreshCw
+                    size={16}
+                    className={refreshing ? "animate-spin" : ""}
+                  />
+                  {refreshing ? "Atualizando..." : "Atualizar"}
                 </button>
                 <span className="text-xs text-gray-400">
-                  Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+                  Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 mt-4">
-                <Button onClick={() => navigate('/financeiro/contas/personal')} variant="outline" className="border-blue-300 text-blue-600 hover:bg-blue-50">Contas Particulares</Button>
-                <Button onClick={() => navigate('/financeiro/contas/company')} variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50">Contas Empresariais</Button>
-                <Button onClick={() => navigate('/financeiro/avisos')} variant="outline" className="border-yellow-300 text-yellow-600 hover:bg-yellow-50">Avisos</Button>
+                <Button
+                  onClick={() => navigate("/financeiro/contas/personal")}
+                  variant="outline"
+                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  Contas Particulares
+                </Button>
+                <Button
+                  onClick={() => navigate("/financeiro/contas/company")}
+                  variant="outline"
+                  className="border-purple-300 text-purple-600 hover:bg-purple-50"
+                >
+                  Contas Empresariais
+                </Button>
+                <Button
+                  onClick={() => navigate("/financeiro/avisos")}
+                  variant="outline"
+                  className="border-yellow-300 text-yellow-600 hover:bg-yellow-50"
+                >
+                  Avisos
+                </Button>
               </div>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap gap-3">
               <Button
                 onClick={() => setShowModal(true)}
                 className="bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg btn-primary"
@@ -168,7 +204,7 @@ export default function DashboardPage() {
                 Cadastrar Conta
               </Button>
               <Button
-                onClick={() => handleExport('pdf')}
+                onClick={() => handleExport("pdf")}
                 variant="outline"
                 className="border-purple-300 text-purple-600 hover:bg-purple-50"
                 data-testid="btn-export-pdf"
@@ -177,7 +213,7 @@ export default function DashboardPage() {
                 PDF
               </Button>
               <Button
-                onClick={() => handleExport('excel')}
+                onClick={() => handleExport("excel")}
                 variant="outline"
                 className="border-blue-300 text-blue-600 hover:bg-blue-50"
                 data-testid="btn-export-excel"
@@ -189,15 +225,19 @@ export default function DashboardPage() {
           </div>
 
           {urgentAlerts.length > 0 && (
-            <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg slide-in" data-testid="urgent-alerts-banner">
+            <div
+              className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg slide-in"
+              data-testid="urgent-alerts-banner"
+            >
               <div className="flex items-center">
                 <AlertTriangle className="text-yellow-600 mr-3" size={24} />
                 <div>
                   <p className="font-semibold text-yellow-800">
-                    Atenção! Você tem {urgentAlerts.length} conta(s) próxima(s) ao vencimento
+                    Atenção! Você tem {urgentAlerts.length} conta(s) próxima(s)
+                    ao vencimento
                   </p>
                   <button
-                    onClick={() => navigate('/financeiro/avisos')}
+                    onClick={() => navigate("/financeiro/avisos")}
                     className="text-sm text-yellow-700 underline hover:text-yellow-900"
                     data-testid="link-view-alerts"
                   >
@@ -209,68 +249,101 @@ export default function DashboardPage() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-total-paid">
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              data-testid="card-total-paid"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-green-100 rounded-lg">
                   <TrendingUp className="text-green-600" size={24} />
                 </div>
               </div>
-              <h3 className="text-gray-600 text-sm font-medium mb-1">Total Pago</h3>
-              <p className="text-3xl font-bold text-gray-800">{formatCurrency(report?.total_paid)}</p>
+              <h3 className="text-gray-600 text-sm font-medium mb-1">
+                Total Pago
+              </h3>
+              <p className="text-3xl font-bold text-gray-800">
+                {formatCurrency(report?.total_paid)}
+              </p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-total-open">
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              data-testid="card-total-open"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-red-100 rounded-lg">
                   <TrendingDown className="text-red-600" size={24} />
                 </div>
               </div>
-              <h3 className="text-gray-600 text-sm font-medium mb-1">Total em Aberto</h3>
-              <p className="text-3xl font-bold text-gray-800">{formatCurrency(report?.total_open)}</p>
+              <h3 className="text-gray-600 text-sm font-medium mb-1">
+                Total em Aberto
+              </h3>
+              <p className="text-3xl font-bold text-gray-800">
+                {formatCurrency(report?.total_open)}
+              </p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-upcoming">
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              data-testid="card-upcoming"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-yellow-100 rounded-lg">
                   <Calendar className="text-yellow-600" size={24} />
                 </div>
               </div>
-              <h3 className="text-gray-600 text-sm font-medium mb-1">Próximos 7 Dias</h3>
-              <p className="text-3xl font-bold text-gray-800">{report?.upcoming_bills}</p>
+              <h3 className="text-gray-600 text-sm font-medium mb-1">
+                Próximos 7 Dias
+              </h3>
+              <p className="text-3xl font-bold text-gray-800">
+                {report?.upcoming_bills}
+              </p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover" data-testid="card-overdue">
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              data-testid="card-overdue"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-purple-100 rounded-lg">
-                  <AlertTriangle 
-                    className={`text-purple-600 ${report?.overdue_bills > 0 ? 'animate-pulse-scale' : ''}`}
-                    size={24} 
+                  <AlertTriangle
+                    className={`text-purple-600 ${report?.overdue_bills > 0 ? "animate-pulse-scale" : ""}`}
+                    size={24}
                   />
                 </div>
               </div>
-              <h3 className="text-gray-600 text-sm font-medium mb-1">Atrasadas</h3>
-              <p className="text-3xl font-bold text-gray-800">{report?.overdue_bills}</p>
+              <h3 className="text-gray-600 text-sm font-medium mb-1">
+                Atrasadas
+              </h3>
+              <p className="text-3xl font-bold text-gray-800">
+                {report?.overdue_bills}
+              </p>
             </div>
           </div>
 
           {/* Cards de Alertas de Contas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Contas a pagar HOJE */}
-            <div 
-              className="bg-linear-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer" 
+            <div
+              className="bg-linear-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer"
               data-testid="card-due-today"
               title="Contas com vencimento na data de hoje (status: Em Aberto)"
-              onClick={() => navigate('/financeiro/avisos')}
+              onClick={() => navigate("/financeiro/avisos")}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-white/20 rounded-lg">
                   <AlertTriangle size={24} />
                 </div>
-                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">🔴 Urgente</span>
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                  🔴 Urgente
+                </span>
               </div>
-              <h3 className="text-white text-sm font-medium mb-1 opacity-90">Contas a Pagar HOJE!</h3>
+              <h3 className="text-white text-sm font-medium mb-1 opacity-90">
+                Contas a Pagar HOJE!
+              </h3>
               <p className="text-4xl font-bold mb-2">
-                {report?.bills_due_today || 0} {report?.bills_due_today === 1 ? 'conta' : 'contas'}
+                {report?.bills_due_today || 0}{" "}
+                {report?.bills_due_today === 1 ? "conta" : "contas"}
               </p>
               <p className="text-sm opacity-80">
                 Total: {formatCurrency(report?.amount_due_today)}
@@ -278,21 +351,26 @@ export default function DashboardPage() {
             </div>
 
             {/* Contas a pagar em 3 dias */}
-            <div 
-              className="bg-linear-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer" 
+            <div
+              className="bg-linear-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer"
               data-testid="card-due-3-days"
               title="Contas que vencem nos próximos 3 dias (status: Em Aberto)"
-              onClick={() => navigate('/financeiro/avisos')}
+              onClick={() => navigate("/financeiro/avisos")}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-white/20 rounded-lg">
                   <Calendar size={24} />
                 </div>
-                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">🟡 Atenção</span>
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                  🟡 Atenção
+                </span>
               </div>
-              <h3 className="text-white text-sm font-medium mb-1 opacity-90">Contas a Pagar em 3 Dias!</h3>
+              <h3 className="text-white text-sm font-medium mb-1 opacity-90">
+                Contas a Pagar em 3 Dias!
+              </h3>
               <p className="text-4xl font-bold mb-2">
-                {report?.bills_due_3_days || 0} {report?.bills_due_3_days === 1 ? 'conta' : 'contas'}
+                {report?.bills_due_3_days || 0}{" "}
+                {report?.bills_due_3_days === 1 ? "conta" : "contas"}
               </p>
               <p className="text-sm opacity-80">
                 Total: {formatCurrency(report?.amount_due_3_days)}
@@ -300,8 +378,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Contas em dia */}
-            <div 
-              className="bg-linear-to-br from-green-500 to-green-600 rounded-xl shadow-md p-6 text-white card-hover" 
+            <div
+              className="bg-linear-to-br from-green-500 to-green-600 rounded-xl shadow-md p-6 text-white card-hover"
               data-testid="card-up-to-date"
               title="Contas com vencimento futuro (após 3 dias, status: Em Aberto)"
             >
@@ -309,11 +387,16 @@ export default function DashboardPage() {
                 <div className="p-3 bg-white/20 rounded-lg">
                   <TrendingUp size={24} />
                 </div>
-                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">🟢 OK</span>
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                  🟢 OK
+                </span>
               </div>
-              <h3 className="text-white text-sm font-medium mb-1 opacity-90">Contas em Dia</h3>
+              <h3 className="text-white text-sm font-medium mb-1 opacity-90">
+                Contas em Dia
+              </h3>
               <p className="text-4xl font-bold mb-2">
-                {report?.bills_up_to_date || 0} {report?.bills_up_to_date === 1 ? 'conta' : 'contas'}
+                {report?.bills_up_to_date || 0}{" "}
+                {report?.bills_up_to_date === 1 ? "conta" : "contas"}
               </p>
               <p className="text-sm opacity-80">
                 Total: {formatCurrency(report?.amount_up_to_date)}
@@ -322,36 +405,62 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100" data-testid="section-by-category">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Valor Pago por Categoria</h2>
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100"
+              data-testid="section-by-category"
+            >
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                Valor Pago por Categoria
+              </h2>
               <div className="space-y-3">
                 {report?.bills_by_category.length > 0 ? (
                   report.bills_by_category.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                      <span className="font-medium text-gray-700">{item.category}</span>
-                      <span className="text-purple-600 font-semibold">{formatCurrency(item.total)}</span>
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-purple-50 rounded-lg"
+                    >
+                      <span className="font-medium text-gray-700">
+                        {item.category}
+                      </span>
+                      <span className="text-purple-600 font-semibold">
+                        {formatCurrency(item.total)}
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500 text-center py-4">Nenhum pagamento realizado ainda</p>
+                  <p className="text-gray-500 text-center py-4">
+                    Nenhum pagamento realizado ainda
+                  </p>
                 )}
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100" data-testid="section-by-date">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Datas com Mais Pagamentos</h2>
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100"
+              data-testid="section-by-date"
+            >
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                Datas com Mais Pagamentos
+              </h2>
               <div className="space-y-3">
                 {report?.bills_by_date.length > 0 ? (
                   report.bills_by_date.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-blue-50 rounded-lg"
+                    >
                       <span className="font-medium text-gray-700">
-                        {new Date(item.date).toLocaleDateString('pt-BR')}
+                        {new Date(item.date).toLocaleDateString("pt-BR")}
                       </span>
-                      <span className="text-blue-600 font-semibold">{item.count} pagamento(s)</span>
+                      <span className="text-blue-600 font-semibold">
+                        {item.count} pagamento(s)
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500 text-center py-4">Nenhum pagamento realizado ainda</p>
+                  <p className="text-gray-500 text-center py-4">
+                    Nenhum pagamento realizado ainda
+                  </p>
                 )}
               </div>
             </div>

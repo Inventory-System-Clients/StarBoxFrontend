@@ -521,6 +521,9 @@ export default function FluxoCaixa() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Funcionário
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Data / Horário
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Valor Esperado
                     </th>
@@ -759,6 +762,13 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     }
   };
 
+  const dataMovimentacao =
+    fluxo?.movimentacao?.dataColeta ||
+    fluxo?.movimentacao?.createdAt ||
+    fluxo?.createdAt ||
+    fluxo?.updatedAt;
+  const dataHoraMovimentacao = formatDateTime(dataMovimentacao);
+
   return (
     <tr
       className={`${fluxo.conferencia === "bateu" ? "bg-green-50" : fluxo.conferencia === "nao_bateu" ? "bg-red-50" : ""} hover:bg-gray-50 transition-colors`}
@@ -787,6 +797,16 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
         <div className="text-xs text-gray-500">
           {fluxo.movimentacao.usuario.email}
         </div>
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+        <div className="font-semibold">
+          {dataHoraMovimentacao?.hora || "--:--"}
+        </div>
+        {dataHoraMovimentacao?.data && (
+          <div className="text-xs text-gray-500">
+            {dataHoraMovimentacao.data}
+          </div>
+        )}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
         <div className="flex flex-col items-end gap-1">
@@ -961,4 +981,19 @@ function formatLocalDateKey(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return formatDate(date);
+}
+
+function formatDateTime(value) {
+  if (!value) return null;
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return {
+    data: date.toLocaleDateString("pt-BR"),
+    hora: date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
 }
