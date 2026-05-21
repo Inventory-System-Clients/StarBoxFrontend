@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { buscarRoteiros } from "../services/roteiros";
@@ -16,6 +16,9 @@ export function Relatorios() {
   const [dashboard, setDashboard] = useState(null);
   const [lojas, setLojas] = useState([]);
   const [lojaSelecionada, setLojaSelecionada] = useState("");
+  const [buscaLoja, setBuscaLoja] = useState("");
+  const [buscaLojaConsolidado, setBuscaLojaConsolidado] = useState("");
+  const [buscaRoteiro, setBuscaRoteiro] = useState("");
   const [lojasSelecionadasConsolidado, setLojasSelecionadasConsolidado] =
     useState([]);
   const [roteiros, setRoteiros] = useState([]);
@@ -33,6 +36,40 @@ export function Relatorios() {
   const [error, setError] = useState("");
   const [gastosFixosLoja, setGastosFixosLoja] = useState([]);
   const [comparativoMensal, setComparativoMensal] = useState(null);
+  const termoBuscaLoja = buscaLoja.trim().toLowerCase();
+  const termoBuscaLojaConsolidado = buscaLojaConsolidado.trim().toLowerCase();
+  const termoBuscaRoteiro = buscaRoteiro.trim().toLowerCase();
+
+  const lojasFiltradasBusca = useMemo(() => {
+    if (!termoBuscaLoja) return lojas;
+    return lojas.filter((loja) =>
+      [loja?.nome, loja?.cidade, loja?.endereco, loja?.razaoSocial]
+        .filter(Boolean)
+        .some((valor) => String(valor).toLowerCase().includes(termoBuscaLoja)),
+    );
+  }, [lojas, termoBuscaLoja]);
+
+  const lojasFiltradasConsolidado = useMemo(() => {
+    if (!termoBuscaLojaConsolidado) return lojas;
+    return lojas.filter((loja) =>
+      [loja?.nome, loja?.cidade, loja?.endereco, loja?.razaoSocial]
+        .filter(Boolean)
+        .some((valor) =>
+          String(valor).toLowerCase().includes(termoBuscaLojaConsolidado),
+        ),
+    );
+  }, [lojas, termoBuscaLojaConsolidado]);
+
+  const roteirosFiltradosBusca = useMemo(() => {
+    if (!termoBuscaRoteiro) return roteiros;
+    return roteiros.filter((roteiro) =>
+      [roteiro?.nome, roteiro?.descricao, roteiro?.funcionario?.nome]
+        .filter(Boolean)
+        .some((valor) =>
+          String(valor).toLowerCase().includes(termoBuscaRoteiro),
+        ),
+    );
+  }, [roteiros, termoBuscaRoteiro]);
 
   // Buscar lista de lojas
   const carregarLojas = async () => {
@@ -2817,6 +2854,17 @@ export function Relatorios() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 🗂️ Roteiro
               </label>
+              <input
+                type="text"
+                value={buscaRoteiro}
+                onChange={(e) => setBuscaRoteiro(e.target.value)}
+                className="input-field w-full mb-2"
+                placeholder="Digite o nome do roteiro"
+                disabled={
+                  lojaSelecionada === TODAS_LOJAS_VALUE ||
+                  lojaSelecionada === SELECAO_MANUAL_LOJAS_VALUE
+                }
+              />
               <select
                 value={roteiroSelecionado}
                 onChange={(e) => {
@@ -2831,7 +2879,7 @@ export function Relatorios() {
                 }
               >
                 <option value="">Selecione um roteiro (opcional)</option>
-                {roteiros.map((r) => (
+                {roteirosFiltradosBusca.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.nome}
                   </option>
@@ -2842,6 +2890,14 @@ export function Relatorios() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 🏪 Loja
               </label>
+              <input
+                type="text"
+                value={buscaLoja}
+                onChange={(e) => setBuscaLoja(e.target.value)}
+                className="input-field w-full mb-2"
+                placeholder="Digite o nome da loja"
+                disabled={!!roteiroSelecionado}
+              />
               <select
                 value={lojaSelecionada}
                 onChange={(e) => {
@@ -2861,7 +2917,7 @@ export function Relatorios() {
                 <option value={SELECAO_MANUAL_LOJAS_VALUE}>
                   Selecionar lojas manualmente (consolidado)
                 </option>
-                {lojas.map((loja) => (
+                {lojasFiltradasBusca.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
                   </option>
@@ -2923,8 +2979,16 @@ export function Relatorios() {
                   </div>
                 </div>
 
+                <input
+                  type="text"
+                  value={buscaLojaConsolidado}
+                  onChange={(e) => setBuscaLojaConsolidado(e.target.value)}
+                  className="input-field w-full mb-3"
+                  placeholder="Digite o nome da loja para filtrar a lista"
+                />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
-                  {(lojas || []).map((loja) => {
+                  {(lojasFiltradasConsolidado || []).map((loja) => {
                     const lojaIdNormalizado = String(loja.id);
                     const selecionada =
                       lojasSelecionadasConsolidado.includes(lojaIdNormalizado);

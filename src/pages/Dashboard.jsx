@@ -31,6 +31,7 @@ import AlertAdmin from "../components/AlertAdmin";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 import DashboardGastosRoteirosTab from "../components/DashboardGastosRoteirosTab";
+import AjusteMaquinaAtual from "../components/AjusteMaquinaAtual";
 
 import Swal from "sweetalert2";
 
@@ -2987,6 +2988,10 @@ export function Dashboard() {
               </button>
             </div>
           </div>
+        )}
+
+        {isAdminEstrito && (
+          <AjusteMaquinaAtual />
         )}
 
         {isAdminEstrito && (

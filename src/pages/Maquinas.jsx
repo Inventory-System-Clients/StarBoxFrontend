@@ -25,7 +25,7 @@ export function Maquinas() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [filtroLoja, setFiltroLoja] = useState("");
-  const [filtroCodigo, setFiltroCodigo] = useState("");
+  const [filtroMaquina, setFiltroMaquina] = useState("");
   const [mostrarInativas, setMostrarInativas] = useState(false);
 
   useEffect(() => {
@@ -89,14 +89,22 @@ export function Maquinas() {
   };
 
   // Filtros locais por loja e código (backend já filtra por ativo/inativo)
-  const termoCodigo = filtroCodigo.trim().toLowerCase();
+  const termoLoja = filtroLoja.trim().toLowerCase();
+  const termoMaquina = filtroMaquina.trim().toLowerCase();
   const maquinasFiltradas = maquinas.filter((maquina) => {
-    const correspondeLoja = filtroLoja ? maquina.lojaId === filtroLoja : true;
-    const correspondeCodigo = termoCodigo
-      ? String(maquina.codigo || "").toLowerCase().includes(termoCodigo)
+    const loja = lojas.find((l) => l.id === maquina.lojaId);
+    const correspondeLoja = termoLoja
+      ? [loja?.nome, loja?.razaoSocial, loja?.cidade, loja?.endereco]
+          .filter(Boolean)
+          .some((valor) => String(valor).toLowerCase().includes(termoLoja))
+      : true;
+    const correspondeMaquina = termoMaquina
+      ? [maquina?.codigo, maquina?.nome, maquina?.modelo, maquina?.tipo]
+          .filter(Boolean)
+          .some((valor) => String(valor).toLowerCase().includes(termoMaquina))
       : true;
 
-    return correspondeLoja && correspondeCodigo;
+    return correspondeLoja && correspondeMaquina;
   });
 
   const stats = [
@@ -256,31 +264,26 @@ export function Maquinas() {
           <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Filtrar por Loja
+                Buscar por Loja
               </label>
-              <select
+              <input
+                type="text"
                 value={filtroLoja}
                 onChange={(e) => setFiltroLoja(e.target.value)}
-                className="select-field"
-              >
-                <option value="">Todas as Lojas</option>
-                {lojas.map((loja) => (
-                  <option key={loja.id} value={loja.id}>
-                    {loja.nome}
-                  </option>
-                ))}
-              </select>
+                placeholder="Digite o nome da loja"
+                className="input-field"
+              />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Buscar por Código
+                Buscar por Maquina
               </label>
               <input
                 type="text"
-                value={filtroCodigo}
-                onChange={(e) => setFiltroCodigo(e.target.value)}
-                placeholder="Digite o código da máquina"
+                value={filtroMaquina}
+                onChange={(e) => setFiltroMaquina(e.target.value)}
+                placeholder="Digite nome, codigo ou modelo"
                 className="input-field"
               />
             </div>
@@ -307,7 +310,7 @@ export function Maquinas() {
               icon="🎰"
               title="Nenhuma máquina encontrada"
               message={
-                filtroLoja || filtroCodigo
+                filtroLoja || filtroMaquina
                   ? "Nenhuma máquina corresponde aos filtros informados. Ajuste o ponto ou o código pesquisado."
                   : "Cadastre sua primeira máquina para começar!"
               }
