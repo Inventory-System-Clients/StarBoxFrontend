@@ -10,11 +10,13 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   abrirWhatsAppComMensagem,
   montarMensagemMovimentacoesWhatsAppLoja,
+  obterMovimentacoesWhatsAppPendentesLoja,
   obterUltimaMensagemMovimentacoesWhatsAppLoja,
   obterKmInicialPilotagemAtiva,
   removerMovimentacoesWhatsAppPendentesLoja,
   salvarUltimaMensagemMovimentacoesWhatsAppLoja,
   salvarMovimentacaoWhatsAppPendenteLoja,
+  atualizarMovimentacaoWhatsAppPendenteLoja,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
 export default function RoteiroExecucao() {
@@ -94,6 +96,11 @@ export default function RoteiroExecucao() {
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [movimentacaoParaEditar, setMovimentacaoParaEditar] = useState(null);
   const [maquinasEditadasNaRota, setMaquinasEditadasNaRota] = useState([]);
+  const [leiturasAtualizadasPorLoja, setLeiturasAtualizadasPorLoja] = useState(
+    {},
+  );
+  const [justificativasEdicaoPorLoja, setJustificativasEdicaoPorLoja] =
+    useState({});
   const [abastecimentosExtrasNaRota, setAbastecimentosExtrasNaRota] = useState(
     [],
   );
@@ -118,6 +125,8 @@ export default function RoteiroExecucao() {
   ]);
   const EDICOES_MOVIMENTACAO_ROTA_STORAGE_PREFIX =
     "starbox:roteiro:edicoes-movimentacao:";
+  const JUSTIFICATIVAS_EDICAO_MOVIMENTACAO_ROTA_STORAGE_PREFIX =
+    "starbox:roteiro:justificativas-edicao-movimentacao:";
   const STATUS_EXECUCAO_ROTEIRO_STORAGE_PREFIX =
     "starbox:roteiro:execucao-semanal-status:";
 
@@ -597,6 +606,10 @@ export default function RoteiroExecucao() {
         usuarioId: usuario?.id,
         lojaId: loja.id,
       });
+      setLeiturasAtualizadasPorLoja((prev) => ({
+        ...prev,
+        [String(loja.id)]: false,
+      }));
     }
   };
 
@@ -660,6 +673,53 @@ export default function RoteiroExecucao() {
 
   const limparEdicoesMovimentacaoRota = () => {
     const chave = obterChaveEdicoesMovimentacaoRota();
+    if (!chave) return;
+
+    try {
+      window.localStorage.removeItem(chave);
+    } catch {
+      // Sem bloqueio de fluxo caso localStorage falhe.
+    }
+  };
+
+  const obterChaveJustificativasEdicaoMovimentacaoRota = () => {
+    const roteiroId = String(id || "").trim();
+    const usuarioId = String(
+      roteiro?.funcionarioId || usuario?.id || "",
+    ).trim();
+    if (!roteiroId || !usuarioId) return "";
+    return `${JUSTIFICATIVAS_EDICAO_MOVIMENTACAO_ROTA_STORAGE_PREFIX}${usuarioId}:${roteiroId}`;
+  };
+
+  const carregarJustificativasEdicaoMovimentacaoRota = () => {
+    const chave = obterChaveJustificativasEdicaoMovimentacaoRota();
+    if (!chave) return {};
+
+    try {
+      const bruto = window.localStorage.getItem(chave);
+      if (!bruto) return {};
+      const payload = JSON.parse(bruto);
+      return payload && typeof payload === "object" && !Array.isArray(payload)
+        ? payload
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const salvarJustificativasEdicaoMovimentacaoRota = (payload) => {
+    const chave = obterChaveJustificativasEdicaoMovimentacaoRota();
+    if (!chave) return;
+
+    try {
+      window.localStorage.setItem(chave, JSON.stringify(payload || {}));
+    } catch {
+      // Sem bloqueio de fluxo caso localStorage falhe.
+    }
+  };
+
+  const limparJustificativasEdicaoMovimentacaoRota = () => {
+    const chave = obterChaveJustificativasEdicaoMovimentacaoRota();
     if (!chave) return;
 
     try {
@@ -1172,6 +1232,165 @@ export default function RoteiroExecucao() {
     return alteracoes;
   };
 
+  const numeroOuFallback = (...valores) => {
+    for (const valor of valores) {
+      if (valor === null || valor === undefined || valor === "") continue;
+      const numero = Number(valor);
+      if (Number.isFinite(numero)) return numero;
+    }
+    return 0;
+  };
+
+  const formatarNumeroLeitura = (valor, casas = 0) =>
+    Number(valor || 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: casas,
+      maximumFractionDigits: casas,
+    });
+
+  const obterProdutoMovimentacaoParaLeitura = (movimentacao, resumoBase) => {
+    const detalhePrincipal = Array.isArray(movimentacao?.detalhesProdutos)
+      ? movimentacao.detalhesProdutos[0]
+      : null;
+
+    return {
+      nome:
+        detalhePrincipal?.produto?.nome ||
+        detalhePrincipal?.produtoNome ||
+        resumoBase?.nomeProdutoAbastecido ||
+        resumoBase?.nomeProdutoAbastecimentoExtra ||
+        "",
+      quantidade: numeroOuFallback(
+        movimentacao?.abastecidas,
+        movimentacao?.quantidadeAdicionada,
+        detalhePrincipal?.quantidadeAbastecida,
+        resumoBase?.quantidadeAbastecidaInformada,
+      ),
+    };
+  };
+
+  const montarMensagemLeituraAtualizada = (resumo) => {
+    const alteracoes = Array.isArray(resumo?.alteracoesLeitura)
+      ? resumo.alteracoesLeitura
+      : [];
+
+    return [
+      "STAR BOX",
+      `*${resumo?.lojaNome || "LOJA"}*`,
+      `Data: ${new Date(resumo?.dataMovimentacao || Date.now()).toLocaleString("pt-BR")}`,
+      `LanÃ§ado por: ${resumo?.nomeUsuario || usuario?.nome || "-"}`,
+      "___________________________________",
+      `${resumo?.codigoMaquina || "-"} | ${resumo?.tipoMaquina || "MÃ¡quina"}${resumo?.modeloMaquina ? ` | Modelo: ${resumo.modeloMaquina}` : ""}`,
+      ...(resumo?.nomeProdutoAbastecido
+        ? [
+            `Produto abastecido: ${resumo.nomeProdutoAbastecido}${Number(resumo?.quantidadeAbastecidaInformada || 0) > 0 ? ` (Qtd: ${formatarNumeroLeitura(resumo.quantidadeAbastecidaInformada)})` : ""}`,
+          ]
+        : []),
+      "Leitura atualizada",
+      ...alteracoes.map((item) => `Alteracao: ${item}`),
+      `E  ${formatarNumeroLeitura(resumo?.inAnterior)}  ${formatarNumeroLeitura(resumo?.inAtual)}  ____ R$${formatarNumeroLeitura(resumo?.diferencaIn, 2)}`,
+      `S  ${formatarNumeroLeitura(resumo?.outAnterior)}  ${formatarNumeroLeitura(resumo?.outAtual)}  ____ ${formatarNumeroLeitura(resumo?.quantidadeSaiu)}`,
+      `Saldo: R$${formatarNumeroLeitura(resumo?.saldo ?? resumo?.diferencaIn, 2)}`,
+      `Jogadas medias por pelucia: ${formatarNumeroLeitura(resumo?.jogadasMediasPorPelucia, 0)}`,
+    ].join("\n");
+  };
+
+  const atualizarLeituraPendenteAposEdicao = ({
+    maquina,
+    movimentacaoAnterior,
+    movimentacaoAtualizada,
+  }) => {
+    const lojaIdAtual = String(
+      lojaSelecionada?.id || maquina?.lojaId || maquina?.loja?.id || "",
+    ).trim();
+    const maquinaIdAtual = String(
+      maquina?.id ||
+        movimentacaoAtualizada?.maquinaId ||
+        movimentacaoAtualizada?.maquina?.id ||
+        movimentacaoAnterior?.maquinaId ||
+        "",
+    ).trim();
+
+    if (!lojaIdAtual || !maquinaIdAtual) return false;
+
+    const leiturasPendentes = obterMovimentacoesWhatsAppPendentesLoja({
+      roteiroId: id,
+      usuarioId: usuario?.id,
+      lojaId: lojaIdAtual,
+    });
+    const leituraOriginal = [...leiturasPendentes]
+      .reverse()
+      .find((item) => String(item?.maquinaId || "").trim() === maquinaIdAtual);
+
+    if (!leituraOriginal?.resumo) return false;
+
+    const resumoBase = leituraOriginal.resumo;
+    const inAnterior = numeroOuFallback(resumoBase?.inAnterior);
+    const outAnterior = numeroOuFallback(resumoBase?.outAnterior);
+    const inAtual = numeroOuFallback(
+      movimentacaoAtualizada?.contadorIn,
+      movimentacaoAtualizada?.contadorInAtual,
+      resumoBase?.inAtual,
+    );
+    const outAtual = numeroOuFallback(
+      movimentacaoAtualizada?.contadorOut,
+      movimentacaoAtualizada?.contadorOutAtual,
+      resumoBase?.outAtual,
+    );
+    const diferencaIn = Math.max(0, inAtual - inAnterior);
+    const quantidadeSaiu = numeroOuFallback(
+      movimentacaoAtualizada?.sairam,
+      movimentacaoAtualizada?.quantidadeSaiu,
+      Math.max(0, outAtual - outAnterior),
+    );
+    const produto = obterProdutoMovimentacaoParaLeitura(
+      movimentacaoAtualizada,
+      resumoBase,
+    );
+    const alteracoes = montarAlteracoesMovimentacao(
+      movimentacaoAnterior,
+      movimentacaoAtualizada,
+    );
+
+    const resumoAtualizado = {
+      ...resumoBase,
+      dataMovimentacao: new Date().toISOString(),
+      nomeUsuario: usuario?.nome || resumoBase?.nomeUsuario || "-",
+      codigoMaquina:
+        resumoBase?.codigoMaquina || obterNomeMaquinaExibicao(maquina),
+      tipoMaquina: resumoBase?.tipoMaquina || obterTipoMaquinaExibicao(maquina),
+      inAnterior,
+      inAtual,
+      outAnterior,
+      outAtual,
+      diferencaIn,
+      quantidadeSaiu,
+      jogado: diferencaIn,
+      saldo: diferencaIn,
+      quantidadeAbastecidaInformada: produto.quantidade,
+      nomeProdutoAbastecido: produto.nome,
+      alteracoesLeitura: alteracoes,
+      leituraAtualizada: true,
+    };
+
+    const atualizou = atualizarMovimentacaoWhatsAppPendenteLoja({
+      roteiroId: id,
+      usuarioId: usuario?.id,
+      lojaId: lojaIdAtual,
+      maquinaId: maquinaIdAtual,
+      mensagem: montarMensagemLeituraAtualizada(resumoAtualizado),
+      resumo: resumoAtualizado,
+    });
+
+    if (atualizou) {
+      setLeiturasAtualizadasPorLoja((prev) => ({
+        ...prev,
+        [lojaIdAtual]: true,
+      }));
+    }
+
+    return atualizou;
+  };
+
   const abrirModalAbastecimentoExtra = async (maquina) => {
     let ultimaMov = obterUltimaMovimentacaoPorMaquina(maquina?.id);
 
@@ -1445,6 +1664,9 @@ export default function RoteiroExecucao() {
       `Justificativa: ${justificativa}`,
     ].join("\n");
 
+    const lojaJustificativaId = String(
+      lojaSelecionada?.id || maquina?.lojaId || maquina?.loja?.id || "",
+    ).trim();
     const abriuWhatsApp = abrirWhatsAppComMensagem(mensagemWhatsApp);
 
     if (!abriuWhatsApp) {
@@ -1455,6 +1677,22 @@ export default function RoteiroExecucao() {
       setSuccess("Edição salva e justificativa enviada para o WhatsApp.");
     }
 
+    if (lojaJustificativaId) {
+      setJustificativasEdicaoPorLoja((prev) => {
+        const proximo = {
+          ...prev,
+          [lojaJustificativaId]: {
+            mensagem: mensagemWhatsApp,
+            justificativa,
+            maquinaNome: obterNomeMaquinaExibicao(maquina),
+            atualizadoEm: new Date().toISOString(),
+          },
+        };
+        salvarJustificativasEdicaoMovimentacaoRota(proximo);
+        return proximo;
+      });
+    }
+
     setModalJustificativaEdicao({
       aberto: false,
       justificativa: "",
@@ -1462,6 +1700,27 @@ export default function RoteiroExecucao() {
       movimentacaoAnterior: null,
       movimentacaoAtualizada: null,
     });
+  };
+
+  const reenviarJustificativaEdicao = (loja) => {
+    const item =
+      justificativasEdicaoPorLoja[String(loja?.id || "").trim()] || null;
+    const mensagem = String(item?.mensagem || "").trim();
+
+    if (!mensagem) {
+      setError("Nao ha justificativa de edicao para reenviar neste ponto.");
+      return;
+    }
+
+    const abriuWhatsApp = abrirWhatsAppComMensagem(mensagem);
+
+    if (abriuWhatsApp) {
+      setSuccess("Justificativa de edicao reenviada para o WhatsApp.");
+    } else {
+      setError(
+        "Nao foi possivel abrir o WhatsApp para reenviar a justificativa.",
+      );
+    }
   };
 
   const fecharModalJustificativaEdicao = () => {
@@ -1481,6 +1740,11 @@ export default function RoteiroExecucao() {
       null;
 
     atualizarMovimentacaoEditadaNaRota(movimentacaoAtualizada);
+    atualizarLeituraPendenteAposEdicao({
+      maquina: maquinaBase,
+      movimentacaoAnterior: movimentacaoParaEditar,
+      movimentacaoAtualizada,
+    });
 
     setModalJustificativaEdicao({
       aberto: true,
@@ -1725,6 +1989,9 @@ export default function RoteiroExecucao() {
 
   useEffect(() => {
     setMaquinasEditadasNaRota(carregarEdicoesMovimentacaoRota());
+    setJustificativasEdicaoPorLoja(
+      carregarJustificativasEdicaoMovimentacaoRota(),
+    );
   }, [id, roteiro?.funcionarioId, usuario?.id]);
 
   useEffect(() => {
@@ -2524,8 +2791,10 @@ export default function RoteiroExecucao() {
       }
 
       limparEdicoesMovimentacaoRota();
+      limparJustificativasEdicaoMovimentacaoRota();
       limparStatusExecucoesAnteriores(roteiro);
       setMaquinasEditadasNaRota([]);
+      setJustificativasEdicaoPorLoja({});
       setKmFinalVeiculoInput("");
 
       setModalFinalizar({ aberto: false, etapa: 1, loading: false });
@@ -3140,6 +3409,10 @@ export default function RoteiroExecucao() {
                 .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
                 .map((loja, index) => {
                   const pontoFinalizado = lojaComMaquinasFinalizadas(loja);
+                  const leituraAtualizadaDoPonto =
+                    leiturasAtualizadasPorLoja[String(loja.id)] === true;
+                  const justificativaEdicaoDoPonto =
+                    justificativasEdicaoPorLoja[String(loja.id)] || null;
                   const pontoPuladoJustificado =
                     pontosPuladosPorLoja[String(loja.id)]?.justificativaEnviada ===
                     true;
@@ -3174,12 +3447,27 @@ export default function RoteiroExecucao() {
                       </button>
 
                       {pontoFinalizado && (
-                        <button
-                          className="ml-9 text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg"
-                          onClick={() => enviarWhatsAppLoja(loja)}
-                        >
-                          Enviar leituras do ponto no WhatsApp
-                        </button>
+                        <div className="ml-9 flex flex-col items-start gap-2">
+                          <button
+                            className="text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg"
+                            onClick={() => enviarWhatsAppLoja(loja)}
+                          >
+                            {leituraAtualizadaDoPonto
+                              ? "Enviar leitura atualizada"
+                              : "Enviar leituras do ponto no WhatsApp"}
+                          </button>
+                          {justificativaEdicaoDoPonto?.mensagem &&
+                            justificativaEdicaoDoPonto?.justificativa && (
+                              <button
+                                className="text-xs sm:text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg"
+                                onClick={() =>
+                                  reenviarJustificativaEdicao(loja)
+                                }
+                              >
+                                Reenviar justificativa da edicao
+                              </button>
+                            )}
+                        </div>
                       )}
 
                       {lojaSelecionada?.id === loja.id && (

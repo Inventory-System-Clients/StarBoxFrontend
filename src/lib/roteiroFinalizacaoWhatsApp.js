@@ -350,6 +350,78 @@ export const salvarMovimentacaoWhatsAppPendenteLoja = ({
   }
 };
 
+export const atualizarMovimentacaoWhatsAppPendenteLoja = ({
+  roteiroId,
+  usuarioId,
+  lojaId,
+  maquinaId,
+  mensagem,
+  resumo,
+}) => {
+  const chave = montarChaveMovimentacoesWhatsAppLoja({
+    roteiroId,
+    usuarioId,
+    lojaId,
+  });
+  const maquinaNormalizada = normalizarTexto(maquinaId);
+  const mensagemNormalizada = String(mensagem || "").trim();
+
+  if (!chave || !maquinaNormalizada || !mensagemNormalizada) return false;
+
+  try {
+    const itensAtuais = obterMovimentacoesWhatsAppPendentesLoja({
+      roteiroId,
+      usuarioId,
+      lojaId,
+    });
+
+    const indiceItem = [...itensAtuais]
+      .reverse()
+      .findIndex(
+        (item) => normalizarTexto(item?.maquinaId) === maquinaNormalizada,
+      );
+
+    if (indiceItem < 0) return false;
+
+    const indiceReal = itensAtuais.length - 1 - indiceItem;
+    const itemAnterior = itensAtuais[indiceReal];
+    const itensAtualizados = itensAtuais.map((item, index) =>
+      index === indiceReal
+        ? {
+            ...item,
+            mensagem: mensagemNormalizada,
+            resumo:
+              resumo && typeof resumo === "object"
+                ? {
+                    ...(itemAnterior?.resumo || {}),
+                    ...resumo,
+                    leituraAtualizada: true,
+                    atualizadoEm: new Date().toISOString(),
+                  }
+                : itemAnterior?.resumo || null,
+            mensagemOriginal: itemAnterior?.mensagem || "",
+            updatedAt: new Date().toISOString(),
+          }
+        : item,
+    );
+
+    window.localStorage.setItem(
+      chave,
+      JSON.stringify({
+        roteiroId: String(roteiroId),
+        usuarioId: String(usuarioId),
+        lojaId: String(lojaId),
+        itens: itensAtualizados,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const removerMovimentacoesWhatsAppPendentesLoja = ({
   roteiroId,
   usuarioId,
@@ -617,6 +689,9 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     const nomeProdutoAbastecido = normalizarTexto(
       r?.nomeProdutoAbastecido || r?.nomeProdutoAbastecimentoExtra,
     );
+    const alteracoesLeitura = Array.isArray(r?.alteracoesLeitura)
+      ? r.alteracoesLeitura.map(normalizarTexto).filter(Boolean)
+      : [];
     const quantidadeAbastecidaInformada = Number(
       r?.quantidadeAbastecidaInformada,
     );
@@ -637,6 +712,8 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
             `Produto abastecido: ${nomeProdutoAbastecido}${Number.isFinite(quantidadeAbastecidaInformada) && quantidadeAbastecidaInformada > 0 ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})` : ""}`,
           ]
         : []),
+      ...(r?.leituraAtualizada ? ["Leitura atualizada"] : []),
+      ...alteracoesLeitura.map((item) => `Alteracao: ${item}`),
       `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(saldo)}`,
       `S  ${formatarInteiro(r?.outAnterior)}  ${formatarInteiro(r?.outAtual)}________${formatarInteiro(r?.quantidadeSaiu)}`,
       ...(quantidadeAbastecimentoExtra > 0
