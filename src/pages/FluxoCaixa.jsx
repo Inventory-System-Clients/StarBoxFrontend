@@ -6,6 +6,119 @@ import { PageHeader, AlertBox } from "../components/UIComponents";
 import { PageLoader } from "../components/Loading";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
+const parseNumeroFluxo = (valor) => {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
+};
+
+const arredondarMoeda = (valor) => {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return 0;
+  return Math.round(numero * 100) / 100;
+};
+
+const pickNumeroFluxo = (...valores) => {
+  for (const valor of valores) {
+    const numero = parseNumeroFluxo(valor);
+    if (numero !== null) return numero;
+  }
+  return null;
+};
+
+const calcularValorEsperadoFluxo = (fluxo) => {
+  const movimentacao = fluxo?.movimentacao || {};
+  const valorEsperadoSalvo = pickNumeroFluxo(
+    fluxo?.valorEsperado,
+    fluxo?.valorEsperadoCalculado,
+    movimentacao?.valorFaturado,
+  );
+
+  if (valorEsperadoSalvo !== null) {
+    return arredondarMoeda(valorEsperadoSalvo);
+  }
+
+  const contadorInAtual = parseNumeroFluxo(
+    movimentacao?.contadorIn ?? movimentacao?.contadorInDigital,
+  );
+  const contadorInAnterior = parseNumeroFluxo(
+    fluxo?.contadorInAnteriorCronologico ??
+      movimentacao?.contadorInAnterior ??
+      fluxo?.contadorInAnterior ??
+      fluxo?.ultimoContadorInRetirada,
+  );
+
+  const contadorOutAtual = parseNumeroFluxo(
+    movimentacao?.contadorOut ?? movimentacao?.contadorOutDigital,
+  );
+  const contadorOutAnterior = parseNumeroFluxo(
+    fluxo?.contadorOutAnteriorCronologico ??
+      movimentacao?.contadorOutAnterior ??
+      fluxo?.contadorOutAnterior ??
+      fluxo?.ultimoContadorOutRetirada,
+  );
+
+  const diferencaContadorIn =
+    contadorInAtual !== null && contadorInAnterior !== null
+      ? Math.max(0, contadorInAtual - contadorInAnterior)
+      : null;
+
+  const diferencaContadorOut =
+    contadorOutAtual !== null && contadorOutAnterior !== null
+      ? Math.max(0, contadorOutAtual - contadorOutAnterior)
+      : null;
+
+  const diferencaBase =
+    diferencaContadorIn !== null ? diferencaContadorIn : diferencaContadorOut;
+
+  return arredondarMoeda(diferencaBase ?? 0);
+};
+
+const obterValorRetiradoDigitalFluxo = (fluxo) =>
+  arredondarMoeda(
+    pickNumeroFluxo(
+      fluxo?.valorRetiradoDigital,
+      fluxo?.valorRetiradoCartaoPix,
+      fluxo?.valorDigital,
+      fluxo?.cartaoPix,
+      fluxo?.pixCartao,
+    ) ?? 0,
+  );
+
+const obterValorRetiradoFisicoFluxo = (fluxo) => {
+  const fisico = pickNumeroFluxo(
+    fluxo?.valorRetiradoFisico,
+    fluxo?.valorRetiradoDinheiro,
+    fluxo?.valorFisico,
+    fluxo?.dinheiro,
+  );
+
+  if (fisico !== null) return arredondarMoeda(fisico);
+
+  const total = pickNumeroFluxo(fluxo?.valorRetiradoTotal);
+  const digital = obterValorRetiradoDigitalFluxo(fluxo);
+
+  if (total !== null) return arredondarMoeda(Math.max(0, total - digital));
+
+  return arredondarMoeda(pickNumeroFluxo(fluxo?.valorRetirado) ?? 0);
+};
+
+const fluxoEstaPreenchido = (fluxo) => {
+  const conferencia = String(fluxo?.conferencia || "").toLowerCase();
+  if (conferencia === "pendente") return false;
+  if (conferencia) return true;
+
+  return (
+    parseNumeroFluxo(fluxo?.valorRetiradoFisico) !== null ||
+    parseNumeroFluxo(fluxo?.valorRetiradoDinheiro) !== null ||
+    parseNumeroFluxo(fluxo?.valorFisico) !== null ||
+    parseNumeroFluxo(fluxo?.valorRetiradoDigital) !== null ||
+    parseNumeroFluxo(fluxo?.valorRetiradoCartaoPix) !== null ||
+    parseNumeroFluxo(fluxo?.valorDigital) !== null ||
+    parseNumeroFluxo(fluxo?.valorRetirado) !== null ||
+    parseNumeroFluxo(fluxo?.valorRetiradoTotal) !== null
+  );
+};
+
 export default function FluxoCaixa() {
   const { usuario } = useAuth();
   const [fluxos, setFluxos] = useState([]);
@@ -24,9 +137,7 @@ export default function FluxoCaixa() {
   const [lojas, setLojas] = useState([]);
 
   const roundTo2 = (valor) => {
-    const numero = Number(valor);
-    if (!Number.isFinite(numero)) return 0;
-    return Math.round(numero * 100) / 100;
+    return arredondarMoeda(valor);
   };
 
   useEffect(() => {
@@ -169,19 +280,14 @@ export default function FluxoCaixa() {
   });
 
   const fluxosComBaseContadores = (() => {
-    const parseNumero = (valor) => {
-      const numero = Number(valor);
-      return Number.isFinite(numero) ? numero : null;
-    };
-
     const obterContadorInAtual = (fluxo) =>
-      parseNumero(
+      parseNumeroFluxo(
         fluxo?.movimentacao?.contadorIn ??
           fluxo?.movimentacao?.contadorInDigital,
       );
 
     const obterContadorOutAtual = (fluxo) =>
-      parseNumero(
+      parseNumeroFluxo(
         fluxo?.movimentacao?.contadorOut ??
           fluxo?.movimentacao?.contadorOutDigital,
       );
@@ -309,6 +415,37 @@ export default function FluxoCaixa() {
     }));
   })();
 
+  const resumoCalculado = fluxosComBaseContadores.reduce(
+    (acc, fluxo) => {
+      const valorEsperado = calcularValorEsperadoFluxo(fluxo);
+      const valorFisico = obterValorRetiradoFisicoFluxo(fluxo);
+      const valorDigital = obterValorRetiradoDigitalFluxo(fluxo);
+      const valorRetirado = roundTo2(valorFisico + valorDigital);
+
+      acc.valorTotalEsperado += valorEsperado;
+
+      if (fluxoEstaPreenchido(fluxo)) {
+        acc.valorTotalRetiradoFisico += valorFisico;
+        acc.valorTotalRetiradoDigital += valorDigital;
+        acc.valorTotalRetirado += valorRetirado;
+        acc.diferencaTotal += valorRetirado - valorEsperado;
+      }
+
+      return acc;
+    },
+    {
+      valorTotalRetirado: 0,
+      valorTotalRetiradoFisico: 0,
+      valorTotalRetiradoDigital: 0,
+      valorTotalEsperado: 0,
+      diferencaTotal: 0,
+    },
+  );
+
+  Object.keys(resumoCalculado).forEach((chave) => {
+    resumoCalculado[chave] = roundTo2(resumoCalculado[chave]);
+  });
+
   return (
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
       <Navbar />
@@ -338,7 +475,7 @@ export default function FluxoCaixa() {
               <div className="text-3xl mb-2">💵</div>
               <div className="text-xl font-bold text-gray-900">
                 R${" "}
-                {(resumo.valorTotalRetirado || 0).toLocaleString("pt-BR", {
+                {resumoCalculado.valorTotalRetirado.toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
                 })}
               </div>
@@ -349,7 +486,7 @@ export default function FluxoCaixa() {
               <div className="text-3xl mb-2">💵</div>
               <div className="text-xl font-bold text-gray-900">
                 R${" "}
-                {(resumo.valorTotalRetiradoFisico || 0).toLocaleString(
+                {resumoCalculado.valorTotalRetiradoFisico.toLocaleString(
                   "pt-BR",
                   { minimumFractionDigits: 2 },
                 )}
@@ -361,7 +498,7 @@ export default function FluxoCaixa() {
               <div className="text-3xl mb-2">📱</div>
               <div className="text-xl font-bold text-gray-900">
                 R${" "}
-                {(resumo.valorTotalRetiradoDigital || 0).toLocaleString(
+                {resumoCalculado.valorTotalRetiradoDigital.toLocaleString(
                   "pt-BR",
                   { minimumFractionDigits: 2 },
                 )}
@@ -373,7 +510,7 @@ export default function FluxoCaixa() {
               <div className="text-3xl mb-2">🎯</div>
               <div className="text-xl font-bold text-gray-900">
                 R${" "}
-                {(resumo.valorTotalEsperado || 0).toLocaleString("pt-BR", {
+                {resumoCalculado.valorTotalEsperado.toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
                 })}
               </div>
@@ -383,12 +520,15 @@ export default function FluxoCaixa() {
             <div className="stat-card bg-linear-to-br from-purple-500/10 to-purple-500/5">
               <div className="text-3xl mb-2">📊</div>
               <div
-                className={`text-xl font-bold ${(resumo.diferencaTotal || 0) >= 0 ? "text-green-600" : "text-red-600"}`}
+                className={`text-xl font-bold ${resumoCalculado.diferencaTotal >= 0 ? "text-green-600" : "text-red-600"}`}
               >
-                {(resumo.diferencaTotal || 0) >= 0 ? "+" : ""}R${" "}
-                {Math.abs(resumo.diferencaTotal || 0).toLocaleString("pt-BR", {
-                  minimumFractionDigits: 2,
-                })}
+                {resumoCalculado.diferencaTotal >= 0 ? "+" : ""}R${" "}
+                {Math.abs(resumoCalculado.diferencaTotal).toLocaleString(
+                  "pt-BR",
+                  {
+                    minimumFractionDigits: 2,
+                  },
+                )}
               </div>
               <div className="text-sm text-gray-600">Diferença Total</div>
             </div>
@@ -567,81 +707,16 @@ export default function FluxoCaixa() {
 
 // Componente Item da Tabela
 function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
-  const parseNumero = (valor) => {
-    const numero = Number(valor);
-    return Number.isFinite(numero) ? numero : null;
-  };
-
   const roundTo2 = (valor) => {
-    const numero = Number(valor);
-    if (!Number.isFinite(numero)) return 0;
-    return Math.round(numero * 100) / 100;
+    return arredondarMoeda(valor);
   };
 
-  const calcularValorEsperadoPorContador = () => {
-    const movimentacao = fluxo?.movimentacao || {};
-
-    const contadorInAtual = parseNumero(
-      movimentacao?.contadorIn ?? movimentacao?.contadorInDigital,
-    );
-    const contadorInAnterior = parseNumero(
-      fluxo?.contadorInAnteriorCronologico ??
-        movimentacao?.contadorInAnterior ??
-        fluxo?.contadorInAnterior ??
-        fluxo?.ultimoContadorInRetirada,
-    );
-
-    const contadorOutAtual = parseNumero(
-      movimentacao?.contadorOut ?? movimentacao?.contadorOutDigital,
-    );
-    const contadorOutAnterior = parseNumero(
-      fluxo?.contadorOutAnteriorCronologico ??
-        movimentacao?.contadorOutAnterior ??
-        fluxo?.contadorOutAnterior ??
-        fluxo?.ultimoContadorOutRetirada,
-    );
-
-    const diferencaContadorIn =
-      contadorInAtual !== null && contadorInAnterior !== null
-        ? Math.max(0, contadorInAtual - contadorInAnterior)
-        : null;
-
-    const diferencaContadorOut =
-      contadorOutAtual !== null && contadorOutAnterior !== null
-        ? Math.max(0, contadorOutAtual - contadorOutAnterior)
-        : null;
-
-    const diferencaBase =
-      diferencaContadorIn !== null ? diferencaContadorIn : diferencaContadorOut;
-
-    if (diferencaBase === null) {
-      return null;
-    }
-
-    // Nova regra: valor esperado segue diretamente a diferenca de contador.
-    return diferencaBase;
-  };
-
-  const valorEsperadoCalculadoLocal = calcularValorEsperadoPorContador();
-  const valorEsperadoCalculadoBackend = parseNumero(
-    fluxo?.valorEsperadoCalculado,
+  const valorEsperadoInicial = calcularValorEsperadoFluxo(fluxo);
+  const valorRetiradoFisicoInicial = obterValorRetiradoFisicoFluxo(fluxo);
+  const valorRetiradoDigitalInicial = obterValorRetiradoDigitalFluxo(fluxo);
+  const valorRetiradoTotalInicial = roundTo2(
+    valorRetiradoFisicoInicial + valorRetiradoDigitalInicial,
   );
-  const valorEsperadoInicial =
-    valorEsperadoCalculadoBackend ??
-    valorEsperadoCalculadoLocal ??
-    parseNumero(fluxo?.valorEsperado) ??
-    parseNumero(fluxo?.movimentacao?.valorFaturado) ??
-    0;
-
-  const valorRetiradoFisicoInicial =
-    parseNumero(fluxo?.valorRetiradoFisico) ??
-    parseNumero(fluxo?.valorRetirado) ??
-    0;
-  const valorRetiradoDigitalInicial =
-    parseNumero(fluxo?.valorRetiradoDigital) ?? 0;
-  const valorRetiradoTotalInicial =
-    parseNumero(fluxo?.valorRetiradoTotal) ??
-    roundTo2(valorRetiradoFisicoInicial + valorRetiradoDigitalInicial);
 
   const [editando, setEditando] = useState(false);
   const [formConferencia, setFormConferencia] = useState({
@@ -664,7 +739,11 @@ function ItemFluxoCaixa({ fluxo, onConferir, isAdmin }) {
     fluxo.id,
     fluxo.valorRetirado,
     fluxo.valorRetiradoFisico,
+    fluxo.valorRetiradoDinheiro,
+    fluxo.valorFisico,
     fluxo.valorRetiradoDigital,
+    fluxo.valorRetiradoCartaoPix,
+    fluxo.valorDigital,
     fluxo.valorRetiradoTotal,
     fluxo.conferencia,
     fluxo.observacoes,
