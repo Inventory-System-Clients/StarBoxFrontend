@@ -212,6 +212,14 @@ export function RelatorioTodasLojas({ relatorio }) {
         <p className="text-gray-700 mt-1">
           Pontos com dados: <strong>{relatorio?.lojasComDados || 0}</strong>
         </p>
+        {relatorio?.filtroUsuario && (
+          <p className="text-gray-700 mt-1">
+            Funcionário: <strong>{relatorio.filtroUsuario.nome}</strong>
+            {relatorio.filtroUsuario.email
+              ? ` (${relatorio.filtroUsuario.email})`
+              : ""}
+          </p>
+        )}
         {!!relatorio?.lojasSemDados?.length && (
           <p className="text-amber-700 mt-2 text-sm">
             Pontos sem dados no período: {relatorio.lojasSemDados.join(", ")}

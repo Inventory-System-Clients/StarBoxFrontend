@@ -19,10 +19,13 @@ export function Relatorios() {
   const [buscaLoja, setBuscaLoja] = useState("");
   const [buscaLojaConsolidado, setBuscaLojaConsolidado] = useState("");
   const [buscaRoteiro, setBuscaRoteiro] = useState("");
+  const [buscaUsuario, setBuscaUsuario] = useState("");
   const [lojasSelecionadasConsolidado, setLojasSelecionadasConsolidado] =
     useState([]);
   const [roteiros, setRoteiros] = useState([]);
   const [roteiroSelecionado, setRoteiroSelecionado] = useState("");
+  const [usuarios, setUsuarios] = useState([]);
+  const [usuarioSelecionado, setUsuarioSelecionado] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +42,7 @@ export function Relatorios() {
   const termoBuscaLoja = buscaLoja.trim().toLowerCase();
   const termoBuscaLojaConsolidado = buscaLojaConsolidado.trim().toLowerCase();
   const termoBuscaRoteiro = buscaRoteiro.trim().toLowerCase();
+  const termoBuscaUsuario = buscaUsuario.trim().toLowerCase();
 
   const lojasFiltradasBusca = useMemo(() => {
     if (!termoBuscaLoja) return lojas;
@@ -71,6 +75,43 @@ export function Relatorios() {
     );
   }, [roteiros, termoBuscaRoteiro]);
 
+  const usuariosFiltradosBusca = useMemo(() => {
+    if (!termoBuscaUsuario) return usuarios;
+    return usuarios.filter((usuario) =>
+      [usuario?.nome, usuario?.email, usuario?.role]
+        .filter(Boolean)
+        .some((valor) =>
+          String(valor).toLowerCase().includes(termoBuscaUsuario),
+        ),
+    );
+  }, [usuarios, termoBuscaUsuario]);
+
+  const montarParamsComUsuario = (params = {}, usuarioId = usuarioSelecionado) =>
+    usuarioId ? { ...params, usuarioId } : { ...params };
+
+  const montarFiltroUsuarioRelatorio = (usuarioId = usuarioSelecionado) => {
+    if (!usuarioId) return null;
+
+    const usuario = (Array.isArray(usuarios) ? usuarios : []).find(
+      (item) => String(item?.id) === String(usuarioId),
+    );
+
+    return {
+      id: usuarioId,
+      nome: usuario?.nome || "Funcionário selecionado",
+      email: usuario?.email || "",
+      role: usuario?.role || "",
+    };
+  };
+
+  const aplicarFiltroUsuarioAoRelatorio = (dadosRelatorio, filtroUsuario) => {
+    if (!dadosRelatorio || !filtroUsuario) return dadosRelatorio;
+    return {
+      ...dadosRelatorio,
+      filtroUsuario,
+    };
+  };
+
   // Buscar lista de lojas
   const carregarLojas = async () => {
     try {
@@ -88,15 +129,36 @@ export function Relatorios() {
     }
   };
 
+  const carregarUsuarios = async () => {
+    try {
+      const response = await api.get("/usuarios/funcionarios");
+      const listaUsuarios = Array.isArray(response.data)
+        ? response.data
+        : response.data?.usuarios || response.data?.rows || [];
+      setUsuarios(listaUsuarios);
+    } catch (error) {
+      console.warn("Erro ao carregar usuários para filtro:", error);
+      setUsuarios([]);
+    }
+  };
+
   // Buscar dados do dashboard
-  const carregarDashboard = async (lojaId, dataInicio, dataFim) => {
+  const carregarDashboard = async (
+    lojaId,
+    dataInicio,
+    dataFim,
+    usuarioId = usuarioSelecionado,
+  ) => {
     try {
       const response = await api.get("/relatorios/dashboard", {
-        params: {
+        params: montarParamsComUsuario(
+          {
           lojaId,
           dataInicio,
           dataFim,
-        },
+          },
+          usuarioId,
+        ),
       });
       setDashboard(response.data);
     } catch (error) {
@@ -107,6 +169,7 @@ export function Relatorios() {
 
   useEffect(() => {
     carregarLojas();
+    carregarUsuarios();
     // Carregar roteiros
     buscarRoteiros()
       .then(setRoteiros)
@@ -935,12 +998,13 @@ export function Relatorios() {
 
   const carregarFluxosCaixa = async (filtros = {}) => {
     const params = new URLSearchParams();
-    const { inicio, fim, lojaId, roteiroId } = filtros;
+    const { inicio, fim, lojaId, roteiroId, usuarioId } = filtros;
 
     if (inicio) params.append("dataInicio", inicio);
     if (fim) params.append("dataFim", fim);
     if (lojaId) params.append("lojaId", lojaId);
     if (roteiroId) params.append("roteiroId", roteiroId);
+    if (usuarioId) params.append("usuarioId", usuarioId);
 
     const response = await api.get(`/fluxo-caixa?${params.toString()}`);
     const fluxos = Array.isArray(response?.data)
@@ -950,9 +1014,19 @@ export function Relatorios() {
     return deduplicarFluxosCaixa(fluxos);
   };
 
-  const carregarQuebraCaixaPorLoja = async (lojaId, inicio, fim) => {
+  const carregarQuebraCaixaPorLoja = async (
+    lojaId,
+    inicio,
+    fim,
+    usuarioId = usuarioSelecionado,
+  ) => {
     try {
-      const fluxos = await carregarFluxosCaixa({ inicio, fim, lojaId });
+      const fluxos = await carregarFluxosCaixa({
+        inicio,
+        fim,
+        lojaId,
+        usuarioId,
+      });
 
       return calcularQuebraCaixaComoCusto(fluxos, lojaId, inicio, fim);
     } catch (erroFluxo) {
@@ -964,9 +1038,19 @@ export function Relatorios() {
     }
   };
 
-  const carregarQuebraCaixaRoteiro = async (roteiroId, inicio, fim) => {
+  const carregarQuebraCaixaRoteiro = async (
+    roteiroId,
+    inicio,
+    fim,
+    usuarioId = usuarioSelecionado,
+  ) => {
     try {
-      const fluxos = await carregarFluxosCaixa({ inicio, fim, roteiroId });
+      const fluxos = await carregarFluxosCaixa({
+        inicio,
+        fim,
+        roteiroId,
+        usuarioId,
+      });
 
       return calcularQuebraCaixaComoCusto(fluxos, null, inicio, fim);
     } catch (erroFluxoRoteiro) {
@@ -1274,6 +1358,7 @@ export function Relatorios() {
     idsLojasSelecionadas = [],
     periodoInicio,
     periodoFim,
+    usuarioId = usuarioSelecionado,
   ) => {
     const idsNormalizados = Array.from(
       new Set((idsLojasSelecionadas || []).map((idLoja) => String(idLoja))),
@@ -1351,11 +1436,14 @@ export function Relatorios() {
             await Promise.all([
               api
                 .get("/relatorios/impressao", {
-                  params: {
-                    lojaId,
-                    dataInicio: periodoInicio,
-                    dataFim: periodoFim,
-                  },
+                  params: montarParamsComUsuario(
+                    {
+                      lojaId,
+                      dataInicio: periodoInicio,
+                      dataFim: periodoFim,
+                    },
+                    usuarioId,
+                  ),
                 })
                 .catch(() => null),
               api
@@ -1365,6 +1453,7 @@ export function Relatorios() {
                 inicio: periodoInicio,
                 fim: periodoFim,
                 lojaId,
+                usuarioId,
               }).catch(() => []),
             ]);
 
@@ -1808,12 +1897,16 @@ export function Relatorios() {
 
       const consolidadoManual = lojaSelecionada === SELECAO_MANUAL_LOJAS_VALUE;
       const consolidadoTodas = lojaSelecionada === TODAS_LOJAS_VALUE;
+      const usuarioFiltroId = usuarioSelecionado || "";
+      const filtroUsuarioRelatorio =
+        montarFiltroUsuarioRelatorio(usuarioFiltroId);
 
       if (consolidadoManual) {
         const relatorioTodasLojas = await construirConsolidadoManualPorLojas(
           lojasSelecionadasConsolidado,
           dataInicio,
           dataFim,
+          usuarioFiltroId,
         );
 
         let comparativoMensal = null;
@@ -1825,6 +1918,7 @@ export function Relatorios() {
             lojasSelecionadasConsolidado,
             dataInicioMesAnterior,
             dataFimMesAnterior,
+            usuarioFiltroId,
           );
 
           const totaisAtual = relatorioTodasLojas?.totais || {};
@@ -1902,7 +1996,10 @@ export function Relatorios() {
         }
 
         setRelatorio({
-          ...relatorioTodasLojas,
+          ...aplicarFiltroUsuarioAoRelatorio(
+            relatorioTodasLojas,
+            filtroUsuarioRelatorio,
+          ),
           comparativoMensal,
         });
       } else if (consolidadoTodas) {
@@ -1914,6 +2011,7 @@ export function Relatorios() {
           idsTodasLojas,
           dataInicio,
           dataFim,
+          usuarioFiltroId,
         );
 
         let comparativoMensal = null;
@@ -1925,6 +2023,7 @@ export function Relatorios() {
             idsTodasLojas,
             dataInicioMesAnterior,
             dataFimMesAnterior,
+            usuarioFiltroId,
           );
 
           const totaisAtual = relatorioTodasLojas?.totais || {};
@@ -2002,16 +2101,27 @@ export function Relatorios() {
         }
 
         setRelatorio({
-          ...relatorioTodasLojas,
+          ...aplicarFiltroUsuarioAoRelatorio(
+            relatorioTodasLojas,
+            filtroUsuarioRelatorio,
+          ),
           comparativoMensal,
         });
       } else if (roteiroSelecionado) {
         // Buscar relatório de roteiro inteiro
         const [response, custoQuebraCaixaRoteiroFluxo] = await Promise.all([
           api.get("/relatorios/roteiro", {
-            params: { roteiroId: roteiroSelecionado, dataInicio, dataFim },
+            params: montarParamsComUsuario(
+              { roteiroId: roteiroSelecionado, dataInicio, dataFim },
+              usuarioFiltroId,
+            ),
           }),
-          carregarQuebraCaixaRoteiro(roteiroSelecionado, dataInicio, dataFim),
+          carregarQuebraCaixaRoteiro(
+            roteiroSelecionado,
+            dataInicio,
+            dataFim,
+            usuarioFiltroId,
+          ),
         ]);
         const dadosRoteiro = response.data || {};
         const resumoRoteiroBackend =
@@ -2083,6 +2193,7 @@ export function Relatorios() {
                 roteiroId: roteiroSelecionado,
                 inicio: dataInicio,
                 fim: dataFim,
+                usuarioId: usuarioFiltroId,
               }).catch(() => []),
             ),
           );
@@ -2137,6 +2248,7 @@ export function Relatorios() {
               idsLojasRoteiro,
               dataInicio,
               dataFim,
+              usuarioFiltroId,
             );
 
             resumoRoteiroConsolidado = resumoRoteiroConsolidado
@@ -2219,11 +2331,16 @@ export function Relatorios() {
           );
         }
 
-        setRelatorio({
-          tipo: "roteiro",
-          ...dadosRoteiro,
-          resumoRoteiroConsolidado,
-        });
+        setRelatorio(
+          aplicarFiltroUsuarioAoRelatorio(
+            {
+              tipo: "roteiro",
+              ...dadosRoteiro,
+              resumoRoteiroConsolidado,
+            },
+            filtroUsuarioRelatorio,
+          ),
+        );
       } else if (lojaSelecionada) {
         // Buscar relatório de loja + dashboard + comissão + produtos em paralelo
         const [
@@ -2235,16 +2352,25 @@ export function Relatorios() {
           custoQuebraCaixaPeriodo,
         ] = await Promise.all([
           api.get("/relatorios/impressao", {
-            params: { lojaId: lojaSelecionada, dataInicio, dataFim },
+            params: montarParamsComUsuario(
+              { lojaId: lojaSelecionada, dataInicio, dataFim },
+              usuarioFiltroId,
+            ),
           }),
           api
             .get("/movimentacoes/relatorio/comissao-dia", {
-              params: { lojaId: lojaSelecionada, data: dataFim },
+              params: montarParamsComUsuario(
+                { lojaId: lojaSelecionada, data: dataFim },
+                usuarioFiltroId,
+              ),
             })
             .catch(() => ({ data: null })),
           api
             .get("/movimentacoes/relatorio/lucro-dia", {
-              params: { lojaId: lojaSelecionada, data: dataFim },
+              params: montarParamsComUsuario(
+                { lojaId: lojaSelecionada, data: dataFim },
+                usuarioFiltroId,
+              ),
             })
             .catch((err) => {
               console.error(
@@ -2255,14 +2381,27 @@ export function Relatorios() {
             }),
           api
             .get("/movimentacoes/relatorio/movimentacoes-dia", {
-              params: { lojaId: lojaSelecionada, data: dataFim },
+              params: montarParamsComUsuario(
+                { lojaId: lojaSelecionada, data: dataFim },
+                usuarioFiltroId,
+              ),
             })
             .catch(() => ({ data: null })),
           api.get("/produtos").catch(() => ({ data: [] })),
-          carregarQuebraCaixaPorLoja(lojaSelecionada, dataInicio, dataFim),
+          carregarQuebraCaixaPorLoja(
+            lojaSelecionada,
+            dataInicio,
+            dataFim,
+            usuarioFiltroId,
+          ),
         ]);
         // Também carregar dashboard
-        await carregarDashboard(lojaSelecionada, dataInicio, dataFim);
+        await carregarDashboard(
+          lojaSelecionada,
+          dataInicio,
+          dataFim,
+          usuarioFiltroId,
+        );
 
         // Criar mapa de preços dos produtos (id -> {preco, custoUnitario})
         const produtosMap = {};
@@ -2322,7 +2461,12 @@ export function Relatorios() {
           custoQuebraCaixaPeriodo,
         );
 
-        setRelatorio(dadosComQuebra);
+        setRelatorio(
+          aplicarFiltroUsuarioAoRelatorio(
+            dadosComQuebra,
+            filtroUsuarioRelatorio,
+          ),
+        );
         setComissaoData(comissaoRes.data);
         setLucroData(lucroRes.data);
 
@@ -2349,16 +2493,20 @@ export function Relatorios() {
           const dataInicioMesAnterior = obterMesmoDiaNoMesAnterior(dataInicio);
           const dataFimMesAnterior = obterMesmoDiaNoMesAnterior(dataFim);
           const responseMesAnterior = await api.get("/relatorios/impressao", {
-            params: {
-              lojaId: lojaSelecionada,
-              dataInicio: dataInicioMesAnterior,
-              dataFim: dataFimMesAnterior,
-            },
+            params: montarParamsComUsuario(
+              {
+                lojaId: lojaSelecionada,
+                dataInicio: dataInicioMesAnterior,
+                dataFim: dataFimMesAnterior,
+              },
+              usuarioFiltroId,
+            ),
           });
           const quebraCaixaMesAnterior = await carregarQuebraCaixaPorLoja(
             lojaSelecionada,
             dataInicioMesAnterior,
             dataFimMesAnterior,
+            usuarioFiltroId,
           );
           const relatorioMesAnterior = aplicarQuebraCaixaNoRelatorioLoja(
             responseMesAnterior.data,
@@ -2849,7 +2997,7 @@ export function Relatorios() {
         {/* Formulário de Filtros */}
         <div className="card mb-6 no-print">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Filtros</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 🗂️ Roteiro
@@ -2920,6 +3068,30 @@ export function Relatorios() {
                 {lojasFiltradasBusca.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                👤 Funcionário
+              </label>
+              <input
+                type="text"
+                value={buscaUsuario}
+                onChange={(e) => setBuscaUsuario(e.target.value)}
+                className="input-field w-full mb-2"
+                placeholder="Digite o nome do funcionário"
+              />
+              <select
+                value={usuarioSelecionado}
+                onChange={(e) => setUsuarioSelecionado(e.target.value)}
+                className="input-field w-full"
+              >
+                <option value="">Todos os funcionários</option>
+                {usuariosFiltradosBusca.map((usuario) => (
+                  <option key={usuario.id} value={usuario.id}>
+                    {usuario.nome}
                   </option>
                 ))}
               </select>
@@ -3063,6 +3235,18 @@ export function Relatorios() {
 
         {relatorio && !loading && relatorio.tipo !== "todas-lojas" && (
           <div className="space-y-6">
+            {relatorio?.filtroUsuario && (
+              <div className="card bg-white border border-indigo-200">
+                <p className="text-sm text-gray-700">
+                  Relatório filtrado por funcionário:{" "}
+                  <strong>{relatorio.filtroUsuario.nome}</strong>
+                  {relatorio.filtroUsuario.email
+                    ? ` (${relatorio.filtroUsuario.email})`
+                    : ""}
+                </p>
+              </div>
+            )}
+
             {isRelatorioRoteiro &&
               (resumoRoteiroConsolidado || relatorio?.totais) && (
                 <div className="card bg-linear-to-r from-sky-50 to-indigo-100 border-2 border-indigo-300">

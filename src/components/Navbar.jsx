@@ -270,6 +270,15 @@ export default function Navbar() {
             )}
             {usuario?.role === "ADMIN" && (
               <MobileNavLink
+                to="/relatorios"
+                active={isActive("/relatorios")}
+                onClick={closeMenu}
+              >
+                📄 Relatórios
+              </MobileNavLink>
+            )}
+            {usuario?.role === "ADMIN" && (
+              <MobileNavLink
                 to="/fluxo-caixa"
                 active={isActive("/fluxo-caixa")}
                 onClick={closeMenu}
