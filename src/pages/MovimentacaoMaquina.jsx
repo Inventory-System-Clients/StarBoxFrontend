@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
+import { Modal } from "../components/UIComponents";
 
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { salvarMovimentacaoWhatsAppPendenteLoja } from "../lib/roteiroFinalizacaoWhatsApp";
@@ -51,6 +52,11 @@ export default function MovimentacaoMaquina() {
   const [isPrimeiraMovimentacao, setIsPrimeiraMovimentacao] = useState(false);
   const [ultimaMovimentacaoData, setUltimaMovimentacaoData] = useState(null);
   const [ultimaMovimentacao, setUltimaMovimentacao] = useState(null);
+  const [ultimoProdutoAbastecidoId, setUltimoProdutoAbastecidoId] = useState("");
+  const [modalTrocaProduto, setModalTrocaProduto] = useState({
+    aberto: false,
+    produtoId: "",
+  });
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [dadosConfirmacao, setDadosConfirmacao] = useState(null);
 
@@ -392,20 +398,22 @@ export default function MovimentacaoMaquina() {
         const tipoContadorInicial =
           tipoContadorSalvo || tipoContadorInferido || "mecanico";
         const usarContadorDigitalInicial = tipoContadorInicial === "digital";
+        const ultimoProdutoId = ultimoProdRes.data?.produtoId;
+        const ultimoProdutoValido = produtosDisponiveisIniciais.some(
+          (produto) => String(produto.id) === String(ultimoProdutoId),
+        )
+          ? String(ultimoProdutoId)
+          : "";
+
+        setUltimoProdutoAbastecidoId(ultimoProdutoValido);
 
         setFormData((prev) => ({
           ...prev,
           produto_id: (() => {
-            const ultimoProdutoId = ultimoProdRes.data?.produtoId;
             const produtoAnteriorValido = produtosDisponiveisIniciais.some(
               (produto) => String(produto.id) === String(prev.produto_id),
             )
               ? prev.produto_id
-              : "";
-            const ultimoProdutoValido = produtosDisponiveisIniciais.some(
-              (produto) => String(produto.id) === String(ultimoProdutoId),
-            )
-              ? String(ultimoProdutoId)
               : "";
 
             return (
@@ -1124,6 +1132,21 @@ export default function MovimentacaoMaquina() {
       return;
     }
 
+    if (
+      name === "produto_id" &&
+      ultimoProdutoAbastecidoId &&
+      value &&
+      String(value) !== String(ultimoProdutoAbastecidoId)
+    ) {
+      setModalTrocaProduto({
+        aberto: true,
+        produtoId: value,
+      });
+      if (error) setError("");
+      if (success) setSuccess("");
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -1390,6 +1413,24 @@ export default function MovimentacaoMaquina() {
   const confirmarSalvarEEnviar = async () => {
     setConfirmacaoAberta(false);
     await salvarMovimentacaoEEnviarWhatsApp();
+  };
+
+  const cancelarTrocaProduto = () => {
+    setModalTrocaProduto({
+      aberto: false,
+      produtoId: "",
+    });
+  };
+
+  const confirmarTrocaProduto = () => {
+    setFormData((prev) => ({
+      ...prev,
+      produto_id: modalTrocaProduto.produtoId,
+    }));
+    setModalTrocaProduto({
+      aberto: false,
+      produtoId: "",
+    });
   };
 
   const resumoPreConfirmacao = useMemo(() => {
@@ -1943,6 +1984,42 @@ export default function MovimentacaoMaquina() {
             {error && <div className="text-red-600 mt-2">{error}</div>}
             {success && <div className="text-green-600 mt-2">{success}</div>}
           </form>
+
+          <Modal
+            isOpen={modalTrocaProduto.aberto}
+            onClose={cancelarTrocaProduto}
+            title="Confirmar troca de produto"
+            size="sm"
+          >
+            <div className="space-y-5">
+              <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                <p className="text-sm font-semibold text-yellow-900">
+                  Tem certeza que deseja mudar o produto desta máquina?
+                </p>
+                <p className="text-xs text-yellow-800 mt-1">
+                  Se cancelar, o produto anterior abastecido nesta máquina será
+                  mantido.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={cancelarTrocaProduto}
+                  className="btn-secondary w-full sm:w-auto"
+                >
+                  Não, manter anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarTrocaProduto}
+                  className="btn-primary w-full sm:w-auto"
+                >
+                  Sim, trocar produto
+                </button>
+              </div>
+            </div>
+          </Modal>
 
           {confirmacaoAberta && dadosConfirmacao && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

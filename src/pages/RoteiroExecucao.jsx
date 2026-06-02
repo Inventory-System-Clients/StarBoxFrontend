@@ -110,6 +110,9 @@ export default function RoteiroExecucao() {
     movimentacao: null,
     quantidade: "",
     produtoId: "",
+    ultimoProdutoId: "",
+    produtoPendenteId: "",
+    confirmarTrocaProdutoAberto: false,
     loading: false,
   });
   const [produtosAbastecimentoExtra, setProdutosAbastecimentoExtra] = useState(
@@ -1415,22 +1418,36 @@ export default function RoteiroExecucao() {
       return;
     }
 
+    let produtosDisponiveisExtra = [];
+
     try {
       const params = {};
       if (usuario?.id) params.usuarioId = usuario.id;
       if (lojaSelecionada?.id) params.lojaId = lojaSelecionada.id;
       const res = await api.get("/produtos/com-estoque", { params });
-      setProdutosAbastecimentoExtra(Array.isArray(res.data) ? res.data : []);
+      produtosDisponiveisExtra = Array.isArray(res.data) ? res.data : [];
+      setProdutosAbastecimentoExtra(produtosDisponiveisExtra);
     } catch {
       setProdutosAbastecimentoExtra([]);
     }
+
+    const produtoPrincipal = obterProdutoPrincipalMovimentacao(ultimaMov);
+    const ultimoProdutoId = produtosDisponiveisExtra.some(
+      (produto) =>
+        String(produto?.id || "") === String(produtoPrincipal?.id || ""),
+    )
+      ? String(produtoPrincipal.id)
+      : "";
 
     setModalAbastecimentoExtra({
       aberto: true,
       maquina,
       movimentacao: ultimaMov,
       quantidade: "",
-      produtoId: "",
+      produtoId: ultimoProdutoId,
+      ultimoProdutoId,
+      produtoPendenteId: "",
+      confirmarTrocaProdutoAberto: false,
       loading: false,
     });
   };
@@ -1443,8 +1460,53 @@ export default function RoteiroExecucao() {
       movimentacao: null,
       quantidade: "",
       produtoId: "",
+      ultimoProdutoId: "",
+      produtoPendenteId: "",
+      confirmarTrocaProdutoAberto: false,
       loading: false,
     });
+  };
+
+  const alterarProdutoAbastecimentoExtra = (produtoIdSelecionado) => {
+    const ultimoProdutoId = String(
+      modalAbastecimentoExtra.ultimoProdutoId || "",
+    );
+    const novoProdutoId = String(produtoIdSelecionado || "");
+
+    if (
+      ultimoProdutoId &&
+      novoProdutoId &&
+      novoProdutoId !== ultimoProdutoId
+    ) {
+      setModalAbastecimentoExtra((prev) => ({
+        ...prev,
+        produtoPendenteId: novoProdutoId,
+        confirmarTrocaProdutoAberto: true,
+      }));
+      return;
+    }
+
+    setModalAbastecimentoExtra((prev) => ({
+      ...prev,
+      produtoId: novoProdutoId,
+    }));
+  };
+
+  const cancelarTrocaProdutoAbastecimentoExtra = () => {
+    setModalAbastecimentoExtra((prev) => ({
+      ...prev,
+      produtoPendenteId: "",
+      confirmarTrocaProdutoAberto: false,
+    }));
+  };
+
+  const confirmarTrocaProdutoAbastecimentoExtra = () => {
+    setModalAbastecimentoExtra((prev) => ({
+      ...prev,
+      produtoId: prev.produtoPendenteId,
+      produtoPendenteId: "",
+      confirmarTrocaProdutoAberto: false,
+    }));
   };
 
   const salvarAbastecimentoExtra = async () => {
@@ -1557,6 +1619,9 @@ export default function RoteiroExecucao() {
         movimentacao: null,
         quantidade: "",
         produtoId: "",
+        ultimoProdutoId: "",
+        produtoPendenteId: "",
+        confirmarTrocaProdutoAberto: false,
         loading: false,
       });
       await carregarRoteiro();
@@ -3924,10 +3989,7 @@ export default function RoteiroExecucao() {
                 className="w-full p-3 border rounded-lg bg-white"
                 value={modalAbastecimentoExtra.produtoId}
                 onChange={(e) =>
-                  setModalAbastecimentoExtra((prev) => ({
-                    ...prev,
-                    produtoId: e.target.value,
-                  }))
+                  alterarProdutoAbastecimentoExtra(e.target.value)
                 }
                 disabled={modalAbastecimentoExtra.loading}
               >
@@ -3976,6 +4038,42 @@ export default function RoteiroExecucao() {
                 {modalAbastecimentoExtra.loading
                   ? "Salvando..."
                   : "Salvar abastecimento"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={modalAbastecimentoExtra.confirmarTrocaProdutoAberto}
+          onClose={cancelarTrocaProdutoAbastecimentoExtra}
+          title="Confirmar troca de produto"
+          size="sm"
+        >
+          <div className="space-y-5">
+            <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+              <p className="text-sm font-semibold text-yellow-900">
+                Tem certeza que deseja mudar o produto desta máquina?
+              </p>
+              <p className="text-xs text-yellow-800 mt-1">
+                Se cancelar, o produto anterior abastecido nesta máquina será
+                mantido.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary w-full sm:w-auto"
+                onClick={cancelarTrocaProdutoAbastecimentoExtra}
+              >
+                Não, manter anterior
+              </button>
+              <button
+                type="button"
+                className="btn-primary w-full sm:w-auto"
+                onClick={confirmarTrocaProdutoAbastecimentoExtra}
+              >
+                Sim, trocar produto
               </button>
             </div>
           </div>
