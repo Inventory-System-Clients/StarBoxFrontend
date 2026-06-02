@@ -266,6 +266,15 @@ const montarChaveUltimaMensagemMovimentacoesWhatsAppLoja = ({
   return `${MOVIMENTACOES_WHATSAPP_ULTIMA_MENSAGEM_LOJA_STORAGE_PREFIX}${usuarioNormalizado}:${roteiroNormalizado}:${lojaNormalizada}`;
 };
 
+const montarChaveUnicaMovimentacaoMaquina = (item = {}) => {
+  const resumo = item?.resumo && typeof item.resumo === "object" ? item.resumo : {};
+  return (
+    normalizarTexto(item?.maquinaId) ||
+    normalizarTexto(item?.maquinaNome) ||
+    normalizarTexto(resumo?.codigoMaquina)
+  );
+};
+
 export const obterMovimentacoesWhatsAppPendentesLoja = ({
   roteiroId,
   usuarioId,
@@ -325,13 +334,21 @@ export const salvarMovimentacaoWhatsAppPendenteLoja = ({
       lojaId,
     });
 
-    itensAtuais.push({
+    const novoItem = {
       maquinaId: normalizarTexto(maquinaId),
       maquinaNome: normalizarTexto(maquinaNome),
       mensagem: mensagemNormalizada,
       resumo: resumo && typeof resumo === "object" ? resumo : null,
       createdAt: new Date().toISOString(),
-    });
+    };
+    const chaveMaquina = montarChaveUnicaMovimentacaoMaquina(novoItem);
+    const itensAtualizados = chaveMaquina
+      ? itensAtuais.filter(
+          (item) => montarChaveUnicaMovimentacaoMaquina(item) !== chaveMaquina,
+        )
+      : itensAtuais;
+
+    itensAtualizados.push(novoItem);
 
     window.localStorage.setItem(
       chave,
@@ -339,7 +356,7 @@ export const salvarMovimentacaoWhatsAppPendenteLoja = ({
         roteiroId: String(roteiroId),
         usuarioId: String(usuarioId),
         lojaId: String(lojaId),
-        itens: itensAtuais,
+        itens: itensAtualizados,
         updatedAt: new Date().toISOString(),
       }),
     );
@@ -645,13 +662,21 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     return dataA - dataB;
   });
 
-  const itensNormalizados = itensOrdenados.map((item) => ({
-    ...item,
-    resumo:
-      item?.resumo && typeof item.resumo === "object"
-        ? item.resumo
-        : extrairResumoLegadoDaMensagem(item?.mensagem, item),
-  }));
+  const itensPorMaquina = new Map();
+  itensOrdenados.forEach((item, index) => {
+    const itemNormalizado = {
+      ...item,
+      resumo:
+        item?.resumo && typeof item.resumo === "object"
+          ? item.resumo
+          : extrairResumoLegadoDaMensagem(item?.mensagem, item),
+    };
+    const chaveMaquina =
+      montarChaveUnicaMovimentacaoMaquina(itemNormalizado) || `item-${index}`;
+    itensPorMaquina.set(chaveMaquina, itemNormalizado);
+  });
+
+  const itensNormalizados = Array.from(itensPorMaquina.values());
 
   const primeiroResumo = itensNormalizados[0].resumo;
   const ultimoResumo = itensNormalizados[itensNormalizados.length - 1].resumo;
@@ -1129,6 +1154,20 @@ const formatarLista = (itens) => {
   return lista.join(", ");
 };
 
+const parseDataValida = (valor) => {
+  if (!valor) return null;
+  const data = new Date(valor);
+  return Number.isNaN(data.getTime()) ? null : data;
+};
+
+const obterPrimeiraDataValida = (...valores) => {
+  for (const valor of valores) {
+    const data = parseDataValida(valor);
+    if (data) return data;
+  }
+  return null;
+};
+
 const extrairNomePonto = (item) => {
   if (!item || typeof item !== "object") return "";
 
@@ -1158,6 +1197,171 @@ const montarResumoManutencoesPorPonto = (manutencoes = []) => {
     .map(([nomePonto, quantidade]) => `${nomePonto} (${quantidade})`);
 };
 
+const extrairDataRealizacaoManutencao = (item) => {
+  if (!item || typeof item !== "object") return null;
+
+  return obterPrimeiraDataValida(
+    item.concluidaEm,
+    item.concluida_em,
+    item.concluidoEm,
+    item.concluido_em,
+    item.finalizadaEm,
+    item.finalizada_em,
+    item.finalizadoEm,
+    item.finalizado_em,
+    item.realizadaEm,
+    item.realizada_em,
+    item.realizadoEm,
+    item.realizado_em,
+    item.dataRealizacao,
+    item.data_realizacao,
+    item.dataConclusao,
+    item.data_conclusao,
+    item.dataFinalizacao,
+    item.data_finalizacao,
+    item.updatedAt,
+    item.updated_at,
+    item.createdAt,
+    item.created_at,
+  );
+};
+
+const filtrarManutencoesRealizadasPorPeriodo = ({
+  manutencoes,
+  inicio,
+  fim,
+}) => {
+  const itens = toArray(manutencoes).filter(
+    (item) => item && typeof item === "object",
+  );
+
+  if (!inicio || !fim || itens.length === 0) return null;
+
+  const itensComData = itens
+    .map((item) => ({
+      item,
+      data: extrairDataRealizacaoManutencao(item),
+    }))
+    .filter((item) => item.data);
+
+  if (itensComData.length === 0) return null;
+
+  return itensComData
+    .filter(({ data }) => data >= inicio && data <= fim)
+    .map(({ item }) => item);
+};
+
+const substituirLinhaResumoFinalizacao = (mensagem, regex, novaLinha) => {
+  if (!regex.test(mensagem)) return mensagem;
+  return mensagem.replace(regex, novaLinha);
+};
+
+export const filtrarMensagemFinalizacaoRoteiroManutencoesPorPeriodo = ({
+  mensagem,
+  finalizacaoData,
+  roteiro,
+}) => {
+  const texto = String(mensagem || "").trim();
+  if (!texto) return "";
+
+  const payload =
+    finalizacaoData && typeof finalizacaoData === "object"
+      ? finalizacaoData
+      : {};
+  const resumo =
+    payload?.resumoExecucao && typeof payload.resumoExecucao === "object"
+      ? payload.resumoExecucao
+      : payload?.resumoExecucaoPersistido &&
+          typeof payload.resumoExecucaoPersistido === "object"
+        ? payload.resumoExecucaoPersistido
+        : payload?.resumo && typeof payload.resumo === "object"
+          ? payload.resumo
+          : payload;
+  const execucao =
+    payload?.execucaoSemanal ||
+    payload?.execucao_semanal ||
+    payload?.execucao ||
+    roteiro?.execucaoSemanal ||
+    roteiro?.execucao_semanal ||
+    roteiro?.execucao ||
+    {};
+
+  const inicio = obterPrimeiraDataValida(
+    payload?.dataInicio,
+    payload?.data_inicio,
+    payload?.iniciadoEm,
+    payload?.iniciado_em,
+    resumo?.dataInicio,
+    resumo?.data_inicio,
+    resumo?.iniciadoEm,
+    resumo?.iniciado_em,
+    execucao?.dataInicio,
+    execucao?.data_inicio,
+    execucao?.iniciadoEm,
+    execucao?.iniciado_em,
+    roteiro?.dataInicio,
+    roteiro?.data_inicio,
+    roteiro?.iniciadoEm,
+    roteiro?.iniciado_em,
+  );
+  const fim = obterPrimeiraDataValida(
+    payload?.finalizadoEm,
+    payload?.finalizado_em,
+    payload?.dataFim,
+    payload?.data_fim,
+    resumo?.finalizadoEm,
+    resumo?.finalizado_em,
+    resumo?.dataFim,
+    resumo?.data_fim,
+    execucao?.finalizadoEm,
+    execucao?.finalizado_em,
+    roteiro?.finalizadoEm,
+    roteiro?.finalizado_em,
+  );
+
+  const manutencoesFiltradas = filtrarManutencoesRealizadasPorPeriodo({
+    manutencoes:
+      resumo?.manutencoesRealizadas ||
+      resumo?.manutencoesFeitas ||
+      payload?.manutencoesRealizadas ||
+      payload?.manutencoesFeitas ||
+      [],
+    inicio,
+    fim,
+  });
+
+  if (!manutencoesFiltradas) return texto;
+
+  const manutencoesLista = normalizarListaNomes(
+    manutencoesFiltradas,
+    "descricao",
+  );
+  const lojasComManutencaoLista = manutencoesFiltradas
+    .map(extrairNomePonto)
+    .filter(Boolean);
+  const lojasUnicas = Array.from(
+    new Set(lojasComManutencaoLista.filter(Boolean)),
+  );
+
+  let textoFiltrado = substituirLinhaResumoFinalizacao(
+    texto,
+    /^Total de manuten[cç][oõ]es realizadas: .*$/im,
+    `Total de manutencoes realizadas: ${manutencoesFiltradas.length}`,
+  );
+  textoFiltrado = substituirLinhaResumoFinalizacao(
+    textoFiltrado,
+    /^Lojas com manuten[cç][aã]o realizada: .*$/im,
+    `Lojas com manutencao realizada: ${formatarLista(lojasUnicas)}`,
+  );
+  textoFiltrado = substituirLinhaResumoFinalizacao(
+    textoFiltrado,
+    /^Manuten[cç][oõ]es realizadas \(\d+\): .*$/im,
+    `Manutencoes realizadas (${manutencoesLista.length}): ${formatarLista(manutencoesLista)}`,
+  );
+
+  return textoFiltrado;
+};
+
 const formatarMoedaBRL = (valor) => {
   const numero = Number(valor);
   if (!Number.isFinite(numero)) return "Nao informado";
@@ -1170,6 +1374,8 @@ const formatarMoedaBRL = (valor) => {
 export const montarMensagemFinalizacaoRoteiro = ({
   roteiroNome,
   possuiVeiculoAssociado = true,
+  rotaIniciadaEm,
+  rotaFinalizadaEm,
   kmInicialVeiculo,
   kmFinalVeiculo,
   lojasFeitas,
@@ -1205,9 +1411,17 @@ export const montarMensagemFinalizacaoRoteiro = ({
     kmInicial !== null && kmFinal !== null
       ? Math.max(0, kmFinal - kmInicial)
       : null;
-  const manutencoesFeitasBrutas = toArray(manutencoesRealizadas).filter(
+  const manutencoesRealizadasBrutas = toArray(manutencoesRealizadas).filter(
     Boolean,
   );
+  const manutencoesFiltradasPorPeriodo =
+    filtrarManutencoesRealizadasPorPeriodo({
+      manutencoes: manutencoesRealizadasBrutas,
+      inicio: parseDataValida(rotaIniciadaEm),
+      fim: parseDataValida(rotaFinalizadaEm),
+    });
+  const manutencoesFeitasBrutas =
+    manutencoesFiltradasPorPeriodo || manutencoesRealizadasBrutas;
   const manutencoesNaoFeitasBrutas = toArray(manutencoesNaoRealizadas).filter(
     Boolean,
   );
@@ -1219,15 +1433,16 @@ export const montarMensagemFinalizacaoRoteiro = ({
     manutencoesNaoFeitasBrutas,
     "descricao",
   );
-  const totalManutencoesFeitas = Number.isFinite(
-    Number(totalManutencoesRealizadas),
-  )
-    ? Number(totalManutencoesRealizadas)
-    : manutencoesFeitasLista.length;
-  const lojasComManutencaoLista = normalizarListaNomes(
-    toArray(lojasComManutencao),
-    "nome",
-  );
+  const totalManutencoesFeitas = manutencoesFiltradasPorPeriodo
+    ? manutencoesFeitasLista.length
+    : Number.isFinite(Number(totalManutencoesRealizadas))
+      ? Number(totalManutencoesRealizadas)
+      : manutencoesFeitasLista.length;
+  const lojasComManutencaoLista = manutencoesFiltradasPorPeriodo
+    ? Array.from(
+        new Set(manutencoesFeitasBrutas.map(extrairNomePonto).filter(Boolean)),
+      )
+    : normalizarListaNomes(toArray(lojasComManutencao), "nome");
   const manutencoesNaoFeitasPorPonto = montarResumoManutencoesPorPonto(
     manutencoesNaoFeitasBrutas,
   );

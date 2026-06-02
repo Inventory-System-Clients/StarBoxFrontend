@@ -17,6 +17,7 @@ import {
   salvarUltimaMensagemMovimentacoesWhatsAppLoja,
   salvarMovimentacaoWhatsAppPendenteLoja,
   atualizarMovimentacaoWhatsAppPendenteLoja,
+  filtrarMensagemFinalizacaoRoteiroManutencoesPorPeriodo,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
 export default function RoteiroExecucao() {
@@ -2833,17 +2834,24 @@ export default function RoteiroExecucao() {
         roteiro,
       );
       setResumoExecucaoBackend(resumoNormalizado);
-      const mensagemWhatsApp =
+      const mensagemWhatsAppOriginal =
         resumoNormalizado?.mensagemResumoWhatsapp ||
         String(res?.data?.mensagemResumoWhatsapp || "").trim();
 
-      if (!mensagemWhatsApp) {
+      if (!mensagemWhatsAppOriginal) {
         setError(
           "Rota finalizada, mas o backend nao retornou mensagemResumoWhatsapp.",
         );
         setModalFinalizar((prev) => ({ ...prev, loading: false }));
         return;
       }
+
+      const mensagemWhatsApp =
+        filtrarMensagemFinalizacaoRoteiroManutencoesPorPeriodo({
+          mensagem: mensagemWhatsAppOriginal,
+          finalizacaoData: res?.data,
+          roteiro,
+        });
 
       const abriuWhatsApp = abrirWhatsAppComMensagem(
         mensagemWhatsApp,

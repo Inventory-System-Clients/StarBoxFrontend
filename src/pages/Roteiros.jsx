@@ -7,6 +7,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { Modal, AlertBox } from "../components/UIComponents";
 import {
   abrirWhatsAppComMensagem,
+  filtrarMensagemFinalizacaoRoteiroManutencoesPorPeriodo,
   obterKmInicialPilotagemAtiva,
 } from "../lib/roteiroFinalizacaoWhatsApp";
 
@@ -1312,14 +1313,27 @@ export function Roteiros() {
       const mensagemDireta = String(
         finalizacaoData?.mensagemResumoWhatsapp || "",
       ).trim();
-      if (mensagemDireta) return mensagemDireta;
+      if (mensagemDireta) {
+        return filtrarMensagemFinalizacaoRoteiroManutencoesPorPeriodo({
+          mensagem: mensagemDireta,
+          finalizacaoData,
+          roteiro,
+        });
+      }
 
       const hoje = new Date().toISOString().slice(0, 10);
       const resumoRes = await api.get(`/roteiros/${roteiroId}/resumo-execucao`, {
         params: { data: hoje },
       });
 
-      return String(resumoRes?.data?.mensagemResumoWhatsapp || "").trim();
+      const mensagemResumo = String(
+        resumoRes?.data?.mensagemResumoWhatsapp || "",
+      ).trim();
+      return filtrarMensagemFinalizacaoRoteiroManutencoesPorPeriodo({
+        mensagem: mensagemResumo,
+        finalizacaoData: resumoRes?.data,
+        roteiro,
+      });
     };
 
     const popupReservado = window.open("about:blank", "_blank");
