@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { reportsAPI } from "../services/api.js";
+import { billsAPI, categoriesAPI, reportsAPI } from "../services/api.js";
 import { Button } from "../components/ui/button.jsx";
 import {
   Plus,
@@ -12,11 +12,16 @@ import {
   RefreshCw,
 } from "lucide-react";
 import BillModal from "../components/BillModal.jsx";
-import { categoriesAPI } from "../services/api.js";
 import { toast } from "sonner";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
 import { useNavigate } from "react-router-dom";
+import {
+  buildRecurringBillOccurrences,
+  buildRecurringPaidCreatePayload,
+  mergeAlertsWithRecurringBills,
+  sumAlertValues,
+} from "../lib/financeiroRecurringBills.js";
 
 // Estilos para animação de pulsar
 const pulseStyles = `
@@ -44,6 +49,13 @@ const formatCurrency = (value) => {
   });
 };
 
+const formatDate = (value) => {
+  if (!value) return "--";
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "--";
+  return parsedDate.toLocaleDateString("pt-BR");
+};
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -52,6 +64,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [bills, setBills] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -64,10 +77,18 @@ export default function DashboardPage() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const [reportData, alertsData, categoriesData] = await Promise.all([
+      const [
+        reportData,
+        alertsData,
+        categoriesData,
+        personalBillsData,
+        companyBillsData,
+      ] = await Promise.all([
         reportsAPI.getDashboard(),
         reportsAPI.getAlerts(),
         categoriesAPI.getAll(),
+        billsAPI.getAll({ bill_type: "personal" }),
+        billsAPI.getAll({ bill_type: "company" }),
       ]);
 
       // Validar campos essenciais
@@ -75,9 +96,19 @@ export default function DashboardPage() {
         console.warn("Campo bills_due_today não encontrado na resposta");
       }
 
-      setReport(reportData);
-      setAlerts(alertsData);
       setCategories(categoriesData);
+      const nextBills = [
+        ...(Array.isArray(personalBillsData) ? personalBillsData : []),
+        ...(Array.isArray(companyBillsData) ? companyBillsData : []),
+      ];
+      const mergedFinanceAlerts = mergeAlertsWithRecurringBills(
+        alertsData,
+        nextBills,
+      );
+
+      setReport(reportData);
+      setAlerts(mergedFinanceAlerts.alerts);
+      setBills(mergedFinanceAlerts.bills);
       setLastUpdate(new Date());
 
       if (isRefresh) {
@@ -122,8 +153,105 @@ export default function DashboardPage() {
     }
   };
 
+  const handleRecurringStatusChange = async (bill) => {
+    try {
+      if (bill.isProjectedRecurring) {
+        const createdBill = await billsAPI.create(
+          buildRecurringPaidCreatePayload(bill),
+        );
+
+        if (createdBill?.id && createdBill.status !== "paid") {
+          await billsAPI.updateStatus(createdBill.id, "paid");
+        }
+      } else {
+        await billsAPI.updateStatus(bill.id, "paid");
+      }
+
+      toast.success("Conta recorrente marcada como paga!");
+      await fetchData(true);
+    } catch (error) {
+      toast.error("Erro ao marcar conta recorrente como paga");
+    }
+  };
+
   const urgentAlerts = alerts.filter(
     (a) => a.urgency === "red" || a.urgency === "yellow",
+  );
+  const redAlerts = alerts.filter((alert) => alert.urgency === "red");
+  const yellowAlerts = alerts.filter((alert) => alert.urgency === "yellow");
+  const greenAlerts = alerts.filter((alert) => alert.urgency === "green");
+  const redAlertsTotal = sumAlertValues(redAlerts);
+  const yellowAlertsTotal = sumAlertValues(yellowAlerts);
+  const greenAlertsTotal = sumAlertValues(greenAlerts);
+  const recurringBills = buildRecurringBillOccurrences(bills)
+    .filter((bill) => bill.recorrente)
+    .slice(0, 8);
+  const recurringBillsSection = recurringBills.length > 0 && (
+    <div
+      className="bg-white rounded-xl shadow-md border border-purple-100 overflow-hidden mb-8"
+      data-testid="dashboard-recurring-bills"
+    >
+      <div className="px-6 py-4 border-b border-purple-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">
+            Contas recorrentes
+          </h2>
+          <p className="text-sm text-gray-600">
+            Pagas do mês atual e próximas em aberto
+          </p>
+        </div>
+        <Button
+          onClick={() => navigate("/financeiro/avisos")}
+          variant="outline"
+          className="border-green-300 text-green-700 hover:bg-green-50"
+        >
+          Ver nos avisos
+        </Button>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {recurringBills.map((bill) => (
+          <div
+            key={bill.id}
+            className="px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-gray-800 truncate">
+                  {bill.name}
+                </p>
+                {bill.isProjectedRecurring && (
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
+                    Próximo mês
+                  </span>
+                )}
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                    bill.status === "paid"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
+                  {bill.status === "paid" ? "Paga" : "Em aberto"}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                {formatDate(bill.due_date)} ·{" "}
+                {bill.bill_type === "company" ? "Empresarial" : "Particular"} ·{" "}
+                {formatCurrency(Number(bill.value ?? bill.amount) || 0)}
+              </p>
+            </div>
+            {bill.status !== "paid" && (
+              <Button
+                onClick={() => handleRecurringStatusChange(bill)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Marcar como paga
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 
   if (loading) {
@@ -323,11 +451,11 @@ export default function DashboardPage() {
 
           {/* Cards de Alertas de Contas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Contas a pagar HOJE */}
+            {/* Contas urgentes */}
             <div
               className="bg-linear-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white card-hover cursor-pointer"
               data-testid="card-due-today"
-              title="Contas com vencimento na data de hoje (status: Em Aberto)"
+              title="Contas com status urgente"
               onClick={() => navigate("/financeiro/avisos")}
             >
               <div className="flex items-center justify-between mb-4">
@@ -339,14 +467,13 @@ export default function DashboardPage() {
                 </span>
               </div>
               <h3 className="text-white text-sm font-medium mb-1 opacity-90">
-                Contas a Pagar HOJE!
+                Contas Urgentes!
               </h3>
               <p className="text-4xl font-bold mb-2">
-                {report?.bills_due_today || 0}{" "}
-                {report?.bills_due_today === 1 ? "conta" : "contas"}
+                {redAlerts.length} {redAlerts.length === 1 ? "conta" : "contas"}
               </p>
               <p className="text-sm opacity-80">
-                Total: {formatCurrency(report?.amount_due_today)}
+                Total: {formatCurrency(redAlertsTotal)}
               </p>
             </div>
 
@@ -369,11 +496,11 @@ export default function DashboardPage() {
                 Contas a Pagar em 3 Dias!
               </h3>
               <p className="text-4xl font-bold mb-2">
-                {report?.bills_due_3_days || 0}{" "}
-                {report?.bills_due_3_days === 1 ? "conta" : "contas"}
+                {yellowAlerts.length}{" "}
+                {yellowAlerts.length === 1 ? "conta" : "contas"}
               </p>
               <p className="text-sm opacity-80">
-                Total: {formatCurrency(report?.amount_due_3_days)}
+                Total: {formatCurrency(yellowAlertsTotal)}
               </p>
             </div>
 
@@ -395,14 +522,16 @@ export default function DashboardPage() {
                 Contas em Dia
               </h3>
               <p className="text-4xl font-bold mb-2">
-                {report?.bills_up_to_date || 0}{" "}
-                {report?.bills_up_to_date === 1 ? "conta" : "contas"}
+                {greenAlerts.length}{" "}
+                {greenAlerts.length === 1 ? "conta" : "contas"}
               </p>
               <p className="text-sm opacity-80">
-                Total: {formatCurrency(report?.amount_up_to_date)}
+                Total: {formatCurrency(greenAlertsTotal)}
               </p>
             </div>
           </div>
+
+          {recurringBillsSection}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div

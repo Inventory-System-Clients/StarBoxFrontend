@@ -25,6 +25,10 @@ import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import {
+  buildRecurringBillOccurrences,
+  buildRecurringPaidCreatePayload,
+} from "../lib/financeiroRecurringBills";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -34,6 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+
+const normalizeFilterValue = (value) => (value === "all" ? "" : value);
 
 export default function BillsPage() {
   const { type } = useParams();
@@ -84,9 +90,20 @@ export default function BillsPage() {
     }
   };
 
-  const handleStatusChange = async (billId, newStatus) => {
+  const handleStatusChange = async (bill, newStatus) => {
     try {
-      await billsAPI.updateStatus(billId, newStatus);
+      if (bill.isProjectedRecurring && newStatus === "paid") {
+        const createdBill = await billsAPI.create(
+          buildRecurringPaidCreatePayload(bill),
+        );
+
+        if (createdBill?.id && createdBill.status !== "paid") {
+          await billsAPI.updateStatus(createdBill.id, "paid");
+        }
+      } else {
+        await billsAPI.updateStatus(bill.id, newStatus);
+      }
+
       toast.success(
         `Conta marcada como ${newStatus === "paid" ? "paga" : "em aberto"}!`,
       );
@@ -116,12 +133,19 @@ export default function BillsPage() {
     setDetailsModal({ open: true, bill });
   };
 
-  const filteredBills = bills.filter((bill) => {
-    if (filters.status && bill.status !== filters.status) return false;
-    if (filters.category && bill.category !== filters.category) return false;
+  const displayBills = buildRecurringBillOccurrences(bills);
+
+  const filteredBills = displayBills.filter((bill) => {
+    const statusFilter = normalizeFilterValue(filters.status);
+    const categoryFilter = normalizeFilterValue(filters.category);
+
+    if (statusFilter && bill.status !== statusFilter) return false;
+    if (categoryFilter && bill.category !== categoryFilter) return false;
     if (
       filters.city &&
-      !bill.city.toLowerCase().includes(filters.city.toLowerCase())
+      !String(bill.city || "")
+        .toLowerCase()
+        .includes(filters.city.toLowerCase())
     )
       return false;
     if (
@@ -227,7 +251,7 @@ export default function BillsPage() {
                 <Select
                   value={filters.status}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, status: value })
+                    setFilters({ ...filters, status: normalizeFilterValue(value) })
                   }
                 >
                   <SelectTrigger data-testid="filter-status">
@@ -247,7 +271,10 @@ export default function BillsPage() {
                 <Select
                   value={filters.category}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, category: value })
+                    setFilters({
+                      ...filters,
+                      category: normalizeFilterValue(value),
+                    })
                   }
                 >
                   <SelectTrigger data-testid="filter-category">
@@ -360,6 +387,11 @@ export default function BillsPage() {
                                 🔁 Mensal
                               </span>
                             )}
+                            {bill.isProjectedRecurring && (
+                              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold" title="Ocorrência aberta gerada para o próximo mês">
+                                Próximo mês
+                              </span>
+                            )}
                             {bill.observations && (
                               <p className="text-sm text-gray-500 mt-1">
                                 {bill.observations}
@@ -415,7 +447,7 @@ export default function BillsPage() {
                               variant="ghost"
                               onClick={() =>
                                 handleStatusChange(
-                                  bill.id,
+                                  bill,
                                   bill.status === "paid" ? "open" : "paid",
                                 )
                               }
@@ -442,6 +474,12 @@ export default function BillsPage() {
                               variant="ghost"
                               onClick={() => handleEdit(bill)}
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              disabled={bill.isProjectedRecurring}
+                              title={
+                                bill.isProjectedRecurring
+                                  ? "Marque como paga para criar a ocorrência deste mês antes de editar"
+                                  : "Editar conta"
+                              }
                               data-testid={`btn-edit-${bill.id}`}
                             >
                               <Edit size={18} />
@@ -456,6 +494,12 @@ export default function BillsPage() {
                                 })
                               }
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={bill.isProjectedRecurring}
+                              title={
+                                bill.isProjectedRecurring
+                                  ? "Ocorrência futura ainda não foi criada"
+                                  : "Excluir conta"
+                              }
                               data-testid={`btn-delete-${bill.id}`}
                             >
                               <Trash2 size={18} />

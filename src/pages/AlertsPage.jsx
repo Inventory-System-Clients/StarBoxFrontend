@@ -5,6 +5,10 @@ import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Button } from "../components/ui/button";
+import {
+  buildRecurringPaidCreatePayload,
+  mergeAlertsWithRecurringBills,
+} from "../lib/financeiroRecurringBills";
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState([]);
@@ -137,7 +141,6 @@ export default function AlertsPage() {
       const alertData = Array.isArray(alertsResult.value)
         ? alertsResult.value
         : [];
-      setAlerts(alertData);
 
       const nextBills = [];
       if (
@@ -154,7 +157,13 @@ export default function AlertsPage() {
         nextBills.push(...companyBillsResult.value);
       }
 
-      setBills(nextBills);
+      const mergedFinanceAlerts = mergeAlertsWithRecurringBills(
+        alertData,
+        nextBills,
+      );
+
+      setAlerts(mergedFinanceAlerts.alerts);
+      setBills(mergedFinanceAlerts.bills);
     } catch (error) {
       toast.error("Erro ao carregar avisos");
     } finally {
@@ -183,17 +192,31 @@ export default function AlertsPage() {
   };
 
   const handleMarkAsPaid = async () => {
-    const billId = detailsModal.bill?.id;
+    const selectedBill = detailsModal.bill;
+    const billId = selectedBill?.id;
 
-    if (!billId || detailsModal.bill?.status === "paid") {
+    if (!billId || selectedBill?.status === "paid") {
       return;
     }
 
     try {
       setMarkingAsPaid(true);
-      await billsAPI.updateStatus(billId, "paid");
+      let updatedBill = { ...selectedBill, status: "paid" };
 
-      const updatedBill = { ...detailsModal.bill, status: "paid" };
+      if (selectedBill.isProjectedRecurring) {
+        const createdBill = await billsAPI.create(
+          buildRecurringPaidCreatePayload(selectedBill),
+        );
+
+        if (createdBill?.id && createdBill.status !== "paid") {
+          await billsAPI.updateStatus(createdBill.id, "paid");
+        }
+
+        updatedBill = { ...selectedBill, ...createdBill, status: "paid" };
+      } else {
+        await billsAPI.updateStatus(billId, "paid");
+      }
+
       setDetailsModal({ open: true, bill: updatedBill });
 
       setBills((currentBills) =>
@@ -273,6 +296,11 @@ export default function AlertsPage() {
     if (days === 0) return "Vence hoje";
     if (days === 1) return "Vence amanhã";
     return `${days} dias para vencer`;
+  };
+
+  const getAlertStatusText = (alert) => {
+    if (alert.status === "paid") return "Pago";
+    return getDaysText(alert.days_until_due);
   };
 
   const redAlerts = alerts.filter((a) => a.urgency === "red");
@@ -480,7 +508,7 @@ export default function AlertsPage() {
                                 <p
                                   className={`font-semibold ${config.iconColor}`}
                                 >
-                                  {getDaysText(alert.days_until_due)}
+                                  {getAlertStatusText(alert)}
                                 </p>
                               </div>
                             </div>
@@ -570,7 +598,7 @@ export default function AlertsPage() {
                                 <p
                                   className={`font-semibold ${config.iconColor}`}
                                 >
-                                  {getDaysText(alert.days_until_due)}
+                                  {getAlertStatusText(alert)}
                                 </p>
                               </div>
                             </div>
@@ -660,7 +688,7 @@ export default function AlertsPage() {
                                 <p
                                   className={`font-semibold ${config.iconColor}`}
                                 >
-                                  {getDaysText(alert.days_until_due)}
+                                  {getAlertStatusText(alert)}
                                 </p>
                               </div>
                             </div>
