@@ -43,71 +43,11 @@ export const getRecurringKey = (bill) =>
 
 export const buildRecurringBillOccurrences = (sourceBills) => {
   const bills = Array.isArray(sourceBills) ? sourceBills : [];
-  const realRecurringMonths = new Set();
-  const latestByRecurringKey = new Map();
-
-  bills.forEach((bill) => {
-    if (!bill.recorrente) return;
-    const recurringKey = getRecurringKey(bill);
-    realRecurringMonths.add(`${recurringKey}|${getMonthKey(bill.due_date)}`);
-
-    const currentLatest = latestByRecurringKey.get(recurringKey);
-    const billDate = parseLocalDate(bill.due_date);
-    const latestDate = parseLocalDate(currentLatest?.due_date);
-    if (!currentLatest || (billDate && latestDate && billDate > latestDate)) {
-      latestByRecurringKey.set(recurringKey, bill);
-    }
-  });
-
-  const generatedOccurrences = [];
-  latestByRecurringKey.forEach((bill, recurringKey) => {
-    let nextDueDate = addMonthsKeepingDay(bill.due_date, 1);
-    const today = new Date();
-    const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    while (parseLocalDate(nextDueDate) < currentMonthStart) {
-      nextDueDate = addMonthsKeepingDay(nextDueDate, 1);
-    }
-
-    if (realRecurringMonths.has(`${recurringKey}|${getMonthKey(nextDueDate)}`)) {
-      return;
-    }
-
-    generatedOccurrences.push({
-      ...bill,
-      id: `${bill.id}-recurring-${getMonthKey(nextDueDate)}`,
-      due_date: nextDueDate,
-      status: "open",
-      isProjectedRecurring: true,
-      sourceBillId: bill.id,
-    });
-  });
-
-  return [...bills, ...generatedOccurrences].sort((first, second) => {
+  return [...bills].sort((first, second) => {
     const firstDate = parseLocalDate(first.due_date);
     const secondDate = parseLocalDate(second.due_date);
     return firstDate - secondDate;
   });
-};
-
-export const buildRecurringPaidCreatePayload = (bill) => {
-  const projectedValue = bill.value ?? bill.amount ?? 0;
-  return {
-    name: bill.name,
-    numero: bill.numero,
-    due_date: bill.due_date,
-    city: bill.city,
-    category: bill.category,
-    observations: bill.observations,
-    bill_type: bill.bill_type,
-    value: Number(projectedValue) || 0,
-    payment_method: bill.payment_method,
-    payment_details: bill.payment_details,
-    boleto_em_maos: bill.boleto_em_maos,
-    recorrente: true,
-    beneficiario: bill.beneficiario,
-    status: "paid",
-  };
 };
 
 export const buildRecurringNextOpenUpdatePayload = (bill) => {
@@ -207,7 +147,6 @@ export const buildAlertFromBill = (bill) => ({
   urgency: getUrgencyFromBill(bill),
   days_until_due: getDaysUntilDue(bill.due_date),
   recorrente: true,
-  isProjectedRecurring: bill.isProjectedRecurring,
 });
 
 export const mergeAlertsWithRecurringBills = (sourceAlerts, sourceBills) => {

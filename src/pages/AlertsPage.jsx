@@ -7,7 +7,6 @@ import Footer from "../components/Footer";
 import { Button } from "../components/ui/button";
 import {
   buildRecurringNextOpenUpdatePayload,
-  buildRecurringPaidCreatePayload,
   mergeAlertsWithRecurringBills,
 } from "../lib/financeiroRecurringBills";
 
@@ -204,25 +203,7 @@ export default function AlertsPage() {
       setMarkingAsPaid(true);
       let updatedBill = { ...selectedBill, status: "paid" };
 
-      if (selectedBill.isProjectedRecurring) {
-        const createdBill = await billsAPI.create(
-          buildRecurringPaidCreatePayload(selectedBill),
-        );
-
-        if (createdBill?.id && createdBill.status !== "paid") {
-          await billsAPI.updateStatus(createdBill.id, "paid");
-        }
-
-        updatedBill = { ...selectedBill, ...createdBill, status: "paid" };
-      } else if (selectedBill.recorrente) {
-        const paidBill = await billsAPI.create(
-          buildRecurringPaidCreatePayload(selectedBill),
-        );
-
-        if (paidBill?.id && paidBill.status !== "paid") {
-          await billsAPI.updateStatus(paidBill.id, "paid");
-        }
-
+      if (selectedBill.recorrente) {
         const nextOpenPayload =
           buildRecurringNextOpenUpdatePayload(selectedBill);
         await billsAPI.update(billId, nextOpenPayload);

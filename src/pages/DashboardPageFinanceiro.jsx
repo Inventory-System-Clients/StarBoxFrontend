@@ -19,7 +19,6 @@ import { useNavigate } from "react-router-dom";
 import {
   buildRecurringBillOccurrences,
   buildRecurringNextOpenUpdatePayload,
-  buildRecurringPaidCreatePayload,
   mergeAlertsWithRecurringBills,
   sumAlertValues,
 } from "../lib/financeiroRecurringBills.js";
@@ -156,29 +155,11 @@ export default function DashboardPage() {
 
   const handleRecurringStatusChange = async (bill) => {
     try {
-      if (bill.isProjectedRecurring) {
-        const createdBill = await billsAPI.create(
-          buildRecurringPaidCreatePayload(bill),
-        );
-
-        if (createdBill?.id && createdBill.status !== "paid") {
-          await billsAPI.updateStatus(createdBill.id, "paid");
-        }
-      } else {
-        const paidBill = await billsAPI.create(
-          buildRecurringPaidCreatePayload(bill),
-        );
-
-        if (paidBill?.id && paidBill.status !== "paid") {
-          await billsAPI.updateStatus(paidBill.id, "paid");
-        }
-
-        await billsAPI.update(
-          bill.id,
-          buildRecurringNextOpenUpdatePayload(bill),
-        );
-        await billsAPI.updateStatus(bill.id, "open");
-      }
+      await billsAPI.update(
+        bill.id,
+        buildRecurringNextOpenUpdatePayload(bill),
+      );
+      await billsAPI.updateStatus(bill.id, "open");
 
       toast.success("Conta recorrente marcada como paga!");
       await fetchData(true);
@@ -232,11 +213,6 @@ export default function DashboardPage() {
                 <p className="font-semibold text-gray-800 truncate">
                   {bill.name}
                 </p>
-                {bill.isProjectedRecurring && (
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
-                    Próximo mês
-                  </span>
-                )}
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-semibold ${
                     bill.status === "paid"

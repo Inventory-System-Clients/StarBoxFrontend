@@ -27,7 +27,6 @@ import Footer from "../components/Footer";
 import {
   buildRecurringBillOccurrences,
   buildRecurringNextOpenUpdatePayload,
-  buildRecurringPaidCreatePayload,
 } from "../lib/financeiroRecurringBills";
 import {
   AlertDialog,
@@ -93,23 +92,7 @@ export default function BillsPage() {
 
   const handleStatusChange = async (bill, newStatus) => {
     try {
-      if (bill.isProjectedRecurring && newStatus === "paid") {
-        const createdBill = await billsAPI.create(
-          buildRecurringPaidCreatePayload(bill),
-        );
-
-        if (createdBill?.id && createdBill.status !== "paid") {
-          await billsAPI.updateStatus(createdBill.id, "paid");
-        }
-      } else if (bill.recorrente && newStatus === "paid") {
-        const paidBill = await billsAPI.create(
-          buildRecurringPaidCreatePayload(bill),
-        );
-
-        if (paidBill?.id && paidBill.status !== "paid") {
-          await billsAPI.updateStatus(paidBill.id, "paid");
-        }
-
+      if (bill.recorrente && newStatus === "paid") {
         await billsAPI.update(
           bill.id,
           buildRecurringNextOpenUpdatePayload(bill),
@@ -402,11 +385,6 @@ export default function BillsPage() {
                                 🔁 Mensal
                               </span>
                             )}
-                            {bill.isProjectedRecurring && (
-                              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold" title="Ocorrência aberta gerada para o próximo mês">
-                                Próximo mês
-                              </span>
-                            )}
                             {bill.observations && (
                               <p className="text-sm text-gray-500 mt-1">
                                 {bill.observations}
@@ -489,12 +467,7 @@ export default function BillsPage() {
                               variant="ghost"
                               onClick={() => handleEdit(bill)}
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              disabled={bill.isProjectedRecurring}
-                              title={
-                                bill.isProjectedRecurring
-                                  ? "Marque como paga para criar a ocorrência deste mês antes de editar"
-                                  : "Editar conta"
-                              }
+                              title="Editar conta"
                               data-testid={`btn-edit-${bill.id}`}
                             >
                               <Edit size={18} />
@@ -509,12 +482,7 @@ export default function BillsPage() {
                                 })
                               }
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              disabled={bill.isProjectedRecurring}
-                              title={
-                                bill.isProjectedRecurring
-                                  ? "Ocorrência futura ainda não foi criada"
-                                  : "Excluir conta"
-                              }
+                              title="Excluir conta"
                               data-testid={`btn-delete-${bill.id}`}
                             >
                               <Trash2 size={18} />
