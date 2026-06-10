@@ -523,22 +523,43 @@ export default function BillsPage() {
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, billId: null })}
       >
-        <AlertDialogContent data-testid="delete-dialog">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
+        <AlertDialogContent
+          className="max-w-md overflow-hidden border-red-100 p-0 shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+          data-testid="delete-dialog"
+        >
+          <div className="bg-gradient-to-r from-red-600 via-rose-600 to-purple-700 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/25">
+                <Trash2 size={22} />
+              </div>
+              <AlertDialogHeader className="space-y-1 text-left">
+                <AlertDialogTitle className="text-xl font-bold text-white">
+                  Confirmar exclusão
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm text-red-50">
+                  Esta conta será removida da sua lista financeira.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+            </div>
+          </div>
+
+          <div className="px-6 py-5">
+            <p className="text-sm leading-6 text-slate-600">
               Tem certeza que deseja excluir esta conta? Esta ação não pode ser
               desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </p>
+          </div>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="btn-cancel-delete">
+          <AlertDialogFooter className="border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <AlertDialogCancel
+              className="border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+              data-testid="btn-cancel-delete"
+            >
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 text-white shadow-sm hover:bg-red-700"
               data-testid="btn-confirm-delete"
             >
               Excluir
