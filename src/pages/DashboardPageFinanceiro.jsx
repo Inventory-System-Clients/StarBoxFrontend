@@ -18,6 +18,7 @@ import Footer from "../components/Footer.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   buildRecurringBillOccurrences,
+  buildRecurringNextOpenUpdatePayload,
   buildRecurringPaidCreatePayload,
   mergeAlertsWithRecurringBills,
   sumAlertValues,
@@ -164,7 +165,19 @@ export default function DashboardPage() {
           await billsAPI.updateStatus(createdBill.id, "paid");
         }
       } else {
-        await billsAPI.updateStatus(bill.id, "paid");
+        const paidBill = await billsAPI.create(
+          buildRecurringPaidCreatePayload(bill),
+        );
+
+        if (paidBill?.id && paidBill.status !== "paid") {
+          await billsAPI.updateStatus(paidBill.id, "paid");
+        }
+
+        await billsAPI.update(
+          bill.id,
+          buildRecurringNextOpenUpdatePayload(bill),
+        );
+        await billsAPI.updateStatus(bill.id, "open");
       }
 
       toast.success("Conta recorrente marcada como paga!");

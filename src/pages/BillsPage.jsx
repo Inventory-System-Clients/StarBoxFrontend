@@ -26,6 +26,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import {
   buildRecurringBillOccurrences,
+  buildRecurringNextOpenUpdatePayload,
   buildRecurringPaidCreatePayload,
 } from "../lib/financeiroRecurringBills";
 import {
@@ -100,6 +101,20 @@ export default function BillsPage() {
         if (createdBill?.id && createdBill.status !== "paid") {
           await billsAPI.updateStatus(createdBill.id, "paid");
         }
+      } else if (bill.recorrente && newStatus === "paid") {
+        const paidBill = await billsAPI.create(
+          buildRecurringPaidCreatePayload(bill),
+        );
+
+        if (paidBill?.id && paidBill.status !== "paid") {
+          await billsAPI.updateStatus(paidBill.id, "paid");
+        }
+
+        await billsAPI.update(
+          bill.id,
+          buildRecurringNextOpenUpdatePayload(bill),
+        );
+        await billsAPI.updateStatus(bill.id, "open");
       } else {
         await billsAPI.updateStatus(bill.id, newStatus);
       }

@@ -110,6 +110,26 @@ export const buildRecurringPaidCreatePayload = (bill) => {
   };
 };
 
+export const buildRecurringNextOpenUpdatePayload = (bill) => {
+  const projectedValue = bill.value ?? bill.amount ?? 0;
+  return {
+    name: bill.name,
+    numero: bill.numero,
+    due_date: addMonthsKeepingDay(bill.due_date, 1),
+    city: bill.city,
+    category: bill.category,
+    observations: bill.observations,
+    bill_type: bill.bill_type,
+    value: Number(projectedValue) || 0,
+    payment_method: bill.payment_method,
+    payment_details: bill.payment_details,
+    boleto_em_maos: bill.boleto_em_maos,
+    recorrente: true,
+    beneficiario: bill.beneficiario,
+    status: "open",
+  };
+};
+
 export const toNumber = (value) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : null;

@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Button } from "../components/ui/button";
 import {
+  buildRecurringNextOpenUpdatePayload,
   buildRecurringPaidCreatePayload,
   mergeAlertsWithRecurringBills,
 } from "../lib/financeiroRecurringBills";
@@ -213,6 +214,21 @@ export default function AlertsPage() {
         }
 
         updatedBill = { ...selectedBill, ...createdBill, status: "paid" };
+      } else if (selectedBill.recorrente) {
+        const paidBill = await billsAPI.create(
+          buildRecurringPaidCreatePayload(selectedBill),
+        );
+
+        if (paidBill?.id && paidBill.status !== "paid") {
+          await billsAPI.updateStatus(paidBill.id, "paid");
+        }
+
+        const nextOpenPayload =
+          buildRecurringNextOpenUpdatePayload(selectedBill);
+        await billsAPI.update(billId, nextOpenPayload);
+        await billsAPI.updateStatus(billId, "open");
+
+        updatedBill = { ...selectedBill, ...nextOpenPayload };
       } else {
         await billsAPI.updateStatus(billId, "paid");
       }
@@ -222,7 +238,7 @@ export default function AlertsPage() {
       setBills((currentBills) =>
         currentBills.map((bill) =>
           String(bill.id) === String(billId)
-            ? { ...bill, status: "paid" }
+            ? { ...bill, ...updatedBill }
             : bill,
         ),
       );
