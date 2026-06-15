@@ -627,9 +627,10 @@ const extrairResumoLegadoDaMensagem = (mensagem = "", item = {}) => {
     inAtual,
     outAnterior,
     outAtual,
-    diferencaIn: Number.isFinite(saldo) ? saldo : diferencaIn,
+    diferencaIn: Number.isFinite(diferencaIn) ? diferencaIn : 0,
     quantidadeSaiu,
-    jogado: Number.isFinite(diferencaIn) ? diferencaIn : 0,
+    jogado: Number.isFinite(saldo) ? saldo : 0,
+    saldo: Number.isFinite(saldo) ? saldo : diferencaIn,
     jogadasMediasPorPelucia: Number.isFinite(mediaBicho) ? mediaBicho : 0,
     diasDesdeUltimaMovimentacao,
     nomeProdutoAbastecido: nomeProdutoAbastecimentoExtra,
@@ -739,6 +740,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     const quantidadeAbastecidaInformada = Number(
       r?.quantidadeAbastecidaInformada,
     );
+    const quantidadeJogadas = Number(r?.diferencaIn || 0);
     const { saldo, jogadaPorPelucia } = calcularFinanceiroResumo(r);
     const dias = r?.diasDesdeUltimaMovimentacao;
     const quantidadeAbastecimentoExtra = Number(
@@ -757,7 +759,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
         : []),
       ...(r?.leituraAtualizada ? ["Leitura atualizada"] : []),
       ...alteracoesLeitura.map((item) => `Alteracao: ${item}`),
-      `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(saldo)}`,
+      `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(quantidadeJogadas)}`,
       `S  ${formatarInteiro(r?.outAnterior)}  ${formatarInteiro(r?.outAtual)}________${formatarInteiro(r?.quantidadeSaiu)}`,
       ...(quantidadeAbastecimentoExtra > 0
         ? [

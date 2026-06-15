@@ -1076,7 +1076,7 @@ export default function MovimentacaoMaquina() {
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
           : ""
       }`,
-      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(saldo)}`,
+      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ ${formatarMoeda(diferencaIn)}`,
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
       ...(linhaComissao ? [linhaComissao] : []),
       ...blocoFinanceiro,
