@@ -241,6 +241,10 @@ export function MaquinaDetalhes() {
                   : maquina.valorFicha || "-"}
               </p>
               <p>
+                <strong>Usa fichas:</strong>{" "}
+                {maquina.usaFichas || maquina.usa_fichas ? "Sim" : "Nao"}
+              </p>
+              <p>
                 <strong>Comissão do Ponto:</strong>{" "}
                 {maquina.comissaoLojaPercentual !== null &&
                 maquina.comissaoLojaPercentual !== undefined &&

@@ -705,6 +705,29 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
       maximumFractionDigits: 0,
     });
 
+  const usaFichasResumo = (resumo = {}) =>
+    resumo?.usaFichas === true ||
+    resumo?.usa_fichas === true ||
+    resumo?.usaFichas === 1 ||
+    resumo?.usa_fichas === 1;
+
+  const calcularFinanceiroResumo = (resumo = {}) => {
+    const quantidadeJogadas = Number(resumo?.diferencaIn || 0);
+    const valorJogada = Number(resumo?.valorJogada || resumo?.valorFicha || 0);
+    const deveMultiplicarPorFicha = usaFichasResumo(resumo) && valorJogada > 0;
+    const saldo = deveMultiplicarPorFicha
+      ? quantidadeJogadas * valorJogada
+      : quantidadeJogadas;
+    const quantidadeSaiu = Number(resumo?.quantidadeSaiu || 0);
+    const jogadaPorPelucia = quantidadeSaiu > 0 ? saldo / quantidadeSaiu : 0;
+
+    return {
+      quantidadeJogadas,
+      saldo,
+      jogadaPorPelucia,
+    };
+  };
+
   const blocosMaquinas = itensNormalizados.map((item) => {
     const r = item.resumo;
     const codigo = normalizarTexto(
@@ -720,8 +743,8 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     const quantidadeAbastecidaInformada = Number(
       r?.quantidadeAbastecidaInformada,
     );
-    const saldo = Number(r?.diferencaIn || 0);
-    const mediaBicho = Number(r?.jogadasMediasPorPelucia || 0);
+    const { quantidadeJogadas, saldo, jogadaPorPelucia } =
+      calcularFinanceiroResumo(r);
     const dias = r?.diasDesdeUltimaMovimentacao;
     const quantidadeAbastecimentoExtra = Number(
       r?.quantidadeAbastecimentoExtra || 0,
@@ -739,7 +762,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
         : []),
       ...(r?.leituraAtualizada ? ["Leitura atualizada"] : []),
       ...alteracoesLeitura.map((item) => `Alteracao: ${item}`),
-      `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(saldo)}`,
+      `E  ${formatarInteiro(r?.inAnterior)}  ${formatarInteiro(r?.inAtual)}_____${formatarMoeda(quantidadeJogadas)}`,
       `S  ${formatarInteiro(r?.outAnterior)}  ${formatarInteiro(r?.outAtual)}________${formatarInteiro(r?.quantidadeSaiu)}`,
       ...(quantidadeAbastecimentoExtra > 0
         ? [
@@ -747,7 +770,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
           ]
         : []),
       `Saldo: ${formatarMoeda(saldo)}`,
-      `Jogada: ${formatarMoeda(mediaBicho)}`,
+      `Jogada: ${formatarMoeda(jogadaPorPelucia)}`,
       ...(Number.isFinite(Number(dias))
         ? [`Cobrado com ${formatarInteiro(dias)} dia(s)`]
         : []),
@@ -756,7 +779,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
   });
 
   const totalEntradas = itensNormalizados.reduce(
-    (acc, item) => acc + Number(item?.resumo?.diferencaIn || 0),
+    (acc, item) => acc + calcularFinanceiroResumo(item?.resumo).saldo,
     0,
   );
   const totalSaidasQtd = itensNormalizados.reduce(
@@ -764,7 +787,7 @@ export const montarMensagemMovimentacoesWhatsAppLoja = ({
     0,
   );
   const totalJogado = itensNormalizados.reduce(
-    (acc, item) => acc + Number(item?.resumo?.jogado || 0),
+    (acc, item) => acc + calcularFinanceiroResumo(item?.resumo).saldo,
     0,
   );
   const totalAbastecimentoExtra = itensNormalizados.reduce(

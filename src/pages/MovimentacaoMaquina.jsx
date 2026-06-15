@@ -999,18 +999,22 @@ export default function MovimentacaoMaquina() {
 
     const diferencaIn = Math.max(0, inAtual - inAnterior);
     const quantidadeSaiu = Math.max(0, outAtual - outAnterior);
-    const saldo = diferencaIn;
     const valorJogada = Number(maquina?.valorFicha || 0);
-    const jogado = valorJogada > 0 ? diferencaIn / valorJogada : 0;
+    const usaFichas =
+      maquina?.usaFichas === true ||
+      maquina?.usa_fichas === true ||
+      maquina?.usaFichas === 1 ||
+      maquina?.usa_fichas === 1;
+    const saldo =
+      usaFichas && valorJogada > 0 ? diferencaIn * valorJogada : diferencaIn;
+    const jogado = saldo;
 
     const produtoSelecionado = produtos.find(
       (p) => String(p.id) === String(formData.produto_id),
     );
     const precoProduto = Number(produtoSelecionado?.preco || 0);
     const jogadasMediasPorPelucia =
-      quantidadeSaiu > 0 && valorJogada > 0
-        ? diferencaIn / valorJogada / quantidadeSaiu
-        : 0;
+      quantidadeSaiu > 0 ? saldo / quantidadeSaiu : 0;
 
     const lojaNome = maquina?.loja?.nome || "Ponto sem nome";
     const dataMovimentacao = new Date().toLocaleString("pt-BR");
@@ -1049,15 +1053,15 @@ export default function MovimentacaoMaquina() {
       ? []
       : [
           `Saldo: R$${formatarMoeda(saldo)}`,
-          `Jogadas medias por pelucia: ${formatarInteiro(jogadasMediasPorPelucia)}`,
+          `Jogadas medias por pelucia: R$${formatarMoeda(jogadasMediasPorPelucia)}`,
           "___________________________________",
           "Qtde Maqs....: 01",
           `Entradas.....: ${formatarInteiro(diferencaIn)}`,
           `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
-          `Jogado.......: ${formatarInteiro(jogado)}`,
+          `Jogado.......: ${formatarMoeda(jogado)}`,
           "Cliente....: 0",
-          `Liquido.....: ${formatarInteiro(saldo)}`,
-          `Especie.....: ${formatarInteiro(saldo)}`,
+          `Liquido.....: ${formatarMoeda(saldo)}`,
+          `Especie.....: ${formatarMoeda(saldo)}`,
         ];
 
     const mensagem = [
@@ -1076,7 +1080,7 @@ export default function MovimentacaoMaquina() {
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
           : ""
       }`,
-      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
+      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ ${formatarMoeda(diferencaIn)}`,
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
       ...(linhaComissao ? [linhaComissao] : []),
       ...blocoFinanceiro,
@@ -1097,6 +1101,8 @@ export default function MovimentacaoMaquina() {
       quantidadeSaiu,
       jogado,
       saldo,
+      valorJogada,
+      usaFichas,
       jogadasMediasPorPelucia,
       diasDesdeUltimaMovimentacao,
       quantidadeAbastecidaInformada,

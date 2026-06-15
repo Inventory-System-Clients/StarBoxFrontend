@@ -35,6 +35,7 @@ export function MaquinaForm() {
     tipo: "",
     capacidadePadrao: "",
     valorFicha: "",
+    usaFichas: false,
     comissaoLojaPercentual: "",
     fichasNecessarias: "",
     forcaForte: "",
@@ -158,6 +159,11 @@ export function MaquinaForm() {
         tipo: response.data.tipo || "",
         capacidadePadrao: response.data.capacidadePadrao || "",
         valorFicha: response.data.valorFicha || "",
+        usaFichas:
+          response.data.usaFichas === true ||
+          response.data.usa_fichas === true ||
+          response.data.usaFichas === 1 ||
+          response.data.usa_fichas === 1,
         comissaoLojaPercentual:
           response.data.comissaoLojaPercentual !== null &&
           response.data.comissaoLojaPercentual !== undefined
@@ -309,6 +315,7 @@ export function MaquinaForm() {
         tipo: formData.tipo?.trim() || null,
         capacidadePadrao: parseInt(formData.capacidadePadrao, 10) || 0,
         valorFicha: parseFloat(formData.valorFicha) || 0,
+        usaFichas: Boolean(formData.usaFichas),
         comissaoLojaPercentual:
           formData.comissaoLojaPercentual === ""
             ? null
@@ -660,6 +667,27 @@ export function MaquinaForm() {
                   <p className="text-xs text-gray-500 mt-1">
                     Valor cobrado por ficha
                   </p>
+                </div>
+
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="usaFichas"
+                      checked={Boolean(formData.usaFichas)}
+                      onChange={handleChange}
+                      className="mt-1 w-5 h-5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-gray-900">
+                        Usa fichas
+                      </span>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Quando marcado, o saldo da leitura sera a diferenca do
+                        IN multiplicada pelo valor da jogada desta maquina.
+                      </p>
+                    </div>
+                  </label>
                 </div>
 
                 <div>

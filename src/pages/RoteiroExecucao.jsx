@@ -1276,6 +1276,9 @@ export default function RoteiroExecucao() {
     const alteracoes = Array.isArray(resumo?.alteracoesLeitura)
       ? resumo.alteracoesLeitura
       : [];
+    const quantidadeSaiu = Number(resumo?.quantidadeSaiu || 0);
+    const saldo = Number(resumo?.saldo ?? resumo?.diferencaIn ?? 0);
+    const jogadaPorPelucia = quantidadeSaiu > 0 ? saldo / quantidadeSaiu : 0;
 
     return [
       "STAR BOX",
@@ -1291,10 +1294,10 @@ export default function RoteiroExecucao() {
         : []),
       "Leitura atualizada",
       ...alteracoes.map((item) => `Alteracao: ${item}`),
-      `E  ${formatarNumeroLeitura(resumo?.inAnterior)}  ${formatarNumeroLeitura(resumo?.inAtual)}  ____ R$${formatarNumeroLeitura(resumo?.diferencaIn, 2)}`,
-      `S  ${formatarNumeroLeitura(resumo?.outAnterior)}  ${formatarNumeroLeitura(resumo?.outAtual)}  ____ ${formatarNumeroLeitura(resumo?.quantidadeSaiu)}`,
-      `Saldo: R$${formatarNumeroLeitura(resumo?.saldo ?? resumo?.diferencaIn, 2)}`,
-      `Jogadas medias por pelucia: ${formatarNumeroLeitura(resumo?.jogadasMediasPorPelucia, 0)}`,
+      `E  ${formatarNumeroLeitura(resumo?.inAnterior)}  ${formatarNumeroLeitura(resumo?.inAtual)}  ____ ${formatarNumeroLeitura(resumo?.diferencaIn, 2)}`,
+      `S  ${formatarNumeroLeitura(resumo?.outAnterior)}  ${formatarNumeroLeitura(resumo?.outAtual)}  ____ ${formatarNumeroLeitura(quantidadeSaiu)}`,
+      `Saldo: R$${formatarNumeroLeitura(saldo, 2)}`,
+      `Jogada: R$${formatarNumeroLeitura(jogadaPorPelucia, 2)}`,
     ].join("\n");
   };
 
@@ -1346,6 +1349,26 @@ export default function RoteiroExecucao() {
       movimentacaoAtualizada?.quantidadeSaiu,
       Math.max(0, outAtual - outAnterior),
     );
+    const valorJogada = numeroOuFallback(
+      resumoBase?.valorJogada,
+      resumoBase?.valorFicha,
+      maquina?.valorFicha,
+      movimentacaoAtualizada?.maquina?.valorFicha,
+      movimentacaoAnterior?.maquina?.valorFicha,
+    );
+    const usaFichas =
+      resumoBase?.usaFichas === true ||
+      resumoBase?.usa_fichas === true ||
+      maquina?.usaFichas === true ||
+      maquina?.usa_fichas === true ||
+      movimentacaoAtualizada?.maquina?.usaFichas === true ||
+      movimentacaoAtualizada?.maquina?.usa_fichas === true ||
+      movimentacaoAnterior?.maquina?.usaFichas === true ||
+      movimentacaoAnterior?.maquina?.usa_fichas === true;
+    const saldo =
+      usaFichas && valorJogada > 0 ? diferencaIn * valorJogada : diferencaIn;
+    const jogadasMediasPorPelucia =
+      quantidadeSaiu > 0 ? saldo / quantidadeSaiu : 0;
     const produto = obterProdutoMovimentacaoParaLeitura(
       movimentacaoAtualizada,
       resumoBase,
@@ -1368,8 +1391,11 @@ export default function RoteiroExecucao() {
       outAtual,
       diferencaIn,
       quantidadeSaiu,
-      jogado: diferencaIn,
-      saldo: diferencaIn,
+      jogado: saldo,
+      saldo,
+      valorJogada,
+      usaFichas,
+      jogadasMediasPorPelucia,
       quantidadeAbastecidaInformada: produto.quantidade,
       nomeProdutoAbastecido: produto.nome,
       alteracoesLeitura: alteracoes,
@@ -1691,6 +1717,8 @@ export default function RoteiroExecucao() {
         tipo: obterTipoMaquinaExibicao(maquina),
         modelo: maquina?.modelo,
         valorFicha: maquina?.valorFicha,
+        usaFichas: maquina?.usaFichas,
+        usa_fichas: maquina?.usa_fichas,
         loja: { nome: lojaSelecionada?.nome || maquina?.loja?.nome || "-" },
       },
     });
@@ -1966,6 +1994,8 @@ export default function RoteiroExecucao() {
               tipo: obterTipoMaquinaExibicao(maquina),
               modelo: maquina?.modelo,
               valorFicha: maquina?.valorFicha,
+              usaFichas: maquina?.usaFichas,
+              usa_fichas: maquina?.usa_fichas,
             },
           };
         }
