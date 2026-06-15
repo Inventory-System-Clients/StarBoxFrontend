@@ -1794,6 +1794,7 @@ export default function RoteiroExecucao() {
       movimentacaoAnterior: null,
       movimentacaoAtualizada: null,
     });
+    setMovimentacaoParaEditar(null);
   };
 
   const reenviarJustificativaEdicao = (loja) => {
@@ -1825,6 +1826,7 @@ export default function RoteiroExecucao() {
       movimentacaoAnterior: null,
       movimentacaoAtualizada: null,
     });
+    setMovimentacaoParaEditar(null);
   };
 
   const concluirEdicaoMovimentacao = (movimentacaoAtualizada) => {
@@ -4123,7 +4125,6 @@ export default function RoteiroExecucao() {
             bloquearDataColeta={true}
             onClose={() => {
               setModalEdicaoAberto(false);
-              setMovimentacaoParaEditar(null);
             }}
             onSucesso={concluirEdicaoMovimentacao}
           />

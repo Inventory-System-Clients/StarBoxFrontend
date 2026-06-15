@@ -233,6 +233,7 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }) {
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
             <h3 className="text-2xl font-bold text-gradient">{title}</h3>
             <button
+              type="button"
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
             >
