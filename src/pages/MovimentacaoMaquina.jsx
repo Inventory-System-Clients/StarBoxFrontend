@@ -999,17 +999,17 @@ export default function MovimentacaoMaquina() {
 
     const diferencaIn = Math.max(0, inAtual - inAnterior);
     const quantidadeSaiu = Math.max(0, outAtual - outAnterior);
-    const saldo = diferencaIn;
     const valorJogada = Number(maquina?.valorFicha || 0);
-    const jogado = valorJogada > 0 ? diferencaIn / valorJogada : 0;
+    const saldo = diferencaIn * (valorJogada > 0 ? valorJogada : 1);
+    const jogado = saldo;
 
     const produtoSelecionado = produtos.find(
       (p) => String(p.id) === String(formData.produto_id),
     );
     const precoProduto = Number(produtoSelecionado?.preco || 0);
     const jogadasMediasPorPelucia =
-      quantidadeSaiu > 0 && valorJogada > 0
-        ? diferencaIn / valorJogada / quantidadeSaiu
+      quantidadeSaiu > 0
+        ? saldo / quantidadeSaiu
         : 0;
 
     const lojaNome = maquina?.loja?.nome || "Ponto sem nome";
@@ -1049,15 +1049,15 @@ export default function MovimentacaoMaquina() {
       ? []
       : [
           `Saldo: R$${formatarMoeda(saldo)}`,
-          `Jogadas medias por pelucia: ${formatarInteiro(jogadasMediasPorPelucia)}`,
+          `Jogadas medias por pelucia: R$${formatarMoeda(jogadasMediasPorPelucia)}`,
           "___________________________________",
           "Qtde Maqs....: 01",
           `Entradas.....: ${formatarInteiro(diferencaIn)}`,
           `Saidas.......: ${formatarInteiro(quantidadeSaiu)}`,
-          `Jogado.......: ${formatarInteiro(jogado)}`,
+          `Jogado.......: ${formatarMoeda(jogado)}`,
           "Cliente....: 0",
-          `Liquido.....: ${formatarInteiro(saldo)}`,
-          `Especie.....: ${formatarInteiro(saldo)}`,
+          `Liquido.....: ${formatarMoeda(saldo)}`,
+          `Especie.....: ${formatarMoeda(saldo)}`,
         ];
 
     const mensagem = [
@@ -1076,7 +1076,7 @@ export default function MovimentacaoMaquina() {
           ? ` (Qtd: ${formatarInteiro(quantidadeAbastecidaInformada)})`
           : ""
       }`,
-      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(diferencaIn)}`,
+      `E  ${formatarInteiro(inAnterior)}  ${formatarInteiro(inAtual)}  ____ R$${formatarMoeda(saldo)}`,
       `S  ${formatarInteiro(outAnterior)}  ${formatarInteiro(outAtual)}  ____ ${formatarInteiro(quantidadeSaiu)}`,
       ...(linhaComissao ? [linhaComissao] : []),
       ...blocoFinanceiro,
@@ -1097,6 +1097,7 @@ export default function MovimentacaoMaquina() {
       quantidadeSaiu,
       jogado,
       saldo,
+      valorJogada,
       jogadasMediasPorPelucia,
       diasDesdeUltimaMovimentacao,
       quantidadeAbastecidaInformada,
