@@ -59,8 +59,20 @@ export default function MovimentacaoMaquina() {
   });
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [dadosConfirmacao, setDadosConfirmacao] = useState(null);
+  const [fotoContadores, setFotoContadores] = useState(null);
+  const [fotoContadoresPreview, setFotoContadoresPreview] = useState("");
+  const [lendoFotoContadores, setLendoFotoContadores] = useState(false);
+  const [resultadoFotoContadores, setResultadoFotoContadores] = useState("");
 
   const CONTADOR_TIPO_STORAGE_PREFIX = "starbox:maquina:contador-tipo:";
+
+  useEffect(() => {
+    return () => {
+      if (fotoContadoresPreview) {
+        URL.revokeObjectURL(fotoContadoresPreview);
+      }
+    };
+  }, [fotoContadoresPreview]);
 
   const obterChaveTipoContadorMaquina = (idMaquina) =>
     `${CONTADOR_TIPO_STORAGE_PREFIX}${String(idMaquina || "").trim()}`;
@@ -1116,6 +1128,167 @@ export default function MovimentacaoMaquina() {
     };
   };
 
+  const limparFotoContadores = () => {
+    if (fotoContadoresPreview) {
+      URL.revokeObjectURL(fotoContadoresPreview);
+    }
+
+    setFotoContadores(null);
+    setFotoContadoresPreview("");
+    setResultadoFotoContadores("");
+  };
+
+  const prepararImagemParaEnvioIa = (file) =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      image.onload = () => {
+        try {
+          const maxSize = 900;
+          const escala = Math.min(
+            1,
+            maxSize / Math.max(image.width, image.height),
+          );
+          const canvas = document.createElement("canvas");
+
+          canvas.width = Math.max(1, Math.round(image.width * escala));
+          canvas.height = Math.max(1, Math.round(image.height * escala));
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            throw new Error("Não foi possível preparar a imagem.");
+          }
+
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.62));
+        } catch (erro) {
+          reject(erro);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
+
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Não foi possível ler a imagem."));
+      };
+
+      image.src = objectUrl;
+    });
+
+  const handleFotoContadores = async (event) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setResultadoFotoContadores("Selecione uma imagem válida.");
+      input.value = "";
+      return;
+    }
+
+    if (fotoContadoresPreview) {
+      URL.revokeObjectURL(fotoContadoresPreview);
+    }
+
+    setFotoContadores(file);
+    setFotoContadoresPreview(URL.createObjectURL(file));
+    setLendoFotoContadores(true);
+    setResultadoFotoContadores("IA lendo os contadores...");
+    setError("");
+    setSuccess("");
+
+    try {
+      const dataUrl = await prepararImagemParaEnvioIa(file);
+      const [meta, imagemBase64] = dataUrl.split(",");
+
+      if (!imagemBase64) {
+        throw new Error("Não foi possível preparar a imagem para envio.");
+      }
+
+      const mimeType =
+        meta.match(/^data:(.*);base64$/)?.[1] || "image/jpeg";
+      const tamanhoEstimadoBytes = Math.ceil(
+        (imagemBase64.length * 3) / 4,
+      );
+
+      if (tamanhoEstimadoBytes > 2 * 1024 * 1024) {
+        setResultadoFotoContadores(
+          "A foto ficou grande demais para enviar. Tire outra foto mais perto dos contadores ou com menos área ao redor.",
+        );
+        return;
+      }
+
+      const response = await api.post("/assistente-ia/ler-contadores", {
+        imagemBase64,
+        mimeType,
+      });
+
+      const { contadorIn, contadorOut, confianca, observacao } =
+        response.data || {};
+      const possuiContadorIn =
+        contadorIn !== null &&
+        contadorIn !== undefined &&
+        contadorIn !== "";
+      const possuiContadorOut =
+        contadorOut !== null &&
+        contadorOut !== undefined &&
+        contadorOut !== "";
+
+      if (
+        !possuiContadorIn ||
+        !possuiContadorOut ||
+        confianca === "baixa"
+      ) {
+        setResultadoFotoContadores(
+          observacao ||
+            "A IA não teve certeza dos dois contadores. Preencha manualmente ou tire outra foto mais perto e reta.",
+        );
+        return;
+      }
+
+      setFormData((prev) => {
+        const camposAtivos = prev.usarContadorManual
+          ? {
+              contadorInManual: String(contadorIn),
+              contadorOutManual: String(contadorOut),
+            }
+          : {
+              contadorInDigital: String(contadorIn),
+              contadorOutDigital: String(contadorOut),
+            };
+
+        return {
+          ...prev,
+          ...camposAtivos,
+          ignoreInOut: false,
+        };
+      });
+
+      setResultadoFotoContadores(
+        `IA leu: IN ${contadorIn} e OUT ${contadorOut}. Confira antes de salvar.`,
+      );
+    } catch (erro) {
+      console.error("Erro ao ler foto dos contadores com IA:", erro);
+
+      const erroApi =
+        erro.response?.data?.message || erro.response?.data?.error;
+      const mensagem =
+        typeof erroApi === "string"
+          ? erroApi
+          : erroApi
+            ? JSON.stringify(erroApi)
+            : erro.message ||
+              "Não foi possível ler a foto com IA. Preencha manualmente ou tente novamente.";
+
+      setResultadoFotoContadores(mensagem);
+    } finally {
+      setLendoFotoContadores(false);
+      input.value = "";
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
@@ -1397,6 +1570,7 @@ export default function MovimentacaoMaquina() {
       }
 
       salvarTipoContadorMaquina(maquinaId, tipoContadorAtivo);
+      limparFotoContadores();
       setTimeout(() => {
         navigate(`/roteiros/${roteiroId}/executar`, {
           replace: true,
@@ -1699,6 +1873,82 @@ export default function MovimentacaoMaquina() {
                     </div>
                   </div>
                 )}
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-blue-900">
+                        📷 Foto dos contadores
+                      </h3>
+                      <p className="mt-1 text-xs text-blue-800">
+                        No celular, o botão abre a câmera para fotografar os
+                        dois contadores. O maior número será usado como IN e o
+                        menor como OUT. Confira e ajuste se precisar.
+                      </p>
+                    </div>
+                    <input
+                      id="foto-contadores-camera"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFotoContadores}
+                      disabled={lendoFotoContadores}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="foto-contadores-camera"
+                      className={`btn-primary inline-flex min-h-10 items-center justify-center text-center ${
+                        lendoFotoContadores
+                          ? "cursor-not-allowed opacity-60"
+                          : "cursor-pointer"
+                      }`}
+                      aria-disabled={lendoFotoContadores}
+                    >
+                      {lendoFotoContadores
+                        ? "Lendo foto..."
+                        : "Tirar foto dos contadores"}
+                    </label>
+                  </div>
+
+                  {fotoContadoresPreview && (
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
+                      <img
+                        src={fotoContadoresPreview}
+                        alt="Prévia da foto dos contadores"
+                        className="h-32 w-full rounded-lg border border-blue-200 bg-white object-contain sm:w-48"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs text-gray-600">
+                          {fotoContadores?.name || "Foto selecionada"}
+                        </p>
+                        {resultadoFotoContadores && (
+                          <p
+                            className={`mt-2 text-sm ${
+                              resultadoFotoContadores.startsWith("IA leu:")
+                                ? "font-semibold text-green-700"
+                                : "text-blue-900"
+                            }`}
+                          >
+                            {resultadoFotoContadores}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={limparFotoContadores}
+                          disabled={lendoFotoContadores}
+                          className="mt-3 text-sm font-semibold text-red-600 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Remover foto
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!fotoContadoresPreview && resultadoFotoContadores && (
+                    <p className="mt-3 text-sm text-red-700">
+                      {resultadoFotoContadores}
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center mt-2 mb-4">
                   <input
                     type="checkbox"
@@ -1974,11 +2224,12 @@ export default function MovimentacaoMaquina() {
             <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:justify-end pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  limparFotoContadores();
                   navigate(`/roteiros/${roteiroId}/executar`, {
                     state: { lojaId: lojaId },
-                  })
-                }
+                  });
+                }}
                 className="btn-secondary w-full md:w-auto"
               >
                 Voltar
