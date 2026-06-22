@@ -114,6 +114,7 @@ export default function RoteiroExecucao() {
     ultimoProdutoId: "",
     produtoPendenteId: "",
     confirmarTrocaProdutoAberto: false,
+    erro: "",
     loading: false,
   });
   const [produtosAbastecimentoExtra, setProdutosAbastecimentoExtra] = useState(
@@ -1446,6 +1447,7 @@ export default function RoteiroExecucao() {
     }
 
     let produtosDisponiveisExtra = [];
+    let erroProdutos = "";
 
     try {
       const params = {};
@@ -1454,16 +1456,21 @@ export default function RoteiroExecucao() {
       const res = await api.get("/produtos/com-estoque", { params });
       produtosDisponiveisExtra = Array.isArray(res.data) ? res.data : [];
       setProdutosAbastecimentoExtra(produtosDisponiveisExtra);
-    } catch {
+    } catch (err) {
       setProdutosAbastecimentoExtra([]);
+      erroProdutos =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Não foi possível carregar os produtos disponíveis em estoque.";
     }
 
     const produtoPrincipal = obterProdutoPrincipalMovimentacao(ultimaMov);
-    const ultimoProdutoId = produtosDisponiveisExtra.some(
+    const ultimoProdutoId = String(produtoPrincipal?.id || "").trim();
+    const produtoInicialId = produtosDisponiveisExtra.some(
       (produto) =>
-        String(produto?.id || "") === String(produtoPrincipal?.id || ""),
+        String(produto?.id || "") === ultimoProdutoId,
     )
-      ? String(produtoPrincipal.id)
+      ? ultimoProdutoId
       : "";
 
     setModalAbastecimentoExtra({
@@ -1471,10 +1478,11 @@ export default function RoteiroExecucao() {
       maquina,
       movimentacao: ultimaMov,
       quantidade: "",
-      produtoId: ultimoProdutoId,
+      produtoId: produtoInicialId,
       ultimoProdutoId,
       produtoPendenteId: "",
       confirmarTrocaProdutoAberto: false,
+      erro: erroProdutos,
       loading: false,
     });
   };
@@ -1490,6 +1498,7 @@ export default function RoteiroExecucao() {
       ultimoProdutoId: "",
       produtoPendenteId: "",
       confirmarTrocaProdutoAberto: false,
+      erro: "",
       loading: false,
     });
   };
@@ -1509,6 +1518,7 @@ export default function RoteiroExecucao() {
         ...prev,
         produtoPendenteId: novoProdutoId,
         confirmarTrocaProdutoAberto: true,
+        erro: "",
       }));
       return;
     }
@@ -1516,6 +1526,7 @@ export default function RoteiroExecucao() {
     setModalAbastecimentoExtra((prev) => ({
       ...prev,
       produtoId: novoProdutoId,
+      erro: "",
     }));
   };
 
@@ -1527,36 +1538,59 @@ export default function RoteiroExecucao() {
     }));
   };
 
-  const confirmarTrocaProdutoAbastecimentoExtra = () => {
+  const confirmarTrocaProdutoAbastecimentoExtra = async () => {
+    const produtoIdConfirmado = String(
+      modalAbastecimentoExtra.produtoPendenteId || "",
+    ).trim();
+
     setModalAbastecimentoExtra((prev) => ({
       ...prev,
-      produtoId: prev.produtoPendenteId,
+      produtoId: produtoIdConfirmado,
       produtoPendenteId: "",
       confirmarTrocaProdutoAberto: false,
+      erro: "",
     }));
+
+    await salvarAbastecimentoExtra(produtoIdConfirmado);
   };
 
-  const salvarAbastecimentoExtra = async () => {
+  const salvarAbastecimentoExtra = async (produtoIdConfirmado = "") => {
     const quantidadeNumero = Number(modalAbastecimentoExtra.quantidade || 0);
-    const produtoId = String(modalAbastecimentoExtra.produtoId || "").trim();
+    const produtoId = String(
+      produtoIdConfirmado || modalAbastecimentoExtra.produtoId || "",
+    ).trim();
 
     if (!Number.isFinite(quantidadeNumero) || quantidadeNumero <= 0) {
-      setError("Informe uma quantidade válida para abastecimento.");
+      setModalAbastecimentoExtra((prev) => ({
+        ...prev,
+        erro: "Informe uma quantidade válida para abastecimento.",
+      }));
       return;
     }
 
     if (!produtoId) {
-      setError("Selecione o produto abastecido.");
+      setModalAbastecimentoExtra((prev) => ({
+        ...prev,
+        erro: "Selecione o produto abastecido.",
+      }));
       return;
     }
 
     if (!modalAbastecimentoExtra.movimentacao?.id) {
-      setError("Movimentação base não encontrada para abastecimento.");
+      setModalAbastecimentoExtra((prev) => ({
+        ...prev,
+        erro: "Movimentação base não encontrada para abastecimento.",
+      }));
       return;
     }
 
     try {
-      setModalAbastecimentoExtra((prev) => ({ ...prev, loading: true }));
+      setModalAbastecimentoExtra((prev) => ({
+        ...prev,
+        produtoId,
+        erro: "",
+        loading: true,
+      }));
 
       const res = await api.patch(
         `/movimentacoes/${modalAbastecimentoExtra.movimentacao.id}/abastecimento-extra`,
@@ -1649,14 +1683,23 @@ export default function RoteiroExecucao() {
         ultimoProdutoId: "",
         produtoPendenteId: "",
         confirmarTrocaProdutoAberto: false,
+        erro: "",
         loading: false,
       });
       await carregarRoteiro();
     } catch (err) {
-      setError(
-        err?.response?.data?.error || "Erro ao salvar abastecimento extra.",
-      );
-      setModalAbastecimentoExtra((prev) => ({ ...prev, loading: false }));
+      const mensagemErro =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        (err?.response?.status === 409
+          ? "Estoque insuficiente para realizar o abastecimento."
+          : "Erro ao salvar abastecimento extra.");
+
+      setModalAbastecimentoExtra((prev) => ({
+        ...prev,
+        erro: mensagemErro,
+        loading: false,
+      }));
     }
   };
 
@@ -4021,6 +4064,19 @@ export default function RoteiroExecucao() {
               )}
             </div>
 
+            {modalAbastecimentoExtra.erro && (
+              <AlertBox
+                type="error"
+                message={modalAbastecimentoExtra.erro}
+                onClose={() =>
+                  setModalAbastecimentoExtra((prev) => ({
+                    ...prev,
+                    erro: "",
+                  }))
+                }
+              />
+            )}
+
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Produto abastecido *
@@ -4056,6 +4112,7 @@ export default function RoteiroExecucao() {
                   setModalAbastecimentoExtra((prev) => ({
                     ...prev,
                     quantidade: e.target.value,
+                    erro: "",
                   }))
                 }
                 disabled={modalAbastecimentoExtra.loading}
@@ -4072,7 +4129,7 @@ export default function RoteiroExecucao() {
               </button>
               <button
                 className="btn-primary"
-                onClick={salvarAbastecimentoExtra}
+                onClick={() => salvarAbastecimentoExtra()}
                 disabled={modalAbastecimentoExtra.loading}
               >
                 {modalAbastecimentoExtra.loading
@@ -4112,8 +4169,11 @@ export default function RoteiroExecucao() {
                 type="button"
                 className="btn-primary w-full sm:w-auto"
                 onClick={confirmarTrocaProdutoAbastecimentoExtra}
+                disabled={modalAbastecimentoExtra.loading}
               >
-                Sim, trocar produto
+                {modalAbastecimentoExtra.loading
+                  ? "Salvando..."
+                  : "Sim, trocar produto"}
               </button>
             </div>
           </div>
