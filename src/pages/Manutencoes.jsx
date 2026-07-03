@@ -1328,6 +1328,9 @@ function Manutencoes() {
                     Data/Hora
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Criado por
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Loja
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -1365,6 +1368,7 @@ function Manutencoes() {
                     <td className="px-4 py-2">
                       {new Date(m.createdAt).toLocaleString("pt-BR")}
                     </td>
+                    <td className="px-4 py-2">{m.criadoPor?.nome || "-"}</td>
                     <td className="px-4 py-2">{m.loja?.nome || "-"}</td>
                     <td className="px-4 py-2">
                       {m.maquina?.codigo || "-"}
@@ -1479,6 +1483,10 @@ function Manutencoes() {
                 <div>
                   <strong>Data/Hora:</strong>{" "}
                   {new Date(detalhe.createdAt).toLocaleString("pt-BR")}
+                </div>
+                <div>
+                  <strong>Criado por:</strong>{" "}
+                  {detalhe.criadoPor?.nome || "-"}
                 </div>
                 <div>
                   <strong>Status:</strong> {detalhe.status}
