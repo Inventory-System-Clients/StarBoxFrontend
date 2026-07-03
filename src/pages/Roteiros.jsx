@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import Swal from "sweetalert2";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer.jsx";
@@ -1234,6 +1235,44 @@ export function Roteiros() {
     }
   };
 
+  const handleRemoverPontoDoRoteiro = async (roteiro, loja) => {
+    if (isRoteiroFinalizado(roteiro)) {
+      setError("Roteiro finalizado não permite remover pontos.");
+      return;
+    }
+
+    const primeiraConfirmacao = await Swal.fire({
+      icon: "warning",
+      title: "Remover ponto do roteiro?",
+      html: `Deseja remover <b>${loja.nome}</b> deste roteiro?`,
+      showCancelButton: true,
+      confirmButtonText: "Sim, remover",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!primeiraConfirmacao.isConfirmed) return;
+
+    const segundaConfirmacao = await Swal.fire({
+      icon: "error",
+      title: "Confirmar remoção",
+      html: `Essa ação não pode ser desfeita.<br/>Confirma a remoção de <b>${loja.nome}</b>?`,
+      showCancelButton: true,
+      confirmButtonText: "Sim, tenho certeza",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!segundaConfirmacao.isConfirmed) return;
+
+    try {
+      await api.delete(`/roteiros/${roteiro.id}/lojas/${loja.id}`);
+      setSuccess("Ponto removido do roteiro com sucesso.");
+      carregarDadosIniciais();
+    } catch (err) {
+      const mensagemBackend = err?.response?.data?.error;
+      setError(mensagemBackend || "Erro ao remover ponto do roteiro.");
+    }
+  };
+
   const handleDesfinalizarRoteiro = async (roteiro) => {
     if (!roteiro?.id || desfinalizandoRoteiros[roteiro.id]) return;
 
@@ -1938,7 +1977,21 @@ export function Roteiros() {
                               <span className="bg-[#24094E] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
                                 {index + 1}
                               </span>
-                              🏪 {loja.nome}
+                              <span className="flex-1">🏪 {loja.nome}</span>
+                              {isGestorRoteiro && !isRoteiroFinalizado(roteiro) && (
+                                <button
+                                  type="button"
+                                  draggable={false}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoverPontoDoRoteiro(roteiro, loja);
+                                  }}
+                                  title="Remover ponto do roteiro"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full w-6 h-6 flex items-center justify-center shrink-0"
+                                >
+                                  🗑️
+                                </button>
+                              )}
                             </div>
                           ))}
 
