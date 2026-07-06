@@ -7,6 +7,7 @@ import Footer from "../components/Footer";
 import { Button } from "../components/ui/button";
 import {
   buildRecurringNextOpenUpdatePayload,
+  isRecurringBill,
   mergeAlertsWithRecurringBills,
 } from "../lib/financeiroRecurringBills";
 
@@ -119,6 +120,7 @@ export default function AlertsPage() {
     value: alert?.value,
     status: alert?.status || "open",
     bill_type: alert?.bill_type || null,
+    recorrente: alert?.recorrente,
   });
 
   const fetchAlerts = async (showLoader = false) => {
@@ -203,7 +205,7 @@ export default function AlertsPage() {
       setMarkingAsPaid(true);
       let updatedBill = { ...selectedBill, status: "paid" };
 
-      if (selectedBill.recorrente) {
+      if (isRecurringBill(selectedBill)) {
         const nextOpenPayload =
           buildRecurringNextOpenUpdatePayload(selectedBill);
         await billsAPI.update(billId, nextOpenPayload);
@@ -241,7 +243,9 @@ export default function AlertsPage() {
       toast.success("Conta marcada como paga!");
       await fetchAlerts();
     } catch (error) {
-      toast.error("Erro ao marcar conta como paga");
+      toast.error(
+        error.response?.data?.detail || "Erro ao marcar conta como paga",
+      );
     } finally {
       setMarkingAsPaid(false);
     }
@@ -785,7 +789,7 @@ export default function AlertsPage() {
                       🔁 Recorrente
                     </label>
                     <div className="mt-1">
-                      {detailsModal.bill.recorrente === true && (
+                      {isRecurringBill(detailsModal.bill) && (
                         <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
                           ✅ Sim
                           {detailsModal.bill.due_date
@@ -794,13 +798,14 @@ export default function AlertsPage() {
                         </span>
                       )}
 
-                      {detailsModal.bill.recorrente === false && (
-                        <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
-                          ❌ Não
-                        </span>
-                      )}
+                      {!isRecurringBill(detailsModal.bill) &&
+                        detailsModal.bill.recorrente === false && (
+                          <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+                            ❌ Não
+                          </span>
+                        )}
 
-                      {detailsModal.bill.recorrente !== true &&
+                      {!isRecurringBill(detailsModal.bill) &&
                         detailsModal.bill.recorrente !== false && (
                           <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold">
                             Não informado

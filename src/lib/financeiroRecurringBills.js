@@ -50,24 +50,36 @@ export const buildRecurringBillOccurrences = (sourceBills) => {
   });
 };
 
+// Contas antigas (criadas antes destes campos existirem no formulário) podem
+// não ter valor algum para eles. Enviar `undefined` faz o JSON omitir o campo
+// por completo, o que pode ser rejeitado por uma validação de campo
+// obrigatório no backend — por isso tudo aqui recebe um valor concreto.
 export const buildRecurringNextOpenUpdatePayload = (bill) => {
   const projectedValue = bill.value ?? bill.amount ?? 0;
   return {
-    name: bill.name,
-    numero: bill.numero,
+    name: bill.name ?? "",
+    numero: bill.numero ?? "",
     due_date: addMonthsKeepingDay(bill.due_date, 1),
-    city: bill.city,
-    category: bill.category,
-    observations: bill.observations,
-    bill_type: bill.bill_type,
+    city: bill.city ?? "",
+    category: bill.category ?? "",
+    observations: bill.observations ?? "",
+    bill_type: bill.bill_type ?? "",
     value: Number(projectedValue) || 0,
-    payment_method: bill.payment_method,
-    payment_details: bill.payment_details,
-    boleto_em_maos: bill.boleto_em_maos,
+    payment_method: bill.payment_method ?? "",
+    payment_details: bill.payment_details ?? "",
+    boleto_em_maos: bill.boleto_em_maos ?? false,
     recorrente: true,
-    beneficiario: bill.beneficiario,
+    beneficiario: bill.beneficiario ?? "",
     status: "open",
   };
+};
+
+// Tolerante ao formato exato que o backend usa para o campo (bool, ou string
+// "true"/"1" em registros mais antigos) para que a recorrência de fato dispare
+// sempre que a conta estiver marcada como recorrente, independente da origem.
+export const isRecurringBill = (bill) => {
+  const value = bill?.recorrente;
+  return value === true || value === "true" || value === 1 || value === "1";
 };
 
 export const toNumber = (value) => {
@@ -153,7 +165,7 @@ export const mergeAlertsWithRecurringBills = (sourceAlerts, sourceBills) => {
   const alerts = Array.isArray(sourceAlerts) ? sourceAlerts : [];
   const billsWithRecurringOccurrences = buildRecurringBillOccurrences(sourceBills);
   const recurringAlerts = billsWithRecurringOccurrences
-    .filter((bill) => bill.recorrente)
+    .filter(isRecurringBill)
     .filter((bill) => !alerts.some((alert) => isSameBill(bill, alert)))
     .map(buildAlertFromBill);
 

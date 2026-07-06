@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import {
   buildRecurringBillOccurrences,
   buildRecurringNextOpenUpdatePayload,
+  isRecurringBill,
   mergeAlertsWithRecurringBills,
   sumAlertValues,
 } from "../lib/financeiroRecurringBills.js";
@@ -164,7 +165,10 @@ export default function DashboardPage() {
       toast.success("Conta recorrente marcada como paga!");
       await fetchData(true);
     } catch (error) {
-      toast.error("Erro ao marcar conta recorrente como paga");
+      toast.error(
+        error.response?.data?.detail ||
+          "Erro ao marcar conta recorrente como paga",
+      );
     }
   };
 
@@ -178,7 +182,7 @@ export default function DashboardPage() {
   const yellowAlertsTotal = sumAlertValues(yellowAlerts);
   const greenAlertsTotal = sumAlertValues(greenAlerts);
   const recurringBills = buildRecurringBillOccurrences(bills)
-    .filter((bill) => bill.recorrente)
+    .filter(isRecurringBill)
     .slice(0, 8);
   const recurringBillsSection = recurringBills.length > 0 && (
     <div

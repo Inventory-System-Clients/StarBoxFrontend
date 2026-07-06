@@ -27,6 +27,7 @@ import Footer from "../components/Footer";
 import {
   buildRecurringBillOccurrences,
   buildRecurringNextOpenUpdatePayload,
+  isRecurringBill,
 } from "../lib/financeiroRecurringBills";
 import {
   AlertDialog,
@@ -92,7 +93,7 @@ export default function BillsPage() {
 
   const handleStatusChange = async (bill, newStatus) => {
     try {
-      if (bill.recorrente && newStatus === "paid") {
+      if (isRecurringBill(bill) && newStatus === "paid") {
         await billsAPI.update(
           bill.id,
           buildRecurringNextOpenUpdatePayload(bill),
@@ -107,7 +108,9 @@ export default function BillsPage() {
       );
       fetchData();
     } catch (error) {
-      toast.error("Erro ao atualizar status da conta");
+      toast.error(
+        error.response?.data?.detail || "Erro ao atualizar status da conta",
+      );
     }
   };
 
@@ -380,7 +383,7 @@ export default function BillsPage() {
                             >
                               {bill.name}
                             </button>
-                            {bill.recorrente && (
+                            {isRecurringBill(bill) && (
                               <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold" title="Conta recorrente mensal">
                                 🔁 Mensal
                               </span>
@@ -659,7 +662,7 @@ export default function BillsPage() {
                     🔁 Recorrente
                   </label>
                   <div className="mt-1">
-                    {detailsModal.bill.recorrente ? (
+                    {isRecurringBill(detailsModal.bill) ? (
                       <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
                         ✅ Sim - Repete todo mês no dia {new Date(detailsModal.bill.due_date).getDate()}
                       </span>
