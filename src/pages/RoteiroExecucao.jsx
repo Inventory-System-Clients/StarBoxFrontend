@@ -1425,6 +1425,15 @@ export default function RoteiroExecucao() {
   const abrirModalAbastecimentoExtra = async (maquina) => {
     let ultimaMov = obterUltimaMovimentacaoPorMaquina(maquina?.id);
 
+    const usuarioAtualId = normalizarIdTexto(usuario?.id);
+    if (
+      ultimaMov?.id &&
+      usuarioAtualId &&
+      obterUsuarioMovimentacao(ultimaMov) !== usuarioAtualId
+    ) {
+      ultimaMov = null;
+    }
+
     if (!ultimaMov?.id) {
       try {
         ultimaMov = await buscarUltimaMovimentacaoDaMaquina(maquina?.id);
@@ -1708,7 +1717,7 @@ export default function RoteiroExecucao() {
       params: {
         maquinaId,
         roteiroId: id,
-        limite: 1,
+        limite: 50,
       },
     });
 
@@ -1726,7 +1735,14 @@ export default function RoteiroExecucao() {
         })
       : [];
 
-    return listaOrdenada[0] || null;
+    const usuarioAtualId = normalizarIdTexto(usuario?.id);
+    if (!usuarioAtualId) return listaOrdenada[0] || null;
+
+    const listaDoUsuarioAtual = listaOrdenada.filter(
+      (item) => obterUsuarioMovimentacao(item) === usuarioAtualId,
+    );
+
+    return listaDoUsuarioAtual[0] || null;
   };
 
   const abrirFluxoJustificativaEdicao = async (maquina) => {
@@ -2005,11 +2021,13 @@ export default function RoteiroExecucao() {
             params: {
               maquinaId: maquina.id,
               roteiroId: id,
-              limite: 1,
+              limite: 50,
             },
           }),
         ),
       );
+
+      const usuarioAtualId = normalizarIdTexto(usuario?.id);
 
       const ultimasPorMaquina = {};
       respostas.forEach((resultado, index) => {
@@ -2029,7 +2047,13 @@ export default function RoteiroExecucao() {
               return String(b?.id || "").localeCompare(String(a?.id || ""));
             })
           : [];
-        const ultimaMovimentacao = listaOrdenada[0] || null;
+        const listaDoUsuarioAtual = usuarioAtualId
+          ? listaOrdenada.filter(
+              (item) => obterUsuarioMovimentacao(item) === usuarioAtualId,
+            )
+          : [];
+        const ultimaMovimentacao =
+          listaDoUsuarioAtual[0] || listaOrdenada[0] || null;
 
         if (ultimaMovimentacao?.id) {
           ultimasPorMaquina[String(maquina.id)] = {
