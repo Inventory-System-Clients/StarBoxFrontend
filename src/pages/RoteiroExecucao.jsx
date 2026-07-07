@@ -1707,6 +1707,7 @@ export default function RoteiroExecucao() {
     const resposta = await api.get("/movimentacoes", {
       params: {
         maquinaId,
+        roteiroId: id,
         limite: 1,
       },
     });
@@ -2003,6 +2004,7 @@ export default function RoteiroExecucao() {
           api.get("/movimentacoes", {
             params: {
               maquinaId: maquina.id,
+              roteiroId: id,
               limite: 1,
             },
           }),
