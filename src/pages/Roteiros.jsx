@@ -19,6 +19,7 @@ export function Roteiros() {
   const isAdmin = usuario?.role === "ADMIN";
   const isGestorRoteiro =
     isAdmin || usuario?.role === "GERENCIADOR";
+  const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
   const ORCAMENTO_SEMANAL_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
@@ -1691,9 +1692,11 @@ export function Roteiros() {
                 </span>
               </div>
 
-              <p className="text-xs text-gray-500 mb-3">
-                🚗 {getVeiculoResumoRoteiro(roteiro)}
-              </p>
+              {!isFuncionarioAbastecedor && (
+                <p className="text-xs text-gray-500 mb-3">
+                  🚗 {getVeiculoResumoRoteiro(roteiro)}
+                </p>
+              )}
 
               {/* Seção de Funcionário */}
               <div className="mb-4">
@@ -1771,31 +1774,33 @@ export function Roteiros() {
               </div>
 
               {/* Seção de Veículo */}
-              <div className="mb-4">
-                <label className="text-xs font-bold text-gray-400 block mb-1">
-                  VEÍCULO
-                </label>
-                {isGestorRoteiro ? (
-                  <select
-                    className="w-full p-2 text-sm border rounded bg-gray-50"
-                    value={String(roteiro.veiculoId || "")}
-                    onChange={(e) =>
-                      handleAtualizarVeiculoRoteiro(roteiro, e.target.value)
-                    }
-                  >
-                    <option value="">Sem veículo</option>
-                    {veiculos.map((veiculo) => (
-                      <option key={veiculo.id} value={String(veiculo.id)}>
-                        {getVeiculoLabel(veiculo)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-sm font-medium">
-                    {getVeiculoResumoRoteiro(roteiro)}
-                  </p>
-                )}
-              </div>
+              {!isFuncionarioAbastecedor && (
+                <div className="mb-4">
+                  <label className="text-xs font-bold text-gray-400 block mb-1">
+                    VEÍCULO
+                  </label>
+                  {isGestorRoteiro ? (
+                    <select
+                      className="w-full p-2 text-sm border rounded bg-gray-50"
+                      value={String(roteiro.veiculoId || "")}
+                      onChange={(e) =>
+                        handleAtualizarVeiculoRoteiro(roteiro, e.target.value)
+                      }
+                    >
+                      <option value="">Sem veículo</option>
+                      {veiculos.map((veiculo) => (
+                        <option key={veiculo.id} value={String(veiculo.id)}>
+                          {getVeiculoLabel(veiculo)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {getVeiculoResumoRoteiro(roteiro)}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Seção Dias da Semana */}
               <div className="mb-4">
@@ -2078,7 +2083,7 @@ export function Roteiros() {
                             ? "Continuar rota"
                             : "Começar Rota"}
                     </button>
-                    {roteiro.funcionarioId && (
+                    {roteiro.funcionarioId && !isFuncionarioAbastecedor && (
                       <button
                         onClick={() => abrirModalFinalizacao(roteiro)}
                         disabled={

@@ -637,6 +637,7 @@ export default function RoteiroExecucao() {
   const roleUsuarioNormalizado = String(usuario?.role || "")
     .trim()
     .toUpperCase();
+  const isFuncionarioAbastecedor = roleUsuarioNormalizado === "FUNCIONARIO";
   const usuarioPodeEditarMovimentacaoNaRota =
     perfisPermitidosEditarMovimentacaoRota.has(roleUsuarioNormalizado) ||
     roleUsuarioNormalizado.includes("FUNCIONARIO") ||
@@ -1459,11 +1460,33 @@ export default function RoteiroExecucao() {
     let erroProdutos = "";
 
     try {
-      const params = {};
-      if (usuario?.id) params.usuarioId = usuario.id;
-      if (lojaSelecionada?.id) params.lojaId = lojaSelecionada.id;
-      const res = await api.get("/produtos/com-estoque", { params });
-      produtosDisponiveisExtra = Array.isArray(res.data) ? res.data : [];
+      const [produtosRes, estoqueUsuarioRes] = await Promise.all([
+        api.get("/produtos"),
+        api
+          .get("/estoque-usuarios/me")
+          .catch(() => ({ data: { estoque: [] } })),
+      ]);
+
+      const listaProdutos = Array.isArray(produtosRes.data)
+        ? produtosRes.data
+        : [];
+      const estoqueUsuarioData = Array.isArray(
+        estoqueUsuarioRes?.data?.estoque,
+      )
+        ? estoqueUsuarioRes.data.estoque
+        : Array.isArray(estoqueUsuarioRes?.data)
+          ? estoqueUsuarioRes.data
+          : [];
+
+      const produtoIdsComEstoque = new Set(
+        estoqueUsuarioData
+          .filter((item) => Number(item?.quantidade || 0) > 0)
+          .map((item) => String(item.produtoId)),
+      );
+
+      produtosDisponiveisExtra = listaProdutos.filter((produto) =>
+        produtoIdsComEstoque.has(String(produto?.id || "")),
+      );
       setProdutosAbastecimentoExtra(produtosDisponiveisExtra);
     } catch (err) {
       setProdutosAbastecimentoExtra([]);
@@ -3194,9 +3217,11 @@ export default function RoteiroExecucao() {
               </span>
             )}
         </h1>
-        <p className="text-sm text-gray-600 mb-4">
-          🚗 Veículo: {veiculoResumo}
-        </p>
+        {!isFuncionarioAbastecedor && (
+          <p className="text-sm text-gray-600 mb-4">
+            🚗 Veículo: {veiculoResumo}
+          </p>
+        )}
         <section className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
           <h3 className="text-sm font-bold text-violet-900 mb-2">
             📋 Resumo da execução (backend)
@@ -3287,6 +3312,7 @@ export default function RoteiroExecucao() {
           </section>
         )}
 
+        {!isFuncionarioAbastecedor && (
         <section className="mb-8 bg-white rounded-xl shadow p-5 border border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
             <h2 className="text-lg font-bold">💸 Gastos Semanais do Roteiro</h2>
@@ -3572,6 +3598,7 @@ export default function RoteiroExecucao() {
             </table>
           </div>
         </section>
+        )}
 
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-2">
@@ -3751,15 +3778,16 @@ export default function RoteiroExecucao() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-          {(!roteiroEstaFinalizado(roteiro.status) ||
-            roteiroTemPendencias(roteiro)) && (
-            <button
-              className="w-full sm:w-auto bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
-              onClick={abrirModalFinalizacao}
-            >
-              Finalizar Rota
-            </button>
-          )}
+          {!isFuncionarioAbastecedor &&
+            (!roteiroEstaFinalizado(roteiro.status) ||
+              roteiroTemPendencias(roteiro)) && (
+              <button
+                className="w-full sm:w-auto bg-green-600 text-white py-2 px-6 rounded-lg font-bold hover:bg-green-700"
+                onClick={abrirModalFinalizacao}
+              >
+                Finalizar Rota
+              </button>
+            )}
           <button
             className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
               roteiroEstaFinalizado(roteiro.status) && !enviandoResumoWhatsapp
