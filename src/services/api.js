@@ -73,6 +73,16 @@ export const billsAPI = {
     });
     return response.data;
   },
+  // Marca uma ocorrência mensal específica (visão DDA) como paga/aberta,
+  // sem afetar o due_date "nativo" do registro. Requer suporte no backend
+  // (tabela de ocorrências) — ver prompt de backend enviado ao time.
+  setOccurrenceStatus: async (id, month, status) => {
+    const response = await api.patch(
+      `/financeiro/bills/${id}/occurrences/${month}`,
+      { status },
+    );
+    return response.data;
+  },
   delete: async (id) => {
     const response = await api.delete(`/financeiro/bills/${id}`);
     return response.data;

@@ -28,6 +28,139 @@ export const addMonthsKeepingDay = (dateValue, monthsToAdd) => {
   return formatDateInput(target);
 };
 
+export const MONTH_LABELS_PT = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
+
+// Janela rolante de meses usada na visão de DDA das contas: sempre o mês
+// atual + os próximos 11, nunca fixa ao calendário (dez/jan não "reseta").
+export const getNextMonthKeys = (count = 12, fromDate = new Date()) => {
+  const base = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1);
+  const keys = [];
+  for (let i = 0; i < count; i += 1) {
+    const current = new Date(base.getFullYear(), base.getMonth() + i, 1);
+    keys.push({
+      key: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`,
+      label: `${MONTH_LABELS_PT[current.getMonth()]}/${String(current.getFullYear()).slice(-2)}`,
+      year: current.getFullYear(),
+      monthIndex: current.getMonth(),
+    });
+  }
+  return keys;
+};
+
+// Desloca o due_date de uma conta recorrente para o mês alvo (mesmo dia,
+// ajustado para o último dia do mês quando necessário), sem depender de
+// quantos ciclos já rolaram — funciona tanto para meses futuros quanto
+// (defensivamente) para meses anteriores ao due_date atual.
+export const buildDueDateForMonthKey = (bill, monthKey) => {
+  const billMonthKey = getMonthKey(bill.due_date);
+  if (!billMonthKey || !monthKey) return null;
+  const [billYear, billMonth] = billMonthKey.split("-").map(Number);
+  const [targetYear, targetMonth] = monthKey.split("-").map(Number);
+  const monthsDiff = (targetYear - billYear) * 12 + (targetMonth - billMonth);
+  return addMonthsKeepingDay(bill.due_date, monthsDiff);
+};
+
+// Resolve a ocorrência (vencimento + status) de uma conta para um mês
+// específico da janela do DDA.
+//
+// - Contas não recorrentes só aparecem no mês do próprio due_date, exceto
+//   quando estão vencidas e não pagas: nesse caso "carregam" para a aba do
+//   mês atual, para não sumirem da visão.
+// - Contas recorrentes: se o backend já mandar `bill.occurrences` (lista de
+//   `{ month, due_date, status, paid_at }`), usamos o valor vindo de lá. Sem
+//   isso, inferimos localmente: o mês nativo (o due_date/status atual do
+//   registro) usa o status real; meses antes dele são considerados pagos
+//   (o rolamento de due_date já "passou" por eles); meses depois ficam em
+//   aberto. Um ciclo vencido e não pago sempre aparece na aba do mês atual.
+export const getBillOccurrenceForMonth = (bill, monthKey, currentMonthKey) => {
+  const billMonthKey = getMonthKey(bill.due_date);
+  if (!billMonthKey) return null;
+
+  const isOverdueUnpaidNative =
+    billMonthKey < currentMonthKey && bill.status !== "paid";
+
+  if (!isRecurringBill(bill)) {
+    if (billMonthKey === monthKey) {
+      return {
+        monthKey,
+        dueDate: bill.due_date,
+        status: bill.status,
+        paidAt: bill.paid_at || null,
+        isNative: true,
+      };
+    }
+    if (isOverdueUnpaidNative && monthKey === currentMonthKey) {
+      return {
+        monthKey,
+        dueDate: bill.due_date,
+        status: bill.status,
+        paidAt: bill.paid_at || null,
+        isNative: true,
+      };
+    }
+    return null;
+  }
+
+  if (Array.isArray(bill.occurrences)) {
+    const found = bill.occurrences.find((occ) => occ.month === monthKey);
+    if (found) {
+      return {
+        monthKey,
+        dueDate: found.due_date,
+        status: found.status,
+        paidAt: found.paid_at || null,
+        isNative: billMonthKey === monthKey,
+      };
+    }
+  }
+
+  if (billMonthKey === monthKey) {
+    return {
+      monthKey,
+      dueDate: bill.due_date,
+      status: bill.status,
+      paidAt: bill.paid_at || null,
+      isNative: true,
+    };
+  }
+
+  if (isOverdueUnpaidNative && monthKey === currentMonthKey) {
+    return {
+      monthKey,
+      dueDate: bill.due_date,
+      status: bill.status,
+      paidAt: bill.paid_at || null,
+      isNative: true,
+    };
+  }
+
+  if (monthKey < currentMonthKey) return null;
+
+  const dueDate = buildDueDateForMonthKey(bill, monthKey);
+  if (!dueDate) return null;
+
+  return {
+    monthKey,
+    dueDate,
+    status: monthKey < billMonthKey ? "paid" : "open",
+    paidAt: null,
+    isNative: false,
+  };
+};
+
 export const getRecurringKey = (bill) =>
   [
     bill.bill_type,

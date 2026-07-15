@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { billsAPI, categoriesAPI } from "../services/api";
 import { Button } from "../components/ui/button";
@@ -25,9 +25,10 @@ import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import {
-  buildRecurringBillOccurrences,
   buildRecurringNextOpenUpdatePayload,
   isRecurringBill,
+  getNextMonthKeys,
+  getBillOccurrenceForMonth,
 } from "../lib/financeiroRecurringBills";
 import {
   AlertDialog,
@@ -70,6 +71,12 @@ export default function BillsPage() {
     city: "",
     search: "",
   });
+
+  // Janela rolante de 12 meses (mês atual + próximos 11) para a visão em
+  // DDA. Calculada uma vez ao montar a página.
+  const monthKeys = useMemo(() => getNextMonthKeys(12), []);
+  const currentMonthKey = monthKeys[0]?.key || "";
+  const [selectedMonthKey, setSelectedMonthKey] = useState(currentMonthKey);
 
   useEffect(() => {
     fetchData();
@@ -114,6 +121,31 @@ export default function BillsPage() {
     }
   };
 
+  // Marca o pagamento de uma ocorrência mensal específica na visão DDA.
+  // O mês "nativo" (o ciclo atual em aberto da conta) continua usando o
+  // fluxo já existente (que funciona com o backend atual). Meses fora do
+  // ciclo nativo (pré-pagamento de meses futuros, por exemplo) dependem do
+  // endpoint novo de ocorrências no backend.
+  const handleOccurrenceStatusChange = async (bill, occurrence, newStatus) => {
+    if (occurrence.isNative) {
+      await handleStatusChange(bill, newStatus);
+      return;
+    }
+
+    try {
+      await billsAPI.setOccurrenceStatus(bill.id, occurrence.monthKey, newStatus);
+      toast.success(
+        `Mês marcado como ${newStatus === "paid" ? "pago" : "em aberto"}!`,
+      );
+      fetchData();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail ||
+          "Ainda não é possível marcar meses futuros/avulsos individualmente — recurso pendente no backend.",
+      );
+    }
+  };
+
   const handleDelete = async () => {
     try {
       await billsAPI.delete(deleteDialog.billId);
@@ -134,13 +166,29 @@ export default function BillsPage() {
     setDetailsModal({ open: true, bill });
   };
 
-  const displayBills = buildRecurringBillOccurrences(bills);
+  // Linhas do mês selecionado na aba DDA: cada conta contribui com, no
+  // máximo, uma ocorrência para o mês em foco (recorrente ou avulsa).
+  const monthlyRows = useMemo(() => {
+    return bills
+      .map((bill) => {
+        const occurrence = getBillOccurrenceForMonth(
+          bill,
+          selectedMonthKey,
+          currentMonthKey,
+        );
+        return occurrence ? { bill, occurrence } : null;
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) => new Date(a.occurrence.dueDate) - new Date(b.occurrence.dueDate),
+      );
+  }, [bills, selectedMonthKey, currentMonthKey]);
 
-  const filteredBills = displayBills.filter((bill) => {
+  const filteredRows = monthlyRows.filter(({ bill, occurrence }) => {
     const statusFilter = normalizeFilterValue(filters.status);
     const categoryFilter = normalizeFilterValue(filters.category);
 
-    if (statusFilter && bill.status !== statusFilter) return false;
+    if (statusFilter && occurrence.status !== statusFilter) return false;
     if (categoryFilter && bill.category !== categoryFilter) return false;
     if (
       filters.city &&
@@ -167,14 +215,35 @@ export default function BillsPage() {
     return diffDays;
   };
 
-  const getStatusColor = (bill) => {
-    if (bill.status === "paid") return "bg-green-100 text-green-700";
-    const days = getDaysUntilDue(bill.due_date);
+  // Vermelha somente quando o vencimento já passou (dias < 0) e a
+  // ocorrência daquele mês ainda não foi marcada como paga.
+  const getStatusColor = (occurrence) => {
+    if (occurrence.status === "paid") return "bg-green-100 text-green-700";
+    const days = getDaysUntilDue(occurrence.dueDate);
     if (days < 0) return "bg-red-100 text-red-700";
     if (days <= 1) return "bg-red-100 text-red-700";
     if (days <= 3) return "bg-yellow-100 text-yellow-700";
     return "bg-blue-100 text-blue-700";
   };
+
+  // Contagem de contas em aberto/vencidas por mês, só para o badge das abas.
+  const monthSummaries = useMemo(() => {
+    return monthKeys.map((month) => {
+      let openCount = 0;
+      let overdueCount = 0;
+      bills.forEach((bill) => {
+        const occurrence = getBillOccurrenceForMonth(
+          bill,
+          month.key,
+          currentMonthKey,
+        );
+        if (!occurrence || occurrence.status === "paid") return;
+        openCount += 1;
+        if (getDaysUntilDue(occurrence.dueDate) < 0) overdueCount += 1;
+      });
+      return { ...month, openCount, overdueCount };
+    });
+  }, [bills, monthKeys, currentMonthKey]);
 
   if (loading) {
     return (
@@ -217,6 +286,52 @@ export default function BillsPage() {
               <Plus size={20} className="mr-2" />
               Nova Conta
             </Button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-4 mb-6 border border-purple-100">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                Visão mensal (DDA)
+              </h2>
+              <span className="text-xs text-gray-400">
+                Mês atual + próximos 11 meses
+              </span>
+            </div>
+            <div
+              className="flex gap-2 overflow-x-auto pb-1"
+              data-testid="month-tabs"
+            >
+              {monthSummaries.map((month) => {
+                const isSelected = month.key === selectedMonthKey;
+                return (
+                  <button
+                    key={month.key}
+                    type="button"
+                    onClick={() => setSelectedMonthKey(month.key)}
+                    data-testid={`month-tab-${month.key}`}
+                    className={`relative shrink-0 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                      isSelected
+                        ? "bg-purple-600 text-white border-purple-600 shadow"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-700"
+                    }`}
+                  >
+                    {month.label}
+                    {month.overdueCount > 0 && (
+                      <span
+                        className={`ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-[10px] font-bold ${
+                          isSelected
+                            ? "bg-white text-red-600"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                        title={`${month.overdueCount} conta(s) vencida(s)`}
+                      >
+                        {month.overdueCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-purple-100">
@@ -358,21 +473,21 @@ export default function BillsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredBills.length === 0 ? (
+                  {filteredRows.length === 0 ? (
                     <tr>
                       <td
                         colSpan="9"
                         className="px-6 py-12 text-center text-gray-500"
                       >
-                        Nenhuma conta encontrada
+                        Nenhuma conta encontrada neste mês
                       </td>
                     </tr>
                   ) : (
-                    filteredBills.map((bill) => (
+                    filteredRows.map(({ bill, occurrence }) => (
                       <tr
-                        key={bill.id}
+                        key={`${bill.id}-${occurrence.monthKey}`}
                         className="hover:bg-purple-50 transition-colors"
-                        data-testid={`bill-row-${bill.id}`}
+                        data-testid={`bill-row-${bill.id}-${occurrence.monthKey}`}
                       >
                         <td className="px-6 py-4">
                           <div>
@@ -414,7 +529,7 @@ export default function BillsPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-gray-700">
-                          {new Date(bill.due_date).toLocaleDateString("pt-BR")}
+                          {new Date(occurrence.dueDate).toLocaleDateString("pt-BR")}
                         </td>
                         <td className="px-6 py-4">
                           <span className="font-semibold text-gray-800">
@@ -431,9 +546,13 @@ export default function BillsPage() {
                         <td className="px-6 py-4 text-gray-700">{bill.city}</td>
                         <td className="px-6 py-4">
                           <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(bill)}`}
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(occurrence)}`}
                           >
-                            {bill.status === "paid" ? "Paga" : "Em Aberto"}
+                            {occurrence.status === "paid"
+                              ? "Paga"
+                              : getDaysUntilDue(occurrence.dueDate) < 0
+                                ? "Vencida"
+                                : "Em Aberto"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -442,24 +561,25 @@ export default function BillsPage() {
                               size="sm"
                               variant="ghost"
                               onClick={() =>
-                                handleStatusChange(
+                                handleOccurrenceStatusChange(
                                   bill,
-                                  bill.status === "paid" ? "open" : "paid",
+                                  occurrence,
+                                  occurrence.status === "paid" ? "open" : "paid",
                                 )
                               }
                               className={`${
-                                bill.status === "paid"
+                                occurrence.status === "paid"
                                   ? "text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
                                   : "text-green-600 hover:text-green-700 hover:bg-green-50"
                               }`}
                               title={
-                                bill.status === "paid"
+                                occurrence.status === "paid"
                                   ? "Marcar como em aberto"
                                   : "Marcar como paga"
                               }
-                              data-testid={`btn-toggle-status-${bill.id}`}
+                              data-testid={`btn-toggle-status-${bill.id}-${occurrence.monthKey}`}
                             >
-                              {bill.status === "paid" ? (
+                              {occurrence.status === "paid" ? (
                                 <XCircle size={18} />
                               ) : (
                                 <CheckCircle size={18} />
