@@ -201,46 +201,30 @@ export default function AlertsPage() {
       return;
     }
 
+    // O aviso sempre se refere ao ciclo atual (vencido ou não) da conta —
+    // é esse mês específico (ex: julho, se está atrasada) que precisa ser
+    // marcado como pago, e não o próximo ciclo para o qual o due_date rola.
+    const paidCycleLabel = formatDate(selectedBill.due_date);
+
     try {
       setMarkingAsPaid(true);
-      let updatedBill = { ...selectedBill, status: "paid" };
 
       if (isRecurringBill(selectedBill)) {
+        // Mantém o mecanismo atual (avança due_date/status para o próximo
+        // ciclo em aberto) — é o que já persiste o pagamento no backend.
+        // O que estava errado era só o feedback: a modal reabria mostrando
+        // o próximo ciclo como "Pendente", dando a impressão de que nada
+        // tinha sido marcado como pago.
         const nextOpenPayload =
           buildRecurringNextOpenUpdatePayload(selectedBill);
         await billsAPI.update(billId, nextOpenPayload);
         await billsAPI.updateStatus(billId, "open");
-
-        updatedBill = { ...selectedBill, ...nextOpenPayload };
       } else {
         await billsAPI.updateStatus(billId, "paid");
       }
 
-      setDetailsModal({ open: true, bill: updatedBill });
-
-      setBills((currentBills) =>
-        currentBills.map((bill) =>
-          String(bill.id) === String(billId)
-            ? { ...bill, ...updatedBill }
-            : bill,
-        ),
-      );
-
-      setAlerts((currentAlerts) =>
-        currentAlerts.map((alert) => {
-          if (!isSameBill(updatedBill, alert)) {
-            return alert;
-          }
-
-          return {
-            ...alert,
-            urgency: "green",
-            days_until_due: Math.max(Number(alert.days_until_due) || 0, 0),
-          };
-        }),
-      );
-
-      toast.success("Conta marcada como paga!");
+      toast.success(`Conta de ${paidCycleLabel} marcada como paga!`);
+      setDetailsModal({ open: false, bill: null });
       await fetchAlerts();
     } catch (error) {
       toast.error(
