@@ -280,7 +280,7 @@ export const getUrgencyFromBill = (bill) => {
 };
 
 export const buildAlertFromBill = (bill) => ({
-  id: `recurring-${bill.id}`,
+  id: `fallback-${bill.id}`,
   bill_id: bill.id,
   account: bill.name,
   category: bill.category,
@@ -291,19 +291,24 @@ export const buildAlertFromBill = (bill) => ({
   bill_type: bill.bill_type,
   urgency: getUrgencyFromBill(bill),
   days_until_due: getDaysUntilDue(bill.due_date),
-  recorrente: true,
+  recorrente: isRecurringBill(bill),
 });
 
+// O backend nem sempre gera um aviso para toda conta em aberto (ex: alguma
+// regra própria de janela de dias, paginação, etc.), então aqui completamos
+// a lista com um aviso "de fallback" para qualquer conta (recorrente ou não)
+// que esteja em aberto e ainda não tenha um aviso correspondente vindo do
+// backend — assim nenhuma conta vencida fica de fora da tela de Avisos.
 export const mergeAlertsWithRecurringBills = (sourceAlerts, sourceBills) => {
   const alerts = Array.isArray(sourceAlerts) ? sourceAlerts : [];
   const billsWithRecurringOccurrences = buildRecurringBillOccurrences(sourceBills);
-  const recurringAlerts = billsWithRecurringOccurrences
-    .filter(isRecurringBill)
+  const fallbackAlerts = billsWithRecurringOccurrences
+    .filter((bill) => bill.status !== "paid")
     .filter((bill) => !alerts.some((alert) => isSameBill(bill, alert)))
     .map(buildAlertFromBill);
 
   return {
-    alerts: [...alerts, ...recurringAlerts],
+    alerts: [...alerts, ...fallbackAlerts],
     bills: billsWithRecurringOccurrences,
   };
 };

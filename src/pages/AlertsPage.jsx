@@ -19,6 +19,8 @@ export default function AlertsPage() {
   const [detailsModal, setDetailsModal] = useState({
     open: false,
     bill: null,
+    alert: null,
+    isFallback: false,
   });
 
   const redSectionRef = useRef(null);
@@ -178,11 +180,16 @@ export default function AlertsPage() {
   const handleOpenBillDetails = (alert) => {
     const matchedBill = findBillForAlert(alert, bills);
     if (matchedBill) {
-      setDetailsModal({ open: true, bill: matchedBill });
+      setDetailsModal({ open: true, bill: matchedBill, alert, isFallback: false });
       return;
     }
 
-    setDetailsModal({ open: true, bill: buildFallbackBillFromAlert(alert) });
+    setDetailsModal({
+      open: true,
+      bill: buildFallbackBillFromAlert(alert),
+      alert,
+      isFallback: true,
+    });
     toast.info(
       "Exibindo dados do alerta. Alguns detalhes da conta podem não estar disponíveis.",
     );
@@ -190,14 +197,31 @@ export default function AlertsPage() {
 
   const closeDetailsModal = () => {
     if (markingAsPaid) return;
-    setDetailsModal({ open: false, bill: null });
+    setDetailsModal({ open: false, bill: null, alert: null, isFallback: false });
   };
 
   const handleMarkAsPaid = async () => {
-    const selectedBill = detailsModal.bill;
+    // Reresolve a conta real contra o estado mais atual de `bills` (em vez
+    // de confiar cegamente no objeto salvo na modal, que pode ter vindo de
+    // uma reconstrução a partir do aviso). Um objeto reconstruído não tem
+    // `recorrente` de verdade, o que fazia `isRecurringBill` dar falso e o
+    // botão marcar `status: paid` direto na conta em vez de avançar o
+    // ciclo — desalinhando o pagamento do mês certo na aba de Contas.
+    const freshMatch = detailsModal.alert
+      ? findBillForAlert(detailsModal.alert, bills)
+      : null;
+    const selectedBill = freshMatch || detailsModal.bill;
+    const isFallback = !freshMatch;
     const billId = selectedBill?.id;
 
     if (!billId || selectedBill?.status === "paid") {
+      return;
+    }
+
+    if (isFallback) {
+      toast.error(
+        "Não foi possível vincular este aviso a uma conta com segurança. Marque como paga pela aba de Contas Empresariais/Particulares.",
+      );
       return;
     }
 
@@ -224,7 +248,7 @@ export default function AlertsPage() {
       }
 
       toast.success(`Conta de ${paidCycleLabel} marcada como paga!`);
-      setDetailsModal({ open: false, bill: null });
+      setDetailsModal({ open: false, bill: null, alert: null, isFallback: false });
       await fetchAlerts();
     } catch (error) {
       toast.error(
@@ -916,6 +940,16 @@ export default function AlertsPage() {
                     </div>
                   </div>
                 </div>
+
+                {detailsModal.isFallback && detailsModal.bill.status !== "paid" && (
+                  <div className="px-6 pb-2">
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      Não conseguimos vincular este aviso à conta com
+                      certeza. Prefira marcar como paga pela aba de Contas
+                      Empresariais/Particulares, no mês correspondente.
+                    </p>
+                  </div>
+                )}
 
                 <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t rounded-b-xl flex flex-col sm:flex-row justify-end gap-3">
                   {detailsModal.bill.status !== "paid" && (
