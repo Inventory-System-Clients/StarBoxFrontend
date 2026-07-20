@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useParams, useLocation } from "react-router-dom";
 import { billsAPI, categoriesAPI } from "../services/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -45,6 +45,7 @@ const normalizeFilterValue = (value) => (value === "all" ? "" : value);
 
 export default function BillsPage() {
   const { type } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const billType = type === "company" ? "company" : "personal";
@@ -78,9 +79,29 @@ export default function BillsPage() {
   const currentMonthKey = monthKeys[0]?.key || "";
   const [selectedMonthKey, setSelectedMonthKey] = useState(currentMonthKey);
 
+  // Quando chegamos aqui a partir de um aviso (aba Avisos), a conta clicada
+  // deve ficar destacada e visível assim que a lista carregar. O mês
+  // destacável é sempre o atual, pois é dele que os avisos partem.
+  const [highlightedBillId, setHighlightedBillId] = useState(
+    location.state?.highlightBillId || null,
+  );
+  const rowRefs = useRef({});
+
   useEffect(() => {
     fetchData();
   }, [billType]);
+
+  useEffect(() => {
+    if (loading || !highlightedBillId) return;
+
+    const row = rowRefs.current[highlightedBillId];
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    const timeoutId = setTimeout(() => setHighlightedBillId(null), 4000);
+    return () => clearTimeout(timeoutId);
+  }, [loading, highlightedBillId, selectedMonthKey]);
 
   const fetchData = async () => {
     try {
@@ -486,7 +507,14 @@ export default function BillsPage() {
                     filteredRows.map(({ bill, occurrence }) => (
                       <tr
                         key={`${bill.id}-${occurrence.monthKey}`}
-                        className="hover:bg-purple-50 transition-colors"
+                        ref={(el) => {
+                          rowRefs.current[bill.id] = el;
+                        }}
+                        className={`transition-colors ${
+                          highlightedBillId === bill.id
+                            ? "bg-yellow-100 hover:bg-yellow-100 ring-2 ring-inset ring-yellow-400"
+                            : "hover:bg-purple-50"
+                        }`}
                         data-testid={`bill-row-${bill.id}-${occurrence.monthKey}`}
                       >
                         <td className="px-6 py-4">
