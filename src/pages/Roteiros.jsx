@@ -20,11 +20,16 @@ export function Roteiros() {
   const isGestorRoteiro =
     isAdmin || usuario?.role === "GERENCIADOR";
   // Rota cujo funcionário responsável tem role ABASTECEDOR: sem veículo e
-  // sem botão de finalizar/desfinalizar (o backend já expõe esse flag por
-  // roteiro, então não precisamos replicar a checagem de role aqui).
+  // sem botão de finalizar/desfinalizar. Prioriza o flag pronto por rota
+  // vindo do backend, mas também cai para o role do próprio usuário logado
+  // quando ele é o responsável pela rota — assim, mudar o role de alguém
+  // para ABASTECEDOR já reflete nas rotas existentes dessa pessoa na hora.
   const roteiroEhDeAbastecedor = (roteiroItem) =>
     roteiroItem?.funcionarioAbastecedor === true ||
-    roteiroItem?.funcionario?.role === "ABASTECEDOR";
+    roteiroItem?.funcionario?.role === "ABASTECEDOR" ||
+    (usuario?.role === "ABASTECEDOR" &&
+      Boolean(usuario?.id) &&
+      String(roteiroItem?.funcionarioId || "") === String(usuario.id));
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
   const ORCAMENTO_SEMANAL_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([

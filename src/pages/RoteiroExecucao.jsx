@@ -638,9 +638,18 @@ export default function RoteiroExecucao() {
     .trim()
     .toUpperCase();
   // Rota com funcionário responsável de role ABASTECEDOR: sem veículo, sem
-  // gastos e sem finalização manual (o backend expõe esse flag pronto para
-  // não precisarmos replicar a checagem de role aqui).
-  const isFuncionarioAbastecedor = roteiro?.funcionarioAbastecedor === true;
+  // gastos e sem finalização manual. Prioriza o flag pronto que o backend
+  // calcula por rota (`funcionarioAbastecedor`/`funcionario.role`), mas cai
+  // para o role do usuário logado quando ele é o próprio responsável pela
+  // rota — assim, se o admin mudar o role de alguém para ABASTECEDOR, a
+  // rota já existente dessa pessoa vira simplificada na hora, mesmo que o
+  // backend ainda não tenha recalculado/retornado o flag por algum motivo.
+  const isFuncionarioAbastecedor =
+    roteiro?.funcionarioAbastecedor === true ||
+    roteiro?.funcionario?.role === "ABASTECEDOR" ||
+    (roleUsuarioNormalizado === "ABASTECEDOR" &&
+      Boolean(usuario?.id) &&
+      String(roteiro?.funcionarioId || "") === String(usuario?.id));
   const usuarioPodeEditarMovimentacaoNaRota =
     perfisPermitidosEditarMovimentacaoRota.has(roleUsuarioNormalizado) ||
     roleUsuarioNormalizado.includes("FUNCIONARIO") ||
