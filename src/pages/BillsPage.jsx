@@ -66,8 +66,11 @@ export default function BillsPage() {
     bill: null,
   });
 
+  // Permite chegar aqui já filtrado (ex: a partir dos boxes do dashboard),
+  // pré-aplicando o filtro de status igual a como o highlight de conta
+  // funciona vindo dos avisos.
   const [filters, setFilters] = useState({
-    status: "",
+    status: location.state?.presetStatusFilter || "",
     category: "",
     city: "",
     search: "",

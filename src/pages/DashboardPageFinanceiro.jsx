@@ -22,6 +22,10 @@ import {
   isRecurringBill,
   mergeAlertsWithRecurringBills,
   sumAlertValues,
+  getNextMonthKeys,
+  getBillOccurrenceForMonth,
+  getDaysUntilDue,
+  toNumber,
 } from "../lib/financeiroRecurringBills.js";
 
 // Estilos para animação de pulsar
@@ -66,6 +70,9 @@ export default function DashboardPage() {
   const [showModal, setShowModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [bills, setBills] = useState([]);
+  // Ao clicar num box de resumo, pergunta em qual aba (empresarial ou
+  // particular) o usuário quer ver as contas daquele grupo, já no mês atual.
+  const [typeChooser, setTypeChooser] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -170,6 +177,58 @@ export default function DashboardPage() {
           "Erro ao marcar conta recorrente como paga",
       );
     }
+  };
+
+  // Recalcula os 4 boxes do topo com base nas ocorrências do mês atual
+  // (empresariais + particulares juntas), em vez do agregado "geral" que o
+  // backend manda em `report` — assim eles ficam de fato conectados ao
+  // mesmo sistema de mês usado em Contas e Avisos.
+  const currentMonth = getNextMonthKeys(1)[0];
+  const currentMonthKey = currentMonth?.key || "";
+  const currentMonthOccurrences = bills
+    .map((bill) => {
+      const occurrence = getBillOccurrenceForMonth(
+        bill,
+        currentMonthKey,
+        currentMonthKey,
+      );
+      return occurrence ? { bill, occurrence } : null;
+    })
+    .filter(Boolean);
+
+  const sumOccurrenceValues = (items) =>
+    items.reduce(
+      (total, { bill }) => total + (toNumber(bill.value ?? bill.amount) || 0),
+      0,
+    );
+
+  const monthPaidOccurrences = currentMonthOccurrences.filter(
+    ({ occurrence }) => occurrence.status === "paid",
+  );
+  const monthOpenOccurrences = currentMonthOccurrences.filter(
+    ({ occurrence }) => occurrence.status !== "paid",
+  );
+  const monthOverdueOccurrences = monthOpenOccurrences.filter(
+    ({ occurrence }) => getDaysUntilDue(occurrence.dueDate) < 0,
+  );
+  const monthDueSoonOccurrences = monthOpenOccurrences.filter(({ occurrence }) => {
+    const days = getDaysUntilDue(occurrence.dueDate);
+    return days >= 0 && days <= 7;
+  });
+
+  const monthTotalPaid = sumOccurrenceValues(monthPaidOccurrences);
+  const monthTotalOpen = sumOccurrenceValues(monthOpenOccurrences);
+
+  const handleStatsCardClick = (presetStatusFilter, label) => {
+    setTypeChooser({ presetStatusFilter, label });
+  };
+
+  const navigateToBillsWithType = (billTypeChoice) => {
+    if (!typeChooser) return;
+    navigate(`/financeiro/contas/${billTypeChoice}`, {
+      state: { presetStatusFilter: typeChooser.presetStatusFilter },
+    });
+    setTypeChooser(null);
   };
 
   const urgentAlerts = alerts.filter(
@@ -369,10 +428,24 @@ export default function DashboardPage() {
             </div>
           )}
 
+          <p className="text-xs text-gray-400 mb-2">
+            Os 4 boxes abaixo mostram {currentMonth?.label || "o mês atual"}{" "}
+            (empresariais + particulares) e levam direto para a conta em
+            Contas.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div
-              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover cursor-pointer"
               data-testid="card-total-paid"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleStatsCardClick("paid", "Pagas")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleStatsCardClick("paid", "Pagas");
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-green-100 rounded-lg">
@@ -380,16 +453,29 @@ export default function DashboardPage() {
                 </div>
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">
-                Total Pago
+                Total Pago no Mês
               </h3>
               <p className="text-3xl font-bold text-gray-800">
-                {formatCurrency(report?.total_paid)}
+                {formatCurrency(monthTotalPaid)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {monthPaidOccurrences.length}{" "}
+                {monthPaidOccurrences.length === 1 ? "conta" : "contas"}
               </p>
             </div>
 
             <div
-              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover cursor-pointer"
               data-testid="card-total-open"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleStatsCardClick("open", "Em Aberto")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleStatsCardClick("open", "Em Aberto");
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-red-100 rounded-lg">
@@ -397,16 +483,29 @@ export default function DashboardPage() {
                 </div>
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">
-                Total em Aberto
+                Em Aberto no Mês
               </h3>
               <p className="text-3xl font-bold text-gray-800">
-                {formatCurrency(report?.total_open)}
+                {formatCurrency(monthTotalOpen)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {monthOpenOccurrences.length}{" "}
+                {monthOpenOccurrences.length === 1 ? "conta" : "contas"}
               </p>
             </div>
 
             <div
-              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover cursor-pointer"
               data-testid="card-upcoming"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleStatsCardClick("open", "Próximos 7 Dias")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleStatsCardClick("open", "Próximos 7 Dias");
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-yellow-100 rounded-lg">
@@ -417,18 +516,27 @@ export default function DashboardPage() {
                 Próximos 7 Dias
               </h3>
               <p className="text-3xl font-bold text-gray-800">
-                {report?.upcoming_bills}
+                {monthDueSoonOccurrences.length}
               </p>
             </div>
 
             <div
-              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover"
+              className="bg-white rounded-xl shadow-md p-6 border border-purple-100 card-hover cursor-pointer"
               data-testid="card-overdue"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleStatsCardClick("open", "Atrasadas")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleStatsCardClick("open", "Atrasadas");
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-purple-100 rounded-lg">
                   <AlertTriangle
-                    className={`text-purple-600 ${report?.overdue_bills > 0 ? "animate-pulse-scale" : ""}`}
+                    className={`text-purple-600 ${monthOverdueOccurrences.length > 0 ? "animate-pulse-scale" : ""}`}
                     size={24}
                   />
                 </div>
@@ -437,7 +545,7 @@ export default function DashboardPage() {
                 Atrasadas
               </h3>
               <p className="text-3xl font-bold text-gray-800">
-                {report?.overdue_bills}
+                {monthOverdueOccurrences.length}
               </p>
             </div>
           </div>
@@ -602,6 +710,46 @@ export default function DashboardPage() {
           }}
           categories={categories}
         />
+      )}
+
+      {typeChooser && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setTypeChooser(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-gray-800 mb-1">
+              {typeChooser.label}
+            </h2>
+            <p className="text-sm text-gray-600 mb-5">
+              Ver essas contas em qual aba?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => navigateToBillsWithType("company")}
+                className="bg-purple-600 hover:bg-purple-700 justify-start"
+              >
+                🏢 Contas Empresariais
+              </Button>
+              <Button
+                onClick={() => navigateToBillsWithType("personal")}
+                className="bg-blue-600 hover:bg-blue-700 justify-start"
+              >
+                👤 Contas Particulares
+              </Button>
+              <Button
+                onClick={() => setTypeChooser(null)}
+                variant="outline"
+                className="justify-start"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
