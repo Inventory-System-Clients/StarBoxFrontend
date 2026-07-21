@@ -105,7 +105,11 @@ export function Produtos() {
       icon: "📁",
       gradient: "bg-gradient-to-br from-blue-500 to-blue-600",
     },
-    {
+  ];
+
+  // Abastecedor não deve ver valores/preços na tela de produtos.
+  if (usuario?.role !== "ABASTECEDOR") {
+    stats.push({
       label: "Valor Médio",
       value:
         produtos.length > 0
@@ -116,8 +120,8 @@ export function Produtos() {
           : "R$ 0,00",
       icon: "💰",
       gradient: "bg-gradient-to-br from-yellow-500 to-yellow-600",
-    },
-  ];
+    });
+  }
 
   const columns = [
     {
@@ -223,6 +227,18 @@ export function Produtos() {
     },
   ];
 
+  // Abastecedor não deve ver preço, jogadas nem estoque na tabela de produtos.
+  const colunasOcultasParaAbastecedor = new Set([
+    "preco",
+    "jogadas_2_50",
+    "jogadas_5_00",
+    "estoque",
+  ]);
+  const colunasVisiveis =
+    usuario?.role === "ABASTECEDOR"
+      ? columns.filter((coluna) => !colunasOcultasParaAbastecedor.has(coluna.key))
+      : columns;
+
   if (loading) return <PageLoader />;
 
   return (
@@ -295,7 +311,7 @@ export function Produtos() {
           </div>
 
           {produtosFiltrados.length > 0 ? (
-            <DataTable headers={columns} data={produtosFiltrados} />
+            <DataTable headers={colunasVisiveis} data={produtosFiltrados} />
           ) : (
             <EmptyState
               icon="🧸"
