@@ -18,7 +18,6 @@ import Footer from "../components/Footer.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   buildRecurringBillOccurrences,
-  buildRecurringNextOpenUpdatePayload,
   isRecurringBill,
   mergeAlertsWithRecurringBills,
   sumAlertValues,
@@ -161,22 +160,11 @@ export default function DashboardPage() {
     }
   };
 
-  const handleRecurringStatusChange = async (bill) => {
-    try {
-      await billsAPI.update(
-        bill.id,
-        buildRecurringNextOpenUpdatePayload(bill),
-      );
-      await billsAPI.updateStatus(bill.id, "open");
-
-      toast.success("Conta recorrente marcada como paga!");
-      await fetchData(true);
-    } catch (error) {
-      toast.error(
-        error.response?.data?.detail ||
-          "Erro ao marcar conta recorrente como paga",
-      );
-    }
+  const handleViewRecurringBill = (bill) => {
+    const type = bill.bill_type === "company" ? "company" : "personal";
+    navigate(`/financeiro/contas/${type}`, {
+      state: { highlightBillId: bill.id },
+    });
   };
 
   // Recalcula os 4 boxes do topo com base nas ocorrências do mês atual
@@ -292,14 +280,13 @@ export default function DashboardPage() {
                 {formatCurrency(Number(bill.value ?? bill.amount) || 0)}
               </p>
             </div>
-            {bill.status !== "paid" && (
-              <Button
-                onClick={() => handleRecurringStatusChange(bill)}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                Marcar como paga
-              </Button>
-            )}
+            <Button
+              onClick={() => handleViewRecurringBill(bill)}
+              variant="outline"
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              Ver detalhes da conta
+            </Button>
           </div>
         ))}
       </div>
