@@ -106,6 +106,7 @@ export function Usuarios() {
                 <option value="FUNCIONARIO_TODAS_LOJAS">
                   Funcionário (todas as lojas)
                 </option>
+                <option value="ABASTECEDOR">Abastecedor</option>
                 <option value="CONTROLADOR_ESTOQUE">
                   Controlador de Estoque
                 </option>
@@ -177,7 +178,9 @@ export function Usuarios() {
                                 ? "bg-amber-100 text-amber-800"
                                 : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
                                   ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-blue-100 text-blue-800"
+                                  : usuario.role === "ABASTECEDOR"
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-blue-100 text-blue-800"
                         }`}
                       >
                         {usuario.role === "ADMIN"
@@ -188,7 +191,9 @@ export function Usuarios() {
                               ? "Gerenciador"
                               : usuario.role === "FUNCIONARIO_TODAS_LOJAS"
                                 ? "Funcionário (todos os pontos)"
-                                : "Funcionário Abastecedor"}
+                                : usuario.role === "ABASTECEDOR"
+                                  ? "Abastecedor"
+                                  : "Funcionário Abastecedor"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

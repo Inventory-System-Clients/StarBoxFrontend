@@ -19,10 +19,14 @@ import ModalEditarMovimentacao from "../components/ModalEditarMovimentacao";
 export function Movimentacoes() {
   const [modalRegistrarDinheiro, setModalRegistrarDinheiro] = useState(false);
   const { usuario } = useAuth();
-  const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
+  const isFuncionarioAbastecedor = [
+    "FUNCIONARIO",
+    "ABASTECEDOR",
+  ].includes(usuario?.role);
   const isPerfilFuncionario = [
     "FUNCIONARIO",
     "FUNCIONARIO_TODAS_LOJAS",
+    "ABASTECEDOR",
   ].includes(usuario?.role);
 
   // --- ESTADOS ---

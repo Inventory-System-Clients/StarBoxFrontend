@@ -277,7 +277,8 @@ export function Dashboard() {
   // Faz o reload só depois que o modal sumiu
   // (removido reloadAfterModal/useEffect pois reload é imediato)
 
-  const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isFuncionario =
+    usuario?.role === "FUNCIONARIO" || usuario?.role === "ABASTECEDOR";
   const isAdminLike =
     usuario?.role === "ADMIN" ||
     usuario?.role === "GERENCIADOR" ||
@@ -781,7 +782,10 @@ export function Dashboard() {
     async (lojasData) => {
       let lojasParaAnalise = Array.isArray(lojasData) ? lojasData : [];
 
-      if (lojasParaAnalise.length === 0 && usuario?.role === "FUNCIONARIO") {
+      if (
+        lojasParaAnalise.length === 0 &&
+        (usuario?.role === "FUNCIONARIO" || usuario?.role === "ABASTECEDOR")
+      ) {
         try {
           const lojasRes = await api.get("/lojas");
           lojasParaAnalise = Array.isArray(lojasRes.data) ? lojasRes.data : [];
@@ -926,9 +930,9 @@ export function Dashboard() {
         usuario?.role === "GERENCIADOR" ||
         usuario?.role === "GERENTE";
       const bloquearVisualizacaoLojasEMaquinas =
-        usuario?.role === "FUNCIONARIO";
+        usuario?.role === "FUNCIONARIO" || usuario?.role === "ABASTECEDOR";
 
-      // Para FUNCIONARIO, bloqueia o carregamento de lojas e máquinas.
+      // Para FUNCIONARIO/ABASTECEDOR, bloqueia o carregamento de lojas e máquinas.
       const requisicoes = [
         bloquearVisualizacaoLojasEMaquinas
           ? Promise.resolve({ data: [] })

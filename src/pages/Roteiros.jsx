@@ -19,7 +19,12 @@ export function Roteiros() {
   const isAdmin = usuario?.role === "ADMIN";
   const isGestorRoteiro =
     isAdmin || usuario?.role === "GERENCIADOR";
-  const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
+  // Rota cujo funcionário responsável tem role ABASTECEDOR: sem veículo e
+  // sem botão de finalizar/desfinalizar (o backend já expõe esse flag por
+  // roteiro, então não precisamos replicar a checagem de role aqui).
+  const roteiroEhDeAbastecedor = (roteiroItem) =>
+    roteiroItem?.funcionarioAbastecedor === true ||
+    roteiroItem?.funcionario?.role === "ABASTECEDOR";
   const LIMITE_OBSERVACAO_ROTEIRO = 1000;
   const ORCAMENTO_SEMANAL_PADRAO = 2000;
   const STATUS_ROTEIRO_FINALIZADO = new Set([
@@ -402,7 +407,7 @@ export function Roteiros() {
   };
 
   const usuarioPodeSerResponsavelRoteiro = (item) =>
-    ["ADMIN", "FUNCIONARIO", "FUNCIONARIO_TODAS_LOJAS"].includes(
+    ["ADMIN", "FUNCIONARIO", "FUNCIONARIO_TODAS_LOJAS", "ABASTECEDOR"].includes(
       String(item?.role || "")
         .trim()
         .toUpperCase(),
@@ -1692,7 +1697,7 @@ export function Roteiros() {
                 </span>
               </div>
 
-              {!isFuncionarioAbastecedor && (
+              {!roteiroEhDeAbastecedor(roteiro) && (
                 <p className="text-xs text-gray-500 mb-3">
                   🚗 {getVeiculoResumoRoteiro(roteiro)}
                 </p>
@@ -1774,7 +1779,7 @@ export function Roteiros() {
               </div>
 
               {/* Seção de Veículo */}
-              {!isFuncionarioAbastecedor && (
+              {!roteiroEhDeAbastecedor(roteiro) && (
                 <div className="mb-4">
                   <label className="text-xs font-bold text-gray-400 block mb-1">
                     VEÍCULO
@@ -2083,7 +2088,7 @@ export function Roteiros() {
                             ? "Continuar rota"
                             : "Começar Rota"}
                     </button>
-                    {roteiro.funcionarioId && !isFuncionarioAbastecedor && (
+                    {roteiro.funcionarioId && !roteiroEhDeAbastecedor(roteiro) && (
                       <button
                         onClick={() => abrirModalFinalizacao(roteiro)}
                         disabled={
@@ -2122,15 +2127,17 @@ export function Roteiros() {
                     >
                       Abrir Rota
                     </button>
-                    <button
-                      onClick={() => handleDesfinalizarRoteiro(roteiro)}
-                      disabled={Boolean(desfinalizandoRoteiros[roteiro.id])}
-                      className="bg-yellow-500 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-yellow-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {desfinalizandoRoteiros[roteiro.id]
-                        ? "Desfinalizando..."
-                        : "Desfinalizar"}
-                    </button>
+                    {!roteiroEhDeAbastecedor(roteiro) && (
+                      <button
+                        onClick={() => handleDesfinalizarRoteiro(roteiro)}
+                        disabled={Boolean(desfinalizandoRoteiros[roteiro.id])}
+                        className="bg-yellow-500 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-yellow-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {desfinalizandoRoteiros[roteiro.id]
+                          ? "Desfinalizando..."
+                          : "Desfinalizar"}
+                      </button>
+                    )}
                     {isGestorRoteiro && (
                       <button
                         onClick={() => handleExcluirRoteiro(roteiro)}

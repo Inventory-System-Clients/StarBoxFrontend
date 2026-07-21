@@ -13,10 +13,14 @@ export default function MovimentacaoMaquina() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === "ADMIN";
-  const isFuncionarioAbastecedor = usuario?.role === "FUNCIONARIO";
+  const isFuncionarioAbastecedor = [
+    "FUNCIONARIO",
+    "ABASTECEDOR",
+  ].includes(usuario?.role);
   const isPerfilFuncionario = [
     "FUNCIONARIO",
     "FUNCIONARIO_TODAS_LOJAS",
+    "ABASTECEDOR",
   ].includes(usuario?.role);
   const podeVerCamposFinanceirosEObservacao = !isFuncionarioAbastecedor;
 

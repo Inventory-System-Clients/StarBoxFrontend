@@ -9,7 +9,8 @@ export default function PecasPage() {
   const { usuario } = useAuth();
   const isFuncionarioComum =
     usuario?.role === "FUNCIONARIO" ||
-    usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
+    usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+    usuario?.role === "ABASTECEDOR";
   const [pecas, setPecas] = useState([]);
   const [pecaEditando, setPecaEditando] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -351,6 +352,7 @@ export default function PecasPage() {
         {/* Carrinho do usuário */}
         {(usuario?.role === "FUNCIONARIO" ||
           usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+          usuario?.role === "ABASTECEDOR" ||
           usuario?.role === "CONTROLADOR_ESTOQUE" ||
           usuario?.role === "MANUTENCAO" ||
           usuario?.role === "ADMIN" ||

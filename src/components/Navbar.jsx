@@ -8,10 +8,12 @@ export default function Navbar() {
   const [useCompactMenu, setUseCompactMenu] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const isFuncionario = usuario?.role === "FUNCIONARIO";
+  const isFuncionario =
+    usuario?.role === "FUNCIONARIO" || usuario?.role === "ABASTECEDOR";
   const isPerfilFuncionario =
     usuario?.role === "FUNCIONARIO" ||
-    usuario?.role === "FUNCIONARIO_TODAS_LOJAS";
+    usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+    usuario?.role === "ABASTECEDOR";
   const isAdminLike =
     usuario?.role === "ADMIN" || usuario?.role === "GERENCIADOR";
 
@@ -107,6 +109,7 @@ export default function Navbar() {
                 {(usuario?.role === "ADMIN" ||
                   usuario?.role === "FUNCIONARIO" ||
                   usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                  usuario?.role === "ABASTECEDOR" ||
                   usuario?.role === "CONTROLADOR_ESTOQUE" ||
                   usuario?.role === "MANUTENCAO" ||
                   usuario?.role === "GERENCIADOR") && (
@@ -116,7 +119,8 @@ export default function Navbar() {
                 )}
 
                 {(usuario?.role === "FUNCIONARIO" ||
-                  usuario?.role === "FUNCIONARIO_TODAS_LOJAS") && (
+                  usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+                  usuario?.role === "ABASTECEDOR") && (
                   <NavLink
                     to="/dashboard/pecas-defeituosas"
                     active={isActive("/dashboard/pecas-defeituosas")}
@@ -179,7 +183,9 @@ export default function Navbar() {
                         ? "👤 Funcionário (todos os pontos)"
                         : usuario?.role === "MANUTENCAO"
                           ? "🛠️ Manutenção"
-                          : "👤 Funcionário Abastecedor"}
+                          : usuario?.role === "ABASTECEDOR"
+                            ? "🚚 Abastecedor"
+                            : "👤 Funcionário Abastecedor"}
               </div>
             </div>
 
@@ -238,6 +244,7 @@ export default function Navbar() {
             {(usuario?.role === "ADMIN" ||
               usuario?.role === "FUNCIONARIO" ||
               usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+              usuario?.role === "ABASTECEDOR" ||
               usuario?.role === "CONTROLADOR_ESTOQUE" ||
               usuario?.role === "MANUTENCAO" ||
               usuario?.role === "GERENCIADOR") && (
@@ -250,7 +257,8 @@ export default function Navbar() {
               </MobileNavLink>
             )}
             {(usuario?.role === "FUNCIONARIO" ||
-              usuario?.role === "FUNCIONARIO_TODAS_LOJAS") && (
+              usuario?.role === "FUNCIONARIO_TODAS_LOJAS" ||
+              usuario?.role === "ABASTECEDOR") && (
               <MobileNavLink
                 to="/dashboard/pecas-defeituosas"
                 active={isActive("/dashboard/pecas-defeituosas")}

@@ -103,7 +103,7 @@ export function UsuarioForm() {
     }
 
     if (
-      formData.role === "FUNCIONARIO" &&
+      (formData.role === "FUNCIONARIO" || formData.role === "ABASTECEDOR") &&
       formData.lojasPermitidas.length === 0
     ) {
       setError("Funcionários devem ter acesso a pelo menos um ponto");
@@ -120,6 +120,7 @@ export function UsuarioForm() {
         role: formData.role,
         lojasPermitidas:
           formData.role === "FUNCIONARIO" ||
+          formData.role === "ABASTECEDOR" ||
           formData.role === "CONTROLADOR_ESTOQUE"
             ? formData.lojasPermitidas
             : [],
@@ -294,6 +295,7 @@ export function UsuarioForm() {
                   <option value="FUNCIONARIO_TODAS_LOJAS">
                     Funcionário (todos os pontos)
                   </option>
+                  <option value="ABASTECEDOR">Abastecedor</option>
                   <option value="CONTROLADOR_ESTOQUE">
                     Controlador de Estoque
                   </option>
@@ -309,13 +311,16 @@ export function UsuarioForm() {
                         ? "Gerenciador possui perfil administrativo operacional, mas sem acesso a financeiro, relatórios, fluxo de caixa e valores de faturamento de máquina."
                         : formData.role === "FUNCIONARIO_TODAS_LOJAS"
                           ? "Funcionários deste perfil visualizam todos os pontos, mas seguem com acesso operacional de funcionário."
+                          : formData.role === "ABASTECEDOR"
+                            ? "Abastecedor executa rotas simplificadas: sem veículo, sem gastos e sem finalização manual (a rota reseta sozinha toda semana)."
                             : "Funcionário Abastecedor tem acesso operacional limitado aos pontos autorizados"}
                 </p>
               </div>
             </div>
 
-            {/* Pontos Permitidos (para Funcionários e Controlador de Estoque) */}
+            {/* Pontos Permitidos (para Funcionários, Abastecedores e Controlador de Estoque) */}
             {(formData.role === "FUNCIONARIO" ||
+              formData.role === "ABASTECEDOR" ||
               formData.role === "CONTROLADOR_ESTOQUE") && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">

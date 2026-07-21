@@ -94,7 +94,7 @@ function AppRoutes() {
       <Route
         path="/veiculos"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <Veiculos />
           </PrivateRoute>
         }
@@ -102,7 +102,7 @@ function AppRoutes() {
       <Route
         path="/veiculos/revisoes-pendentes"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <RevisoesPendentes />
           </PrivateRoute>
         }
@@ -139,7 +139,11 @@ function AppRoutes() {
         path="/dashboard/pecas-defeituosas"
         element={
           <PrivateRoute
-            allowedRoles={["FUNCIONARIO", "FUNCIONARIO_TODAS_LOJAS"]}
+            allowedRoles={[
+              "FUNCIONARIO",
+              "FUNCIONARIO_TODAS_LOJAS",
+              "ABASTECEDOR",
+            ]}
           >
             <PecasDefeituosasDashboard />
           </PrivateRoute>
@@ -180,7 +184,7 @@ function AppRoutes() {
       <Route
         path="/lojas"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <Lojas />
           </PrivateRoute>
         }
@@ -188,7 +192,7 @@ function AppRoutes() {
       <Route
         path="/lojas/:id"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <LojaDetalhes />
           </PrivateRoute>
         }
@@ -196,7 +200,7 @@ function AppRoutes() {
       <Route
         path="/lojas/nova"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <LojaForm />
           </PrivateRoute>
         }
@@ -204,7 +208,7 @@ function AppRoutes() {
       <Route
         path="/lojas/:id/editar"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <LojaForm />
           </PrivateRoute>
         }
@@ -220,7 +224,7 @@ function AppRoutes() {
       <Route
         path="/maquinas"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <Maquinas />
           </PrivateRoute>
         }
@@ -228,7 +232,7 @@ function AppRoutes() {
       <Route
         path="/maquinas/nova"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <MaquinaForm />
           </PrivateRoute>
         }
@@ -236,7 +240,7 @@ function AppRoutes() {
       <Route
         path="/maquinas/:id/editar"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <MaquinaForm />
           </PrivateRoute>
         }
@@ -244,7 +248,7 @@ function AppRoutes() {
       <Route
         path="/maquinas/:id"
         element={
-          <PrivateRoute deniedRoles={["FUNCIONARIO"]}>
+          <PrivateRoute deniedRoles={["FUNCIONARIO", "ABASTECEDOR"]}>
             <MaquinaDetalhes />
           </PrivateRoute>
         }
@@ -315,6 +319,7 @@ function AppRoutes() {
               "GERENCIADOR",
               "FUNCIONARIO",
               "FUNCIONARIO_TODAS_LOJAS",
+              "ABASTECEDOR",
               "CONTROLADOR_ESTOQUE",
             ]}
           >

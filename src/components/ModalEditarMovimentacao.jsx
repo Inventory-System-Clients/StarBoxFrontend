@@ -31,7 +31,8 @@ export default function ModalEditarMovimentacao({
   bloquearDataColeta = false,
 }) {
   const { usuario } = useAuth();
-  const ocultarCamposFinanceirosEObservacoes = usuario?.role === "FUNCIONARIO";
+  const ocultarCamposFinanceirosEObservacoes =
+    usuario?.role === "FUNCIONARIO" || usuario?.role === "ABASTECEDOR";
   const podeEditarTotalPre = usuario?.role === "ADMIN";
   const [loading, setLoading] = useState(false);
   const [produtos, setProdutos] = useState([]);

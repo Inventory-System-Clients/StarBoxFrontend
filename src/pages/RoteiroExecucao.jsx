@@ -637,7 +637,10 @@ export default function RoteiroExecucao() {
   const roleUsuarioNormalizado = String(usuario?.role || "")
     .trim()
     .toUpperCase();
-  const isFuncionarioAbastecedor = roleUsuarioNormalizado === "FUNCIONARIO";
+  // Rota com funcionário responsável de role ABASTECEDOR: sem veículo, sem
+  // gastos e sem finalização manual (o backend expõe esse flag pronto para
+  // não precisarmos replicar a checagem de role aqui).
+  const isFuncionarioAbastecedor = roteiro?.funcionarioAbastecedor === true;
   const usuarioPodeEditarMovimentacaoNaRota =
     perfisPermitidosEditarMovimentacaoRota.has(roleUsuarioNormalizado) ||
     roleUsuarioNormalizado.includes("FUNCIONARIO") ||
@@ -3266,7 +3269,7 @@ export default function RoteiroExecucao() {
                   Total gasto na rota: {Number(resumoExecucaoBackend.totalGastoRota || 0)} produtos
                 </span>
               </div>
-              {obterTextoResumoParaCompartilhar() && (
+              {!isFuncionarioAbastecedor && obterTextoResumoParaCompartilhar() && (
                 <div>
                   <p className="font-semibold mb-1">Texto do resumo (inclui KM):</p>
                   <pre className="whitespace-pre-wrap rounded-md border border-violet-200 bg-white/70 p-2 text-[11px]">
@@ -3788,40 +3791,44 @@ export default function RoteiroExecucao() {
                 Finalizar Rota
               </button>
             )}
-          <button
-            className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
-              roteiroEstaFinalizado(roteiro.status) && !enviandoResumoWhatsapp
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : "bg-emerald-300 cursor-not-allowed"
-            }`}
-            onClick={enviarResumoWhatsapp}
-            disabled={
-              !roteiroEstaFinalizado(roteiro.status) || enviandoResumoWhatsapp
-            }
-            title={
-              roteiroEstaFinalizado(roteiro.status)
-                ? ""
-                : "Finalize a rota para enviar o resumo no WhatsApp"
-            }
-          >
-            {enviandoResumoWhatsapp ? "Enviando Whats..." : "Enviar resumo Whats"}
-          </button>
-          <button
-            className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
-              roteiroEstaFinalizado(roteiro.status) && !copiandoResumo
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-300 cursor-not-allowed"
-            }`}
-            onClick={copiarResumoFinalizacao}
-            disabled={!roteiroEstaFinalizado(roteiro.status) || copiandoResumo}
-            title={
-              roteiroEstaFinalizado(roteiro.status)
-                ? ""
-                : "Finalize a rota para copiar o resumo"
-            }
-          >
-            {copiandoResumo ? "Copiando..." : "Copiar resumo"}
-          </button>
+          {!isFuncionarioAbastecedor && (
+            <button
+              className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
+                roteiroEstaFinalizado(roteiro.status) && !enviandoResumoWhatsapp
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-emerald-300 cursor-not-allowed"
+              }`}
+              onClick={enviarResumoWhatsapp}
+              disabled={
+                !roteiroEstaFinalizado(roteiro.status) || enviandoResumoWhatsapp
+              }
+              title={
+                roteiroEstaFinalizado(roteiro.status)
+                  ? ""
+                  : "Finalize a rota para enviar o resumo no WhatsApp"
+              }
+            >
+              {enviandoResumoWhatsapp ? "Enviando Whats..." : "Enviar resumo Whats"}
+            </button>
+          )}
+          {!isFuncionarioAbastecedor && (
+            <button
+              className={`w-full sm:w-auto py-2 px-6 rounded-lg font-bold text-white ${
+                roteiroEstaFinalizado(roteiro.status) && !copiandoResumo
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-300 cursor-not-allowed"
+              }`}
+              onClick={copiarResumoFinalizacao}
+              disabled={!roteiroEstaFinalizado(roteiro.status) || copiandoResumo}
+              title={
+                roteiroEstaFinalizado(roteiro.status)
+                  ? ""
+                  : "Finalize a rota para copiar o resumo"
+              }
+            >
+              {copiandoResumo ? "Copiando..." : "Copiar resumo"}
+            </button>
+          )}
           <button
             className="w-full sm:w-auto bg-gray-200 text-gray-700 py-2 px-6 rounded-lg font-bold"
             onClick={() => navigate("/roteiros", { replace: true })}
