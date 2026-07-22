@@ -55,6 +55,14 @@ export default function MovimentacaoMaquina() {
   const [alertaDivergencia, setAlertaDivergencia] = useState(null);
   const [isPrimeiraMovimentacao, setIsPrimeiraMovimentacao] = useState(false);
   const [ultimaMovimentacaoData, setUltimaMovimentacaoData] = useState(null);
+  // Data da última movimentação que realmente leu os contadores (in/out) —
+  // usada só para o cálculo de "Cobrado com X dias", que não deve contar
+  // abastecimentos extras (não mexem em contador) como se fossem a visita
+  // anterior da máquina.
+  const [
+    ultimaMovimentacaoComContadoresData,
+    setUltimaMovimentacaoComContadoresData,
+  ] = useState(null);
   const [ultimaMovimentacao, setUltimaMovimentacao] = useState(null);
   const [ultimoProdutoAbastecidoId, setUltimoProdutoAbastecidoId] = useState("");
   const [modalTrocaProduto, setModalTrocaProduto] = useState({
@@ -241,6 +249,28 @@ export default function MovimentacaoMaquina() {
     );
   };
 
+  // Movimentações de abastecimento extra (entre outras) não alteram os
+  // contadores — só contam como "última leitura" para o "Cobrado com X
+  // dias" as que realmente trazem contador de entrada E de saída.
+  const movimentacaoTemContadores = (movimentacao) => {
+    if (!movimentacao) return false;
+
+    const contadorInPresente =
+      toNumero(
+        movimentacao?.contadorIn ??
+          movimentacao?.contadorInDigital ??
+          movimentacao?.contadorEntrada,
+      ) !== null;
+    const contadorOutPresente =
+      toNumero(
+        movimentacao?.contadorOut ??
+          movimentacao?.contadorOutDigital ??
+          movimentacao?.contadorSaida,
+      ) !== null;
+
+    return contadorInPresente && contadorOutPresente;
+  };
+
   const obterContadorOutAtualDigitado = (dadosForm) => {
     const camposContadorAtivo = obterCamposContadorAtivo(dadosForm);
 
@@ -405,6 +435,17 @@ export default function MovimentacaoMaquina() {
           null;
 
         setUltimaMovimentacaoData(dataUltimaMovimentacao);
+
+        const ultimaMovimentacaoComContadores = movimentacoesOrdenadas.find(
+          movimentacaoTemContadores,
+        );
+        setUltimaMovimentacaoComContadoresData(
+          ultimaMovimentacaoComContadores?.dataColeta ||
+            ultimaMovimentacaoComContadores?.createdAt ||
+            ultimaMovimentacaoComContadores?.dataMovimentacao ||
+            ultimaMovimentacaoComContadores?.data ||
+            null,
+        );
         const capacidadePadrao = Number(
           maqRes.data?.capacidadePadrao ?? maqRes.data?.capacidade ?? 0,
         );
@@ -1037,11 +1078,15 @@ export default function MovimentacaoMaquina() {
     const dataUltimaMovimentacao = ultimaMovimentacaoData
       ? new Date(ultimaMovimentacaoData).toLocaleString("pt-BR")
       : "Sem movimentação anterior";
-    const diasDesdeUltimaMovimentacao = ultimaMovimentacaoData
+    // "Cobrado com X dias" precisa se basear na última movimentação com
+    // contador de entrada/saída, não na última movimentação qualquer (que
+    // pode ser um abastecimento extra, que não mexe em contador).
+    const diasDesdeUltimaMovimentacao = ultimaMovimentacaoComContadoresData
       ? Math.max(
           0,
           Math.floor(
-            (Date.now() - new Date(ultimaMovimentacaoData).getTime()) /
+            (Date.now() -
+              new Date(ultimaMovimentacaoComContadoresData).getTime()) /
               (1000 * 60 * 60 * 24),
           ),
         )
