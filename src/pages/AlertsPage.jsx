@@ -29,8 +29,12 @@ export default function AlertsPage() {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const currentMonth = useMemo(() => getNextMonthKeys(1)[0], []);
+  // Precisa da janela de 2 meses porque uma conta "próxima do vencimento"
+  // (até 3 dias) pode cair no mês seguinte quando estamos perto da virada.
+  const monthWindow = useMemo(() => getNextMonthKeys(2), []);
+  const currentMonth = monthWindow[0] || null;
   const currentMonthKey = currentMonth?.key || "";
+  const nextMonthKey = monthWindow[1]?.key || "";
 
   useEffect(() => {
     fetchBills();
@@ -79,6 +83,30 @@ export default function AlertsPage() {
     )
     .sort((a, b) => new Date(a.occurrence.dueDate) - new Date(b.occurrence.dueDate));
 
+  // Próximas do vencimento: até 3 dias pra vencer, ainda não vencidas e não
+  // pagas. Olha o mês atual e o seguinte, porque perto da virada do mês uma
+  // conta "em até 3 dias" pode já estar tecnicamente no próximo mês.
+  const upcomingBills = [currentMonthKey, nextMonthKey]
+    .filter(Boolean)
+    .flatMap((monthKey) =>
+      bills
+        .map((bill) => {
+          const occurrence = getBillOccurrenceForMonth(
+            bill,
+            monthKey,
+            currentMonthKey,
+          );
+          return occurrence ? { bill, occurrence } : null;
+        })
+        .filter(Boolean),
+    )
+    .filter(({ occurrence }) => {
+      if (occurrence.status === "paid") return false;
+      const dias = getDaysUntilDue(occurrence.dueDate);
+      return dias >= 0 && dias <= 3;
+    })
+    .sort((a, b) => new Date(a.occurrence.dueDate) - new Date(b.occurrence.dueDate));
+
   const handleOpenBill = (bill) => {
     const type = bill.bill_type === "company" ? "company" : "personal";
     navigate(`/financeiro/contas/${type}`, {
@@ -111,43 +139,62 @@ export default function AlertsPage() {
               Avisos de Vencimento
             </h1>
             <p className="text-gray-600">
-              Contas vencidas em {currentMonth?.label || "-"} que ainda não
-              foram marcadas como pagas
+              Contas vencidas em {currentMonth?.label || "-"} e contas
+              próximas do vencimento (até 3 dias)
             </p>
           </div>
 
-          <div
-            className="bg-white rounded-xl shadow-md p-6 mb-8 border-l-4 border-red-500"
-            data-testid="summary-overdue"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">
-                  Vencidas em {currentMonth?.label || "-"}
-                </p>
-                <p className="text-3xl font-bold text-red-600">
-                  {overdueBills.length}
-                </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500"
+              data-testid="summary-overdue"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Vencidas em {currentMonth?.label || "-"}
+                  </p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {overdueBills.length}
+                  </p>
+                </div>
+                <div className="p-3 bg-red-100 rounded-lg">
+                  <AlertCircle className="text-red-600" size={28} />
+                </div>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <AlertCircle className="text-red-600" size={28} />
+            </div>
+
+            <div
+              className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500"
+              data-testid="summary-upcoming"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Próximas do vencimento (até 3 dias)
+                  </p>
+                  <p className="text-3xl font-bold text-yellow-600">
+                    {upcomingBills.length}
+                  </p>
+                </div>
+                <div className="p-3 bg-yellow-100 rounded-lg">
+                  <AlertCircle className="text-yellow-600" size={28} />
+                </div>
               </div>
             </div>
           </div>
 
+          <h2 className="text-xl font-semibold text-red-700 mb-4">
+            Vencidas
+          </h2>
           {overdueBills.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-md p-12 text-center border border-purple-100">
-              <AlertCircle className="mx-auto text-green-500 mb-4" size={64} />
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                Nenhuma conta vencida este mês!
-              </h2>
+            <div className="bg-white rounded-xl shadow-md p-6 text-center border border-purple-100 mb-8">
               <p className="text-gray-600">
-                Todas as contas de {currentMonth?.label || "este mês"} estão
-                em dia ou já foram pagas.
+                Nenhuma conta vencida em {currentMonth?.label || "este mês"}.
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 mb-8">
               {overdueBills.map(({ bill, occurrence }) => (
                 <div
                   key={bill.id}
@@ -220,6 +267,96 @@ export default function AlertsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          <h2 className="text-xl font-semibold text-yellow-700 mb-4">
+            Próximas do Vencimento
+          </h2>
+          {upcomingBills.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-md p-6 text-center border border-purple-100">
+              <p className="text-gray-600">
+                Nenhuma conta com vencimento nos próximos 3 dias.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {upcomingBills.map(({ bill, occurrence }) => {
+                const dias = getDaysUntilDue(occurrence.dueDate);
+                return (
+                  <div
+                    key={bill.id}
+                    className="bg-white rounded-xl shadow-md p-6 border-2 border-yellow-200 bg-yellow-50/40 slide-in card-hover cursor-pointer"
+                    data-testid={`alert-upcoming-${bill.id}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenBill(bill)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleOpenBill(bill);
+                      }
+                    }}
+                    title="Clique para ver esta conta em Contas Empresariais/Particulares"
+                  >
+                    <div className="flex flex-wrap items-start gap-4">
+                      <div className="p-3 rounded-lg bg-yellow-100 shrink-0">
+                        <AlertCircle className="text-yellow-600" size={24} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide mb-1">
+                              Nome da Conta
+                            </p>
+                            <h3 className="text-lg font-bold text-blue-700 mb-1 wrap-break-word">
+                              {bill.name || "Conta sem nome"}
+                            </h3>
+                          </div>
+                          <span className="shrink-0 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500 text-white">
+                            {bill.bill_type === "company"
+                              ? "Empresarial"
+                              : "Particular"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 p-4 bg-white/60 rounded-lg">
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">
+                              Vencimento
+                            </p>
+                            <p className="font-semibold text-gray-800">
+                              {formatDate(occurrence.dueDate)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">
+                              Valor
+                            </p>
+                            <p className="font-semibold text-gray-800">
+                              {formatMoney(bill.value ?? bill.amount)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">
+                              Vence em
+                            </p>
+                            <p className="font-semibold text-yellow-700">
+                              {dias === 0 ? "Hoje" : `${dias} dia(s)`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ChevronRight
+                        className="text-gray-400 shrink-0 self-center"
+                        size={22}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
