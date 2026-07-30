@@ -2225,13 +2225,33 @@ export default function RoteiroExecucao() {
           state: Object.keys(proximoState).length > 0 ? proximoState : {},
         });
         // Quando voltar de uma movimentação, verificar se todas as máquinas da
-        // loja estão finalizadas. Se sim, enviar WhatsApp combinado da loja.
+        // loja estão finalizadas. Se sim, enviar WhatsApp combinado da loja —
+        // mas só automaticamente na primeira vez que o ponto fica completo.
+        // Se o ponto já estava 100% concluído antes (ex: usuário voltou numa
+        // máquina só para lançar um abastecimento extra), não reabre o
+        // WhatsApp sozinho de novo — só sinaliza a leitura atualizada, e o
+        // reenvio fica a cargo do botão manual "Enviar leitura atualizada".
         if (location.state?.origemMovimentacao) {
           const todasFinalizadas =
             loja.maquinas?.length > 0 &&
             loja.maquinas.every((m) => maquinaEstaConcluidaNoBackend(m));
           if (todasFinalizadas) {
-            enviarWhatsAppLoja(loja);
+            const jaHaviaMensagemEnviadaAntes = Boolean(
+              obterUltimaMensagemMovimentacoesWhatsAppLoja({
+                roteiroId: id,
+                usuarioId: usuario?.id,
+                lojaId: loja.id,
+              }),
+            );
+
+            if (jaHaviaMensagemEnviadaAntes) {
+              setLeiturasAtualizadasPorLoja((prev) => ({
+                ...prev,
+                [String(loja.id)]: true,
+              }));
+            } else {
+              enviarWhatsAppLoja(loja);
+            }
           }
         }
       }
